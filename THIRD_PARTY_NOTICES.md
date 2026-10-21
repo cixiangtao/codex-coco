@@ -35,3 +35,7 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 ## 固定样本题
 
 用量工具中的糖果题数量与 21 基准参考 codex-usage 的 CodexIntelligenceCheck.swift（同上 MIT 来源提交与作者）。新实现重写问题提示、结构化输出、进程隔离与统计，并独立用动态规划核对期望值，没有迁回 Swift 运行时或界面代码。
+
+## gifuct-js
+
+菜单栏 GIF 解码采用 gifuct-js 2.1.2（MIT，Copyright (c) 2015 Matt Way）及 js-binary-schema-parser 2.0.3。依赖只处理本地字节，不发起网络请求；重计算放在独立 worker。完整 gifuct-js 许可见 apps/desktop/resources/licenses/gifuct-js.txt，并随桌面资源分发。
