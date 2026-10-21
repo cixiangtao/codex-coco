@@ -1,3 +1,5 @@
+import type { WindowContext, MainPage } from "./windows";
+import type { GlanceSnapshot } from "./glance";
 import type { SaveThemeInput, SettingsSnapshot } from "./settings";
 import type {
   CancelModuleOperationInput,
@@ -8,6 +10,12 @@ import type {
 } from "./modules";
 
 export const channels = {
+  windowContext: "codex-coco:window-context",
+  openMainPage: "codex-coco:open-main-page",
+  dismissGlance: "codex-coco:dismiss-glance",
+  navigate: "codex-coco:navigate",
+  glance: "codex-coco:glance",
+  glanceChanged: "codex-coco:glance-changed",
   bootstrap: "codex-coco:bootstrap",
   saveTheme: "codex-coco:save-theme",
   resetSettings: "codex-coco:reset-settings",
@@ -37,6 +45,12 @@ export type Result<T> =
 
 /** Whitelisted bridge; never exposes raw IPC channels, events or system APIs. */
 export interface DesktopBridge {
+  windowContext(): Promise<Result<WindowContext>>;
+  openMainPage(input: { page?: MainPage }): Promise<Result<void>>;
+  dismissGlance(): Promise<Result<void>>;
+  onNavigate(listener: (page: MainPage) => void): () => void;
+  glance(): Promise<Result<GlanceSnapshot>>;
+  onGlanceChanged(listener: (snapshot: GlanceSnapshot) => void): () => void;
   ready(): void;
   modules(): Promise<Result<ModuleSnapshot[]>>;
   enableModule(input: EnableModuleInput): Promise<Result<ModuleSnapshot>>;

@@ -239,3 +239,81 @@ body {
     gap: 12px;
   }
 }
+
+.glance-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 20px;
+  gap: 16px;
+}
+.glance-toolbar,
+.glance-toolbar > div,
+.glance-item-heading,
+.glance-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.glance-toolbar h1 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.glance-toolbar > div {
+  gap: 4px;
+}
+.glance-content {
+  min-height: 0;
+  overflow: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-gutter: stable;
+}
+.glance-item {
+  padding-block: 4px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.glance-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.glance-item h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 550;
+}
+.glance-item-heading > span {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.glance-item-heading > span[data-error="true"] {
+  color: var(--destructive);
+}
+.glance-item-heading > span svg {
+  width: 14px;
+  height: 14px;
+}
+.glance-item p {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  margin-block: 8px;
+}
+.glance-item > button {
+  margin-left: -10px;
+}
+.glance-actions {
+  flex-shrink: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}

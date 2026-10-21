@@ -9,11 +9,13 @@ import { ModuleManagementPage, ModuleStatusPage } from "./pages/module-status";
 import { useThemeEditor } from "./client/theme-editor";
 
 /** Product entry: the accepted shell uses real host settings and keeps preview drafts per window. */
-export function App() {
-  const [page, setPage] = useState<PageId>("appearance");
+export function App({ initialPage }: { initialPage: PageId }) {
+  const [page, setPage] = useState<PageId>(initialPage);
   const editor = useThemeEditor();
   useEffect(() => {
+    const unsubscribe = window.codexCoco.onNavigate(setPage);
     window.codexCoco.ready();
+    return unsubscribe;
   }, []);
   return (
     <ThemeProvider preference={editor.theme}>

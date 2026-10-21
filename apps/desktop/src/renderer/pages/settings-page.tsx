@@ -158,7 +158,7 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
             <DialogHeader>
               <DialogTitle>Codex Coco</DialogTitle>
               <DialogDescription>
-                本地开发版。用量与外观业务正在建设，菜单栏速览尚未接入。
+                本地开发版。用量与外观业务正在建设，菜单栏速览已提供模块状态与主窗口入口。
               </DialogDescription>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">

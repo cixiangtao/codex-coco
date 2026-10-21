@@ -1,19 +1,25 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { applyTheme } from "@codex-coco/ui/theme";
+import { GlancePage } from "./pages/glance-page";
+import { initializeGlance } from "./client/glance";
 import { App } from "./app";
 import { initializeSettings } from "./client/settings";
 import { initializeModules } from "./client/modules";
 import "./styles.css";
 
 async function start() {
+  const context = await window.codexCoco.windowContext();
+  if (!context.ok) throw new Error("WINDOW_CONTEXT_UNAVAILABLE");
+  document.body.dataset.window = context.value.kind;
   const unsubscribeSettings = await initializeSettings();
-  const unsubscribeModules = await initializeModules();
+  const unsubscribeSurface =
+    context.value.kind === "main" ? await initializeModules() : await initializeGlance();
   window.addEventListener(
     "beforeunload",
     () => {
       unsubscribeSettings();
-      unsubscribeModules();
+      unsubscribeSurface();
     },
     { once: true },
   );
@@ -33,7 +39,7 @@ async function start() {
   if (!root) throw new Error("ROOT_MISSING");
   createRoot(root).render(
     <StrictMode>
-      <App />
+      {context.value.kind === "main" ? <App initialPage={context.value.page} /> : <GlancePage />}
     </StrictMode>,
   );
 }

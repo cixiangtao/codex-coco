@@ -1,9 +1,30 @@
+import type { MainPage } from "../../contracts/windows";
+import type { GlanceSnapshot } from "../../contracts/glance";
 import { contextBridge, ipcRenderer } from "electron";
 import { channels, type DesktopBridge } from "../../contracts/bridge";
 import type { ModuleSnapshot } from "../../contracts/modules";
 import type { SettingsSnapshot } from "../../contracts/settings";
 
 const bridge: DesktopBridge = {
+  windowContext: () => ipcRenderer.invoke(channels.windowContext),
+  openMainPage: (input) => ipcRenderer.invoke(channels.openMainPage, input),
+  dismissGlance: () => ipcRenderer.invoke(channels.dismissGlance),
+  onNavigate: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, page: MainPage) => listener(page);
+    ipcRenderer.on(channels.navigate, handler);
+    return () => {
+      ipcRenderer.removeListener(channels.navigate, handler);
+    };
+  },
+  glance: () => ipcRenderer.invoke(channels.glance),
+  onGlanceChanged: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, snapshot: GlanceSnapshot) =>
+      listener(snapshot);
+    ipcRenderer.on(channels.glanceChanged, handler);
+    return () => {
+      ipcRenderer.removeListener(channels.glanceChanged, handler);
+    };
+  },
   modules: () => ipcRenderer.invoke(channels.modules),
   enableModule: (input) => ipcRenderer.invoke(channels.enableModule, input),
   saveModuleConfig: (input) => ipcRenderer.invoke(channels.saveModuleConfig, input),

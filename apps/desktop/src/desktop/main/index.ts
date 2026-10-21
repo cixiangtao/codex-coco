@@ -8,6 +8,10 @@ import { ModuleError, ModuleHost } from "../../application/module-host";
 import { registeredModules } from "../../modules/registry";
 import { channels, type Result } from "../../contracts/bridge";
 import { resolveTheme } from "@codex-coco/ui/theme/resolve";
+import { MenuBarController } from "./menu-bar";
+import { buildGlanceItems } from "../../application/glance";
+import { openMainPageSchema, type WindowContext, type MainPage } from "../../contracts/windows";
+import type { GlanceSnapshot } from "../../contracts/glance";
 import { isTrustedPage } from "./security";
 
 app.setName("Codex Coco");
@@ -37,6 +41,10 @@ if (developmentUrl) {
 }
 const entryUrl = developmentUrl ?? productionUrl;
 const windows = new Map<number, BrowserWindow>();
+const contexts = new Map<number, WindowContext>();
+let lastMainId: number | undefined;
+let menuBar: MenuBarController | undefined;
+let glance: GlanceSnapshot = { revision: 0, items: buildGlanceItems([]) };
 const definitions = registeredModules(!app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1");
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
   modules: definitions.map((definition) => ({
@@ -54,20 +62,34 @@ const windowStarts = new Map<number, number>();
 let store: SettingsStore;
 let quitting = false;
 
-function createWindow() {
+function createWindow(context: WindowContext = { kind: "main", page: "appearance" }) {
   const began = performance.now();
   const theme = store.getSnapshot().settings.theme;
   const mode =
     theme.mode === "system" ? (nativeTheme.shouldUseDarkColors ? "dark" : "light") : theme.mode;
   const win = new BrowserWindow({
     title: "Codex Coco",
-    width: 980,
-    height: 800,
-    minWidth: 720,
-    minHeight: 640,
-    ...(process.platform === "darwin"
-      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 18 } }
-      : {}),
+    ...(context.kind === "main"
+      ? {
+          width: 980,
+          height: 800,
+          minWidth: 720,
+          minHeight: 640,
+          ...(process.platform === "darwin"
+            ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 18 } }
+            : {}),
+        }
+      : {
+          width: 360,
+          height: 420,
+          frame: false,
+          resizable: false,
+          minimizable: false,
+          maximizable: false,
+          fullscreenable: false,
+          skipTaskbar: true,
+          ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+        }),
     show: false,
     backgroundColor: resolveTheme(theme, mode).background,
     webPreferences: {
@@ -80,9 +102,16 @@ function createWindow() {
   });
   const contentsId = win.webContents.id;
   windows.set(contentsId, win);
+  contexts.set(contentsId, context);
+  if (context.kind === "main")
+    win.on("focus", () => {
+      lastMainId = contentsId;
+    });
   windowStarts.set(contentsId, began);
   win.on("closed", () => {
     windows.delete(contentsId);
+    contexts.delete(contentsId);
+    if (lastMainId === contentsId) lastMainId = undefined;
     windowStarts.delete(contentsId);
   });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -104,6 +133,39 @@ function createWindow() {
   return win;
 }
 
+/** Reuses the last focused main window; pending navigation is replayed after renderer readiness. */
+function openMain(page?: MainPage) {
+  if (quitting) return;
+  const mains = [...windows.values()].filter(
+    (win) => contexts.get(win.webContents.id)?.kind === "main",
+  );
+  const existing = mains.find((win) => win.webContents.id === lastMainId) ?? mains[0];
+  menuBar?.hide();
+  if (!existing) {
+    createWindow({ kind: "main", page: page ?? "appearance" });
+    return;
+  }
+  if (page) {
+    contexts.set(existing.webContents.id, { kind: "main", page });
+    existing.webContents.send(channels.navigate, page);
+  }
+  if (!windowStarts.has(existing.webContents.id)) {
+    if (existing.isMinimized()) existing.restore();
+    existing.show();
+    existing.focus();
+  }
+}
+
+function updateGlance() {
+  const items = buildGlanceItems(modules.snapshots());
+  if (JSON.stringify(items) === JSON.stringify(glance.items)) return;
+  glance = { revision: glance.revision + 1, items };
+  for (const win of windows.values()) {
+    if (!win.isDestroyed() && contexts.get(win.webContents.id)?.kind === "glance")
+      win.webContents.send(channels.glanceChanged, glance);
+  }
+}
+
 function registerIpc() {
   const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) =>
     windows.has(event.sender.id) &&
@@ -111,7 +173,8 @@ function registerIpc() {
     isTrustedPage(event.senderFrame?.url ?? "", entryUrl);
   function handle<T>(
     channel: string,
-    operation: (input: unknown, correlationId: string) => T | Promise<T>,
+    operation: (input: unknown, correlationId: string, window: BrowserWindow) => T | Promise<T>,
+    scope: "main" | "glance" | "all" = "main",
   ) {
     ipcMain.handle(channel, async (event, input: unknown): Promise<Result<T>> => {
       const correlationId = randomUUID();
@@ -125,7 +188,7 @@ function registerIpc() {
           durationMs: performance.now() - began,
           ...(errorCode ? { errorCode } : {}),
         });
-      if (!trusted(event)) {
+      if (!trusted(event) || (scope !== "all" && contexts.get(event.sender.id)?.kind !== scope)) {
         record("FORBIDDEN");
         return {
           ok: false,
@@ -133,7 +196,7 @@ function registerIpc() {
         };
       }
       try {
-        const value = await operation(input, correlationId);
+        const value = await operation(input, correlationId, windows.get(event.sender.id)!);
         record();
         return { ok: true, value };
       } catch (error) {
@@ -153,6 +216,39 @@ function registerIpc() {
       }
     });
   }
+  handle(
+    channels.windowContext,
+    (input, _correlationId, window) => {
+      if (input !== undefined) throw new SettingsError("INVALID_INPUT", "窗口请求无效。");
+      return contexts.get(window.webContents.id)!;
+    },
+    "all",
+  );
+  handle(
+    channels.glance,
+    (input) => {
+      if (input !== undefined) throw new SettingsError("INVALID_INPUT", "速览请求无效。");
+      return glance;
+    },
+    "glance",
+  );
+  handle(
+    channels.openMainPage,
+    (input) => {
+      const parsed = openMainPageSchema.safeParse(input);
+      if (!parsed.success) throw new SettingsError("INVALID_INPUT", "页面跳转请求无效。");
+      openMain(parsed.data.page);
+    },
+    "all",
+  );
+  handle(
+    channels.dismissGlance,
+    (input) => {
+      if (input !== undefined) throw new SettingsError("INVALID_INPUT", "收起请求无效。");
+      menuBar?.hide();
+    },
+    "glance",
+  );
   handle(channels.modules, (input) => {
     if (input !== undefined) throw new ModuleError("INVALID_INPUT", "模块列表请求无效。");
     return modules.snapshots();
@@ -163,14 +259,20 @@ function registerIpc() {
   handle(channels.runModuleOperation, (input, correlationId) => modules.run(input, correlationId));
   handle(channels.cancelModuleOperation, (input) => modules.cancel(input));
   modules.subscribe((snapshot) => {
+    updateGlance();
     for (const win of windows.values()) {
-      if (!win.isDestroyed()) win.webContents.send(channels.moduleChanged, snapshot);
+      if (!win.isDestroyed() && contexts.get(win.webContents.id)?.kind === "main")
+        win.webContents.send(channels.moduleChanged, snapshot);
     }
   });
-  handle(channels.bootstrap, (input) => {
-    if (input !== undefined) throw new SettingsError("INVALID_INPUT", "启动请求无效。");
-    return store.getSnapshot();
-  });
+  handle(
+    channels.bootstrap,
+    (input) => {
+      if (input !== undefined) throw new SettingsError("INVALID_INPUT", "启动请求无效。");
+      return store.getSnapshot();
+    },
+    "all",
+  );
   handle(channels.saveTheme, (input) => store.saveTheme(input));
   handle(channels.resetSettings, (input) => {
     if (input !== undefined) throw new SettingsError("INVALID_INPUT", "恢复请求无效。");
@@ -181,7 +283,13 @@ function registerIpc() {
     const began = windowStarts.get(event.sender.id);
     if (began === undefined) return;
     windowStarts.delete(event.sender.id);
-    windows.get(event.sender.id)?.show();
+    const window = windows.get(event.sender.id)!;
+    const context = contexts.get(event.sender.id)!;
+    if (context.kind === "glance") menuBar?.rendererReady(window);
+    else {
+      window.webContents.send(channels.navigate, context.page);
+      window.show();
+    }
     diagnostics.record({
       event: "window.ready",
       outcome: "ok",
@@ -220,7 +328,15 @@ async function start() {
   store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
   await store.load();
   await modules.load();
+  updateGlance();
   registerIpc();
+  menuBar = new MenuBarController({
+    createGlance: () => createWindow({ kind: "glance" }),
+    openMain,
+    quit: () => app.quit(),
+    unavailable: () =>
+      diagnostics.record({ event: "app.failure", outcome: "error", errorCode: "TRAY_UNAVAILABLE" }),
+  });
   diagnostics.record({ event: "app.ready", outcome: "ok", durationMs: performance.now() - began });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -228,6 +344,11 @@ async function start() {
         label: "Codex Coco",
         submenu: [
           { role: "about", label: "关于 Codex Coco" },
+          {
+            label: "显示或收起速览",
+            accelerator: "CmdOrCtrl+Shift+M",
+            click: () => menuBar?.toggle(),
+          },
           { type: "separator" },
           { role: "quit", label: "退出 Codex Coco" },
         ],
@@ -250,18 +371,17 @@ async function start() {
     ]),
   );
   createWindow();
-  app.on("activate", () => {
-    if (windows.size === 0) createWindow();
-  });
+  app.on("activate", () => openMain());
 }
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  if (process.platform !== "darwin" && !quitting) app.quit();
 });
 app.on("before-quit", (event) => {
   if (quitting || !store) return;
   event.preventDefault();
   quitting = true;
+  menuBar?.dispose();
   void Promise.all([modules.shutdown(), store.flush()])
     .then(async ([statuses]) => {
       const incomplete = statuses.some((status) => status.phase === "error");
@@ -280,12 +400,7 @@ app.on("before-quit", (event) => {
     });
 });
 app.on("second-instance", () => {
-  const existing = [...windows.values()][0];
-  if (existing) {
-    if (existing.isMinimized()) existing.restore();
-    existing.show();
-    existing.focus();
-  } else if (store) createWindow();
+  if (store) openMain();
 });
 if (!app.requestSingleInstanceLock()) app.quit();
 else
