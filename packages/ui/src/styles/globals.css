@@ -1,0 +1,91 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@source "../components";
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-pressed: var(--primary-pressed);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
+:root {
+  --background: #fafafa;
+  --foreground: #202020;
+  --card: #ffffff;
+  --card-foreground: #202020;
+  --popover: #ffffff;
+  --popover-foreground: #202020;
+  --primary: #343434;
+  --primary-foreground: #ffffff;
+  --primary-hover: #2e2e2e;
+  --primary-pressed: #292929;
+  --secondary: #eeeeee;
+  --secondary-foreground: #202020;
+  --accent: #e6e6e6;
+  --accent-foreground: #202020;
+  --muted: #f0f0f0;
+  --muted-foreground: #626262;
+  --border: #d8d8d8;
+  --input: #8a8a8a;
+  --ring: #343434;
+  --destructive: #b42318;
+  --success: #197042;
+  --warning: #845400;
+}
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  input {
+    caret-color: var(--foreground);
+  }
+  :focus-visible {
+    outline-color: var(--ring);
+  }
+  * {
+    scrollbar-color: var(--muted-foreground) var(--background);
+    scrollbar-width: thin;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
