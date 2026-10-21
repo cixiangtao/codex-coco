@@ -95,6 +95,21 @@ try {
   await drag.focus();
   await drag.press("ArrowLeft");
   assert.equal(await page.locator("#main-x").inputValue(), "81");
+  await drag.scrollIntoViewIfNeeded();
+  const dragBounds = await drag.boundingBox();
+  assert(dragBounds);
+  await page.mouse.move(
+    dragBounds.x + dragBounds.width * 0.3,
+    dragBounds.y + dragBounds.height * 0.3,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    dragBounds.x + dragBounds.width * 0.7,
+    dragBounds.y + dragBounds.height * 0.6,
+  );
+  await page.mouse.up();
+  assert.equal(await page.locator("#main-x").inputValue(), "70");
+  assert.equal(await page.locator("#main-y").inputValue(), "60");
   await page.getByRole("textbox", { name: "预设名称", exact: true }).fill("受控布景预设");
   await page.getByRole("button", { name: "保存为预设", exact: true }).click();
   await page.getByRole("button", { name: "仅保存配置", exact: true }).click();
@@ -199,6 +214,7 @@ try {
         layers: 3,
         gallery: true,
         keyboardPositioning: true,
+        pointerPositioning: true,
         namedPresets: true,
         computedStyleVerification: true,
         optInRestartRestoration: true,

@@ -36,7 +36,8 @@
     "verify:usage-tools": "pnpm run build && node scripts/verify-usage-tools.mjs",
     "verify:desktop-preferences": "pnpm run build && node scripts/verify-desktop-preferences.mjs",
     "verify:widget": "node scripts/verify-widget.mjs",
-    "verify:updates": "pnpm run build && node scripts/verify-updates.mjs"
+    "verify:updates": "pnpm run build && node scripts/verify-updates.mjs",
+    "verify:appearance-launcher": "node scripts/verify-appearance-launcher.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
