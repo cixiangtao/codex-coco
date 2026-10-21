@@ -1,6 +1,6 @@
 @import "@codex-coco/ui/styles.css";
 @source "./";
-@source "../modules/*/renderer";
+@source "../modules/**/renderer/**/*.{ts,tsx}";
 
 html,
 body,

@@ -76,6 +76,11 @@ export async function verifyDesktopSession(session) {
   ]);
   await page.getByText("布景尚未连接", { exact: true }).waitFor();
   assert.equal(await page.getByRole("button", { name: "连接 Codex", exact: true }).count(), 0);
+  const columns = await page
+    .locator(".grid-cols-2")
+    .first()
+    .evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
+  assert.equal(columns, 2, "Module Tailwind source detection must generate the real form grid");
   assert.equal(
     await page.locator(".traffic-lights").count(),
     0,

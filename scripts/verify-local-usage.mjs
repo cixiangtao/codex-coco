@@ -87,6 +87,10 @@ try {
   assert.equal(result.trend.source, "session-events");
   assert(!JSON.stringify(result).match(/PRIVATE|private-session|\.jsonl|email/));
   await page.getByText("30 天 · 1,234 tokens", { exact: true }).waitFor();
+  assert(
+    (await page.locator(".h-32").boundingBox()).height >= 120,
+    "The local activity plot must have a real rendered height",
+  );
   const output = join(
     root,
     packaged ? "work/local-usage-verification-packaged" : "work/local-usage-verification",
