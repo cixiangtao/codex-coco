@@ -42,6 +42,8 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 
 ## 菜单栏素材
 
+菜单栏黑色线稿的可见像素、深色占比和色度判断参考 codex-usage 同一 MIT 来源提交中的 StatusBarController.swift。新的 TypeScript 实现对最多八帧采样，并额外支持透明底白色线稿；结果通过 Electron template image 交给系统着色。没有复制 AppKit/CALayer 运行时，彩色图继续原色渲染。
+
 `apps/desktop/resources/tray/` 中的 19 个 GIF 从 codex-usage 的上述提交承接；原项目记录其来自 [BenignX/BuZhiYin](https://github.com/BenignX/BuZhiYin)，提交 `76aa03fdbdbc905ac42ee4afe9fed35dca351c6b`，MIT，Copyright (c) 2023 BenignX。完整授权见 resources/licenses/BuZhiYin.txt，随桌面资源分发。
 
 pixel-cat 与 pixel-ghost 各四帧 PNG 从 codex-skin 同一来源提交的菜单栏像素素材导出，MIT，Copyright (c) 2026 anys；许可全文见根 LICENSE。GIF 解码、动画计时、CPU 联动、图片存储和系统适配由 Codex Coco 重写，没有复制两个旧应用的运行时。

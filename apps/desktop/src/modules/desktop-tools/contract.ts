@@ -61,6 +61,7 @@ export const desktopToolsDefaults: DesktopToolsConfig = {
   shareWidgetSnapshot: false,
 };
 export const trayFramesSchema = z.strictObject({
+  template: z.boolean().optional(),
   frames: z
     .array(z.strictObject({ png: z.string().max(100_000), delay: z.number().min(16).max(10_000) }))
     .min(1)

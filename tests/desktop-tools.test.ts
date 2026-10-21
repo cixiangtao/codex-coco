@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { decodeTrayGif } from "../apps/desktop/src/modules/desktop-tools/gif";
 import { animationDelay } from "../apps/desktop/src/modules/desktop-tools/timing";
+import { TrayContrast } from "../apps/desktop/src/modules/desktop-tools/contrast";
 import {
   createDesktopToolsModule,
   type DesktopToolsDependencies,
@@ -15,6 +16,24 @@ import {
 
 afterEach(() => vi.useRealTimers());
 describe("local tray frames", () => {
+  it("tints dark and light transparent line art while retaining colorful artwork", () => {
+    for (const color of [
+      [0, 0, 0],
+      [255, 255, 255],
+    ]) {
+      const contrast = new TrayContrast();
+      const pixels = new Uint8Array(100 * 4);
+      for (let index = 0; index < 40; index++) pixels.set([...color, 255], index * 4);
+      contrast.add(pixels);
+      expect(contrast.template).toBe(true);
+    }
+    const colorful = new TrayContrast();
+    colorful.add(Uint8Array.from(Array.from({ length: 100 }, () => [230, 30, 80, 255]).flat()));
+    expect(colorful.template).toBe(false);
+    const empty = new TrayContrast();
+    empty.add(new Uint8Array(400));
+    expect(empty.template).toBe(false);
+  });
   it.each(bundledTrayIcons)(
     "decodes licensed $title assets into bounded renderable frames",
     async (icon) => {
@@ -22,6 +41,8 @@ describe("local tray frames", () => {
         new URL(`../apps/desktop/resources/tray/${icon.id.slice(8)}.gif`, import.meta.url),
       );
       const result = decodeTrayGif(await readFile(path));
+      if (["builtin:cat3", "builtin:my0"].includes(icon.id)) expect(result.template).toBe(true);
+      if (icon.id === "builtin:pink_cat") expect(result.template).toBe(false);
       expect(result.frames.length).toBeGreaterThan(1);
       expect(result.frames.length).toBeLessThanOrEqual(300);
       expect(

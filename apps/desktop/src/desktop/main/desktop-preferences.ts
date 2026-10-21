@@ -15,6 +15,7 @@ import {
 } from "../../modules/desktop-tools/contract";
 import type { GlanceSnapshot } from "../../contracts/glance";
 import type { MenuBarController } from "./menu-bar";
+import { TrayContrast } from "../../modules/desktop-tools/contrast";
 
 export function nativePixelFrames(id: string, snapshot: GlanceSnapshot): TrayFrames {
   const rgba = new Uint8Array(36 * 36 * 4);
@@ -167,23 +168,29 @@ export function createDesktopPreferences(options: {
     }
     if (id.startsWith("builtin:")) {
       if (!bundledTrayIcons.some((icon) => icon.id === id)) throw new Error("IMAGE_INVALID");
-      return {
-        value: await decode(join(options.resources, "tray", `${id.slice(8)}.gif`), signal, report),
-        template: false,
-      };
+      const decoded = await decode(
+        join(options.resources, "tray", `${id.slice(8)}.gif`),
+        signal,
+        report,
+      );
+      return { value: decoded, template: decoded.template ?? false };
     }
     await assets.bytes(id);
     signal.throwIfAborted();
-    if (id.endsWith(".gif"))
-      return { value: await decode(join(iconDirectory, id), signal, report), template: false };
+    if (id.endsWith(".gif")) {
+      const decoded = await decode(join(iconDirectory, id), signal, report);
+      return { value: decoded, template: decoded.template ?? false };
+    }
     const image = await nativeImage.createThumbnailFromPath(join(iconDirectory, id), {
       width: 36,
       height: 36,
     });
     if (image.isEmpty()) throw new Error("IMAGE_INVALID");
+    const contrast = new TrayContrast();
+    contrast.add(image.toBitmap());
     return {
       value: { frames: [{ png: image.toPNG().toString("base64"), delay: 100 }] },
-      template: false,
+      template: contrast.template,
     };
   }
   const dependencies: DesktopToolsDependencies = {

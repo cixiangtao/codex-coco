@@ -1,6 +1,7 @@
 import { parseGIF, decompressFrame } from "gifuct-js";
 import { rgbaPng } from "../../application/png.ts";
 import { trayFramesSchema, type TrayFrames } from "./contract.ts";
+import { TrayContrast } from "./contrast.ts";
 /** Composes GIF disposal/transparency frame by frame and reduces frames to 2× menu-bar pixels. */
 export function decodeTrayGif(
   bytes: Buffer,
@@ -41,6 +42,7 @@ export function decodeTrayGif(
   } | null = null;
   const result: TrayFrames = { frames: [] };
   let encodedBytes = 0;
+  const contrast = new TrayContrast();
   for (let index = 0; index < frames.length; index++) {
     if (previous?.disposal === 2) {
       const background = gif.gct?.[gif.lsd.backgroundColorIndex];
@@ -81,6 +83,7 @@ export function decodeTrayGif(
           ((oy + y) * 36 + ox + x) * 4,
         );
       }
+    if (index < 8) contrast.add(scaled);
     const png = rgbaPng(36, 36, scaled).toString("base64");
     encodedBytes += png.length;
     if (encodedBytes > 900_000) throw new Error("IMAGE_INVALID");
@@ -95,5 +98,5 @@ export function decodeTrayGif(
     };
     report(Math.round(((index + 1) / frames.length) * 100));
   }
-  return trayFramesSchema.parse(result);
+  return trayFramesSchema.parse({ ...result, template: contrast.template });
 }
