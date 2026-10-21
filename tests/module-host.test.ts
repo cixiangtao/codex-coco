@@ -49,8 +49,8 @@ afterEach(async () => {
 
 describe("module operation loop", () => {
   it("keeps normal registrations empty and creates no files merely by loading fixtures", async () => {
-    expect(registeredModules(false)).toEqual([]);
-    expect(registeredModules(true, createFixtureWorker)).toHaveLength(2);
+    expect(registeredModules(false).map((item) => item.id)).toEqual(["usage"]);
+    expect(registeredModules(true, createFixtureWorker)).toHaveLength(3);
     const { host, directory } = await fixture();
     expect(await readdir(directory)).toEqual([]);
     expect(host.snapshots().map((item) => item.phase)).toEqual(["disabled", "disabled"]);

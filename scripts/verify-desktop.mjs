@@ -59,7 +59,11 @@ export async function verifyDesktopSession(session) {
   assert.equal(isolation.require, "undefined");
   const modules = await page.evaluate(() => window.codexCoco.modules());
   assert.equal(modules.ok, true);
-  assert.deepEqual(modules.value, [], "Normal and packaged launches must not register fixtures");
+  assert.deepEqual(
+    modules.value.map(({ id, phase, config }) => ({ id, phase, enabled: config.enabled })),
+    [{ id: "usage", phase: "disabled", enabled: false }],
+    "Normal and packaged launches register business modules without reading accounts",
+  );
   const nav = page.getByRole("navigation", { name: "应用导航" });
   assert.deepEqual(await nav.getByRole("button").allTextContents(), [
     "用量",
@@ -108,9 +112,9 @@ export async function verifyDesktopSession(session) {
     "page",
   );
   await nav.getByRole("button", { name: "用量", exact: true }).click();
-  await page.getByRole("heading", { name: "用量模块准备中", exact: true }).waitFor();
-  await page.getByRole("button", { name: "查看模块管理", exact: true }).click();
-  await page.getByText("当前还没有可启用的模块。", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "按需读取用量", exact: true }).waitFor();
+  await nav.getByRole("button", { name: "模块管理", exact: true }).click();
+  await page.getByRole("heading", { name: "已接入的模块", exact: true }).waitFor();
   await nav.getByRole("button", { name: "设置", exact: true }).click();
   assert.equal(
     await page.getByRole("button", { name: "保存主题", exact: true }).isDisabled(),

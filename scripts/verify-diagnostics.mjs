@@ -48,7 +48,11 @@ try {
   await writeFile(logDirectory, "preserve unavailable logging path");
   session = await createDesktopSession(directory, { ...process.env, CODEX_COCO_FIXTURES: "0" });
   const response = await session.page.evaluate(() => window.codexCoco.modules());
-  assert.deepEqual(response, { ok: true, value: [] });
+  assert.equal(response.ok, true);
+  assert.deepEqual(
+    response.value.map(({ id, phase }) => ({ id, phase })),
+    [{ id: "usage", phase: "disabled" }],
+  );
   assert.deepEqual(session.errors, []);
   await session.application.close();
   session = undefined;

@@ -58,7 +58,10 @@ let session;
 const environment = { ...process.env, CODEX_COCO_FIXTURES: "1" };
 try {
   session = await createModuleSession(directory, { ...process.env, CODEX_COCO_FIXTURES: "0" });
-  assert.deepEqual(await snapshots(session.page), []);
+  assert.deepEqual(
+    (await snapshots(session.page)).map(({ id, phase }) => ({ id, phase })),
+    [{ id: "usage", phase: "disabled" }],
+  );
   await session.application.close();
   session = await createModuleSession(directory, environment);
   const { application, page, errors } = session;
@@ -66,7 +69,11 @@ try {
   const peer = page.getByRole("region", { name: "独立模块示例", exact: true });
   await panel.getByRole("button", { name: "启用模块", exact: true }).click();
   await peer.getByRole("button", { name: "启用模块", exact: true }).click();
-  await waitModules(page, (values) => values.every((item) => item.phase === "running"));
+  await waitModules(page, (values) =>
+    [id, peerId].every((moduleId) =>
+      values.some((item) => item.id === moduleId && item.phase === "running"),
+    ),
+  );
   console.log("QA: whitelist, progress, independent tasks and config");
   const invalid = await page.evaluate(
     async (moduleId) => [

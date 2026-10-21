@@ -179,7 +179,9 @@ try {
       chromium: process.versions.chrome,
       node: process.versions.node,
     }));
-    assert.deepEqual(await moduleSummary(session.page), []);
+    assert.deepEqual(await moduleSummary(session.page), [
+      { id: "usage", phase: "disabled", activeTask: false },
+    ]);
     if (index >= 0) {
       await delay(500);
       const idle = await sample(session.application, "one-window-idle");

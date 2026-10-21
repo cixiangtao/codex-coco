@@ -64,7 +64,7 @@ export async function verifyMenuBar(packagedExecutable) {
     assert.equal(summary.ok, true);
     assert.deepEqual(
       summary.value.items.slice(0, 2).map((item) => item.phase),
-      ["unavailable", "unavailable"],
+      ["disabled", "unavailable"],
     );
     assert.equal(summary.value.items.length, packagedExecutable ? 2 : 4);
     const bounds = await application.evaluate(({ BrowserWindow, screen }) => {
@@ -146,7 +146,7 @@ export async function verifyMenuBar(packagedExecutable) {
     }
     await popup.getByRole("button", { name: "打开用量", exact: true }).click();
     await nativeVisible(application, popup, false);
-    await main.getByRole("heading", { name: "用量模块准备中", exact: true }).waitFor();
+    await main.getByRole("heading", { name: "按需读取用量", exact: true }).waitFor();
     assert.equal(application.windows().length, 2, "Jumping must reuse the existing main window");
 
     console.log("QA: saved-theme sync without preview leakage");

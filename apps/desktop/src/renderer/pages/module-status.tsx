@@ -74,22 +74,23 @@ export function ModuleManagementPage() {
         <h2>模块管理</h2>
         <p>查看已接入的能力，分别管理各模块的运行状态。</p>
       </header>
-      {modules.length ? (
-        <ModulesPanel />
-      ) : (
+      {modules.length > 0 && <ModulesPanel />}
+      {Object.keys(plannedModules).some((id) => !modules.some((item) => item.id === id)) && (
         <>
-          <p className="module-registry-note">当前还没有可启用的模块。</p>
+          <p className="module-registry-note">以下能力尚未接入。</p>
           <ul className="planned-module-list" aria-label="计划接入的模块">
-            {Object.entries(plannedModules).map(([id, { title, icon: Icon, description }]) => (
-              <li key={id}>
-                <Icon aria-hidden="true" />
-                <div>
-                  <h3>{title}</h3>
-                  <p>{description}</p>
-                </div>
-                <p>尚未接入</p>
-              </li>
-            ))}
+            {Object.entries(plannedModules)
+              .filter(([id]) => !modules.some((item) => item.id === id))
+              .map(([id, { title, icon: Icon, description }]) => (
+                <li key={id}>
+                  <Icon aria-hidden="true" />
+                  <div>
+                    <h3>{title}</h3>
+                    <p>{description}</p>
+                  </div>
+                  <p>尚未接入</p>
+                </li>
+              ))}
           </ul>
           <p className="module-extension-note">后续模块会沿用同一个入口，独立启停与配置。</p>
         </>

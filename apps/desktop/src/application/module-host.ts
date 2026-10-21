@@ -13,6 +13,7 @@ import {
   type ModuleSnapshot,
 } from "../contracts/modules";
 import type { ErrorCode } from "../contracts/bridge";
+import { glanceDetailSchema, type GlanceDetail } from "../contracts/glance";
 import { silentDiagnostics, type DiagnosticSink } from "./diagnostics";
 import { ModuleManager } from "./modules";
 import { ModuleConfigStore, type ModuleConfigDefinition } from "./module-config-store";
@@ -40,6 +41,8 @@ export interface BuiltinModule {
   config: ModuleConfigDefinition;
   operations: Readonly<Record<string, OperationDefinition>>;
   start(signal: AbortSignal): Promise<ModuleRuntime>;
+  /** Explicit public projection; complete task results never enter the glance bridge. */
+  glance?(snapshot: ModuleSnapshot): GlanceDetail | null;
 }
 export class ModuleError extends Error {
   constructor(
@@ -178,6 +181,19 @@ export class ModuleHost {
   }
   snapshots() {
     return [...this.entries.values()].map((entry) => this.snapshot(entry));
+  }
+  glanceDetails(): ReadonlyMap<string, GlanceDetail> {
+    const details = new Map<string, GlanceDetail>();
+    for (const entry of this.entries.values()) {
+      try {
+        const detail = entry.definition.glance?.(this.snapshot(entry));
+        const parsed = glanceDetailSchema.safeParse(detail);
+        if (parsed.success) details.set(entry.definition.id, parsed.data);
+      } catch {
+        /* A broken presentation must not block other modules or task updates. */
+      }
+    }
+    return details;
   }
   subscribe(listener: (snapshot: ModuleSnapshot) => void) {
     this.listeners.add(listener);

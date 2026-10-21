@@ -161,7 +161,7 @@ function openMain(page?: MainPage) {
 }
 
 function updateGlance() {
-  const items = buildGlanceItems(modules.snapshots());
+  const items = buildGlanceItems(modules.snapshots(), modules.glanceDetails());
   if (JSON.stringify(items) === JSON.stringify(glance.items)) return;
   glance = { revision: glance.revision + 1, items };
   for (const win of windows.values()) {

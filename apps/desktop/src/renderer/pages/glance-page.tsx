@@ -135,6 +135,31 @@ export function GlancePage() {
                   </span>
                 </div>
                 <p>{item.description}</p>
+                {item.metrics && (
+                  <dl className="glance-metrics">
+                    {item.metrics.map((metric) => (
+                      <div key={metric.id}>
+                        <dt>{metric.label}</dt>
+                        <dd>
+                          <strong>{metric.value}</strong>
+                          <span>{metric.detail}</span>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {item.capturedAt !== undefined && (
+                  <p className="glance-captured">
+                    读取于{" "}
+                    {new Date(item.capturedAt).toLocaleString("zh-CN", {
+                      month: "numeric",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    · 请在主窗口刷新确认
+                  </p>
+                )}
                 <Button
                   variant="ghost"
                   disabled={busy}

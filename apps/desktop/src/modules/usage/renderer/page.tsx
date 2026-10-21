@@ -1,0 +1,266 @@
+import { useEffect, useState } from "react";
+import { Activity, RefreshCw } from "lucide-react";
+import { Button } from "@codex-coco/ui/components/button";
+import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@codex-coco/ui/components/empty";
+import type { ModuleSnapshot } from "../../../contracts/modules";
+import { acceptModuleSnapshot } from "../../../renderer/client/modules";
+import {
+  remainingPercent,
+  usageBucketTitle,
+  usageFailures,
+  usageResultSchema,
+  usageWindowTitle,
+  type UsageSnapshot,
+} from "../contract";
+
+const dateTime = (time: number) =>
+  new Date(time).toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+function QuotaData({ data }: { data: UsageSnapshot }) {
+  return (
+    <div className="usage-data">
+      <p className="usage-source">
+        读取于{" "}
+        <time dateTime={new Date(data.capturedAt).toISOString()}>{dateTime(data.capturedAt)}</time>{" "}
+        · Codex CLI
+      </p>
+      {data.buckets.map((bucket, index) => (
+        <section
+          className="usage-bucket"
+          key={bucket.id}
+          aria-label={usageBucketTitle(bucket.id, index)}
+        >
+          <h3>{usageBucketTitle(bucket.id, index)}</h3>
+          <dl className="usage-windows">
+            {bucket.windows.map((window) => (
+              <div className="usage-window" key={window.kind}>
+                <dt>{usageWindowTitle(window)}</dt>
+                <dd>
+                  <strong>剩余 {Number(remainingPercent(window.usedPercent).toFixed(1))}%</strong>
+                  <span>已用 {Number(window.usedPercent.toFixed(1))}%</span>
+                </dd>
+                <dd>
+                  {window.resetsAt === null ? (
+                    "恢复时间未知"
+                  ) : (
+                    <>
+                      <time dateTime={new Date(window.resetsAt * 1000).toISOString()}>
+                        {dateTime(window.resetsAt * 1000)}
+                      </time>
+                      <span>恢复时间</span>
+                    </>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** Main-window reads are opt-in; operation results contain only validated public quota fields. */
+export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const [now, setNow] = useState(Date.now);
+  const operation = snapshot.operation;
+  const running = operation?.phase === "running" || operation?.phase === "cancelling";
+  const parsed = usageResultSchema.safeParse(operation?.result);
+  const result = operation?.phase === "succeeded" && parsed.success ? parsed.data : null;
+  const current = result?.status === "ready" ? result.data : null;
+  const capturedAt = current?.capturedAt;
+  const failed = result?.status === "error" ? result : null;
+  const unavailable =
+    ["invalid", "future-version", "unavailable"].includes(snapshot.config.health) ||
+    snapshot.phase === "error";
+  const busy = pending || running || snapshot.phase === "starting" || snapshot.phase === "stopping";
+  useEffect(() => {
+    if (capturedAt === undefined) return;
+    // Display freshness only; this timer never starts a source read or network request.
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [capturedAt]);
+  async function refresh(enable = false) {
+    setPending(true);
+    setMessage("");
+    try {
+      if (enable) {
+        const activated = await window.codexCoco.enableModule({ moduleId: "usage", enabled: true });
+        if (!activated.ok) {
+          setMessage(activated.error.message);
+          return;
+        }
+        acceptModuleSnapshot(activated.value);
+      }
+      const response = await window.codexCoco.runModuleOperation({
+        moduleId: "usage",
+        operation: "refresh",
+        input: {},
+      });
+      if (response.ok) acceptModuleSnapshot(response.value);
+      else setMessage(response.error.message);
+    } catch {
+      setMessage("用量服务连接失败，请重新打开窗口后重试。");
+    } finally {
+      setPending(false);
+    }
+  }
+  async function cancel() {
+    if (!operation) return;
+    setPending(true);
+    try {
+      const response = await window.codexCoco.cancelModuleOperation({
+        moduleId: "usage",
+        operationId: operation.id,
+      });
+      if (response.ok) acceptModuleSnapshot(response.value);
+      else setMessage(response.error.message);
+    } catch {
+      setMessage("取消请求未完成，请重试。");
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <div className="usage-page">
+      <header className="desktop-page-heading">
+        <h2>用量</h2>
+        <p>查看本机 Codex CLI 登录的 ChatGPT 订阅额度。</p>
+      </header>
+      {snapshot.phase === "running" && (
+        <div className="usage-toolbar">
+          <Button
+            disabled={busy || unavailable}
+            onClick={() => {
+              void refresh();
+            }}
+          >
+            <RefreshCw data-icon="inline-start" />
+            {failed ? "重新读取" : "刷新用量"}
+          </Button>
+          {running && (
+            <Button
+              variant="outline"
+              disabled={pending || operation?.phase === "cancelling"}
+              onClick={() => {
+                void cancel();
+              }}
+            >
+              取消读取
+            </Button>
+          )}
+          <output aria-live="polite">
+            {running
+              ? operation?.phase === "cancelling"
+                ? "正在取消读取…"
+                : "正在读取额度…"
+              : "手动刷新，不在后台轮询。"}
+          </output>
+        </div>
+      )}
+      {message && (
+        <Alert variant="destructive">
+          <AlertTitle>操作未完成</AlertTitle>
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      )}
+      {unavailable ? (
+        <Alert variant="destructive">
+          <AlertTitle>用量模块需要处理</AlertTitle>
+          <AlertDescription>请在模块管理中检查运行状态或恢复配置，然后重试。</AlertDescription>
+        </Alert>
+      ) : snapshot.phase !== "running" ? (
+        <Empty className="desktop-module-empty">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Activity aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>按需读取用量</EmptyTitle>
+            <EmptyDescription>
+              启用后通过本机 Codex CLI 读取订阅额度。Codex Coco
+              不接收或保存登录令牌；本轮不会自动刷新，也不会创建对话。
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button
+              disabled={busy}
+              onClick={() => {
+                void refresh(true);
+              }}
+            >
+              启用并读取用量
+            </Button>
+          </EmptyContent>
+        </Empty>
+      ) : running ? (
+        <div className="usage-loading" aria-label="正在读取用量">
+          <p>正在等待 Codex CLI 返回额度，读取完成后这里会更新。</p>
+        </div>
+      ) : failed ? (
+        <>
+          <Alert variant="destructive">
+            <AlertTitle>{usageFailures[failed.reason].title}</AlertTitle>
+            <AlertDescription>
+              <p>{usageFailures[failed.reason].recovery}</p>
+              <p>检查于 {dateTime(failed.checkedAt)}</p>
+            </AlertDescription>
+          </Alert>
+          {failed.previous && (
+            <details className="usage-previous">
+              <summary>查看上次成功记录（非当前状态）</summary>
+              <p>这是上次读取的记录，可能属于此前的登录，不代表当前账号状态。</p>
+              <QuotaData data={failed.previous} />
+            </details>
+          )}
+        </>
+      ) : current ? (
+        <>
+          {(now - current.capturedAt > 10 * 60_000 ||
+            current.buckets.some((bucket) =>
+              bucket.windows.some(
+                (window) => window.resetsAt !== null && window.resetsAt * 1000 <= now,
+              ),
+            )) && (
+            <Alert>
+              <AlertTitle>请刷新确认当前额度</AlertTitle>
+              <AlertDescription>
+                记录已超过 10 分钟或恢复时间已到，下方数值仍是上次读取的记录。
+              </AlertDescription>
+            </Alert>
+          )}
+          <QuotaData data={current} />
+        </>
+      ) : (
+        <Empty className="desktop-module-empty">
+          <EmptyHeader>
+            <EmptyTitle>
+              {operation?.phase === "cancelled"
+                ? "读取已取消"
+                : operation?.phase === "failed"
+                  ? "读取未完成"
+                  : "准备读取额度"}
+            </EmptyTitle>
+            <EmptyDescription>
+              点击上方“刷新用量”获取当前记录。只读取额度窗口，不读取对话内容。
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+    </div>
+  );
+}

@@ -1,4 +1,4 @@
-import type { GlanceItem } from "../contracts/glance";
+import type { GlanceItem, GlanceDetail } from "../contracts/glance";
 import type { ModuleSnapshot } from "../contracts/modules";
 
 const planned = [
@@ -19,7 +19,10 @@ const phaseDescriptions = {
 } as const;
 
 /** Projects host state without copying private configuration, results, or raw error strings. */
-export function buildGlanceItems(snapshots: readonly ModuleSnapshot[]): GlanceItem[] {
+export function buildGlanceItems(
+  snapshots: readonly ModuleSnapshot[],
+  details: ReadonlyMap<string, GlanceDetail> = new Map(),
+): GlanceItem[] {
   const items: GlanceItem[] = planned.map((item) => ({ ...item, phase: "unavailable" }));
   for (const snapshot of snapshots) {
     const target = items.find((item) => item.id === snapshot.id);
@@ -39,6 +42,14 @@ export function buildGlanceItems(snapshots: readonly ModuleSnapshot[]): GlanceIt
           : phaseDescriptions[phase],
       page: phase === "error" ? "modules" : (target?.page ?? "modules"),
     };
+    const detail = details.get(snapshot.id);
+    if (phase === "running" && detail) {
+      item.phase = detail.phase ?? phase;
+      item.description = detail.description;
+      item.page = target?.page ?? "modules";
+      if (detail.metrics) item.metrics = detail.metrics;
+      if (detail.capturedAt !== undefined) item.capturedAt = detail.capturedAt;
+    }
     if (target) items[items.indexOf(target)] = item;
     else items.push(item);
   }

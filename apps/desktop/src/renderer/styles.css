@@ -105,6 +105,100 @@ body {
 .desktop-module-empty {
   min-height: 360px;
 }
+.usage-page,
+.usage-data {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.usage-page .desktop-page-heading {
+  margin-bottom: 0;
+}
+.usage-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.usage-toolbar p,
+.usage-toolbar output,
+.usage-source,
+.usage-window dd > span,
+.usage-previous > p {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.usage-bucket h3 {
+  font-size: 15px;
+  font-weight: 550;
+  margin-bottom: 12px;
+}
+.usage-window {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(160px, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding-block: 20px;
+  border-top: 1px solid var(--border);
+}
+.usage-window dd {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.usage-window strong {
+  font-size: 18px;
+  font-weight: 550;
+}
+.usage-loading {
+  min-height: 240px;
+  padding-block: 24px;
+  color: var(--muted-foreground);
+}
+.usage-previous {
+  color: var(--muted-foreground);
+}
+.usage-previous summary {
+  cursor: pointer;
+  padding-block: 12px;
+  font-size: 13px;
+}
+.usage-previous .usage-data {
+  margin-top: 16px;
+}
+.glance-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.glance-metrics dt,
+.glance-metrics dd > span,
+.glance-captured {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.glance-metrics dd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.glance-metrics strong {
+  font-size: 14px;
+  font-weight: 550;
+}
+@media (max-width: 800px) {
+  .usage-window {
+    grid-template-columns: minmax(100px, 1fr) minmax(100px, 1fr);
+  }
+  .usage-window dd:last-child {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
 .settings-page {
   display: flex;
   flex-direction: column;

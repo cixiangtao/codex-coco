@@ -4,11 +4,16 @@ import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/a
 import type { ModuleSnapshot } from "../contracts/modules";
 import { useModules, acceptModuleSnapshot } from "./client/modules";
 import { modulePages } from "./module-pages";
+import { navigation } from "./shell/navigation";
 
 function ModulePanel({ snapshot }: { snapshot: ModuleSnapshot }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const Page = Object.hasOwn(modulePages, snapshot.id) ? modulePages[snapshot.id] : undefined;
+  const Page =
+    !navigation.some((item) => item.id === snapshot.id && item.group === "primary") &&
+    Object.hasOwn(modulePages, snapshot.id)
+      ? modulePages[snapshot.id]
+      : undefined;
   const unavailable = ["invalid", "future-version", "unavailable"].includes(snapshot.config.health);
   async function control(reset: boolean) {
     setBusy(true);
@@ -33,8 +38,15 @@ function ModulePanel({ snapshot }: { snapshot: ModuleSnapshot }) {
     <section aria-label={snapshot.title} className="flex flex-col gap-4">
       <h3>{snapshot.title}</h3>
       <p className="text-muted-foreground">
-        期望：{snapshot.config.enabled ? "启用" : "停用"}；运行阶段：{snapshot.phase}；运行代次：
-        {snapshot.generation}
+        {
+          {
+            disabled: "已停用",
+            starting: "启动中",
+            running: "已启用",
+            stopping: "停止中",
+            error: "需要处理",
+          }[snapshot.phase]
+        }
       </p>
       {(unavailable || snapshot.error) && (
         <Alert variant="destructive">
@@ -81,17 +93,28 @@ function ModulePanel({ snapshot }: { snapshot: ModuleSnapshot }) {
   );
 }
 
-/** Temporary host surface; absent in normal launches while the business registry is empty. */
+/** Primary module pages live in navigation; other registered pages may render their controls here. */
 export function ModulesPanel() {
   const modules = useModules();
   if (!modules.length) return null;
   return (
     <section aria-labelledby="modules-title" className="flex flex-col gap-6">
-      <h2 id="modules-title">模块链路验证</h2>
-      <p className="text-muted-foreground">仅验证合成任务、取消与配置；这里不是正式业务页面。</p>
+      <h2 id="modules-title">已接入的模块</h2>
       {modules.map((snapshot) => (
         <ModulePanel key={snapshot.id} snapshot={snapshot} />
       ))}
     </section>
+  );
+}
+
+export function RegisteredModulePage({ moduleId }: { moduleId: string }) {
+  const snapshot = useModules().find((item) => item.id === moduleId);
+  const Page = Object.hasOwn(modulePages, moduleId) ? modulePages[moduleId] : undefined;
+  return snapshot && Page ? (
+    <Suspense fallback={<p>正在载入模块页面…</p>}>
+      <Page snapshot={snapshot} />
+    </Suspense>
+  ) : (
+    <p>模块页面暂时不可用，请重新打开窗口。</p>
   );
 }

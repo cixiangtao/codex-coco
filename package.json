@@ -23,8 +23,9 @@
     "verify:diagnostics": "pnpm run build && node scripts/verify-diagnostics.mjs",
     "verify:modules": "pnpm run build && node scripts/verify-modules.mjs",
     "verify:workers": "pnpm run build && node scripts/verify-workers.mjs",
+    "verify:usage": "pnpm run build && node scripts/verify-usage.mjs",
     "verify:desktop": "pnpm run build && node scripts/verify-desktop.mjs",
-    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged && node scripts/verify-menu-bar.mjs --packaged && node scripts/verify-workers.mjs --packaged",
+    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged && node scripts/verify-menu-bar.mjs --packaged && node scripts/verify-workers.mjs --packaged && node scripts/verify-usage.mjs --packaged",
     "verify:menu-bar": "pnpm run build && node scripts/verify-menu-bar.mjs",
     "design:review": "pnpm --filter @codex-coco/desktop run design:review",
     "design:build": "pnpm --filter @codex-coco/desktop run design:build"

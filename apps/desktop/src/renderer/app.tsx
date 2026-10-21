@@ -7,6 +7,7 @@ import type { PageId } from "./shell/navigation";
 import { SettingsPage } from "./pages/settings-page";
 import { ModuleManagementPage, ModuleStatusPage } from "./pages/module-status";
 import { useThemeEditor } from "./client/theme-editor";
+import { RegisteredModulePage } from "./modules-panel";
 
 /** Product entry: the accepted shell uses real host settings and keeps preview drafts per window. */
 export function App({ initialPage }: { initialPage: PageId }) {
@@ -41,7 +42,7 @@ export function App({ initialPage }: { initialPage: PageId }) {
           <ModuleStatusPage moduleId="appearance" onPage={setPage} />
         </section>
         <section className="desktop-page" aria-label="用量页面" hidden={page !== "usage"}>
-          <ModuleStatusPage moduleId="usage" onPage={setPage} />
+          <RegisteredModulePage moduleId="usage" />
         </section>
         <section className="desktop-page" aria-label="模块管理页面" hidden={page !== "modules"}>
           <ModuleManagementPage />
