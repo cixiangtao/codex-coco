@@ -446,6 +446,74 @@
 .other-account button {
   flex-shrink: 0;
 }
+.window-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.layout-sidebar {
+  --review-sidebar-width: 168px;
+}
+.layout-sidebar .window-titlebar {
+  grid-template-columns: var(--review-sidebar-width) minmax(0, 1fr);
+  gap: 0;
+  height: 52px;
+  padding-inline: 0;
+  border-bottom: 0;
+}
+.layout-sidebar .window-controls {
+  align-self: stretch;
+  padding-inline: 16px 10px;
+  background: var(--muted);
+}
+.layout-sidebar .window-name {
+  text-align: center;
+}
+.layout-sidebar .window-layout {
+  grid-template-columns: var(--review-sidebar-width) minmax(0, 1fr);
+  min-height: 578px;
+}
+.layout-sidebar .navigation-region {
+  padding: 12px 10px;
+  gap: 0;
+}
+.layout-sidebar .app-navigation {
+  flex: 1;
+  gap: 4px;
+}
+.layout-sidebar .nav-item {
+  min-height: 36px;
+}
+.layout-sidebar .nav-utility-start {
+  margin-top: auto;
+}
+.layout-sidebar .product-content {
+  padding: 24px 40px 40px;
+}
+.layout-sidebar .product-content > div,
+.layout-sidebar .product-content > section {
+  max-width: 860px;
+  margin-inline: auto;
+}
+@media (min-width: 581px) {
+  .layout-sidebar.sidebar-collapsed {
+    --review-sidebar-width: 56px;
+  }
+  .sidebar-collapsed .window-titlebar {
+    grid-template-columns: 168px minmax(0, 1fr);
+  }
+  .sidebar-collapsed .window-controls {
+    background: var(--review-surface);
+  }
+  .sidebar-collapsed .nav-item > span {
+    display: none;
+  }
+  .sidebar-collapsed .nav-item {
+    justify-content: center;
+    padding-inline: 0;
+  }
+}
 .layout-topbar .window-layout {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -1113,4 +1181,40 @@ input:focus-visible {
 .quota-title {
   flex-wrap: wrap;
   gap: 4px 12px;
+}
+
+@media (max-width: 840px) {
+  .layout-sidebar .product-content {
+    padding-inline: 28px;
+  }
+}
+@media (max-width: 580px) {
+  .layout-sidebar .window-titlebar {
+    grid-template-columns: 72px minmax(0, 1fr) 72px;
+  }
+  .layout-sidebar .window-controls {
+    background: var(--review-surface);
+    padding-inline: 12px 0;
+  }
+  .layout-sidebar .sidebar-toggle {
+    display: none;
+  }
+  .layout-sidebar .window-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .layout-sidebar .navigation-region {
+    padding: 10px;
+  }
+  .layout-sidebar .app-navigation {
+    flex-direction: row;
+  }
+  .layout-sidebar .nav-utility-start {
+    margin-top: 0;
+  }
+  .layout-sidebar .nav-item {
+    padding-inline: 6px;
+  }
+  .layout-sidebar .product-content {
+    padding: 24px 20px 32px;
+  }
 }

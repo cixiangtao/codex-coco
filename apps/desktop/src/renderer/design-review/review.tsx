@@ -8,6 +8,8 @@ import {
   Layers3,
   Monitor,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   RefreshCw,
   Settings2,
@@ -27,10 +29,10 @@ import { normalizePrimaryColor } from "@codex-coco/ui/theme/contract";
 
 const directions = {
   sidebar: {
-    name: "A · 固定侧栏",
-    title: "熟悉的桌面秩序",
-    description: "模块一直可见，状态与详情留在同一页。",
-    tradeoff: "适合逐步增加模块；代价是常驻侧栏占用横向空间。",
+    name: "A · 精简侧栏",
+    title: "导航更轻，内容优先",
+    description: "常用模块在上，管理与设置在下。",
+    tradeoff: "侧栏可收起，完整能力留在当前页面。",
   },
   topbar: {
     name: "B · 顶部导航",
@@ -69,7 +71,15 @@ interface SurfaceProps {
   notify(message: string): void;
 }
 
-function Navigation({ page, onChange }: { page: Page; onChange(page: Page): void }) {
+function Navigation({
+  page,
+  onChange,
+  compact = false,
+}: {
+  page: Page;
+  onChange(page: Page): void;
+  compact?: boolean;
+}) {
   return (
     <nav className="app-navigation" aria-label="应用导航">
       {pages.map(({ id, label, icon: Icon }) => (
@@ -77,11 +87,13 @@ function Navigation({ page, onChange }: { page: Page; onChange(page: Page): void
           key={id}
           variant={page === id ? "secondary" : "ghost"}
           aria-current={page === id ? "page" : undefined}
-          className="nav-item"
+          aria-label={compact && id === "modules" ? "模块管理" : label}
+          title={compact && id === "modules" ? "模块管理" : label}
+          className={cn("nav-item", compact && id === "modules" && "nav-utility-start")}
           onClick={() => onChange(id)}
         >
           <Icon data-icon="inline-start" />
-          <span>{label}</span>
+          <span>{compact && id === "modules" ? "模块管理" : label}</span>
         </Button>
       ))}
     </nav>
@@ -652,8 +664,9 @@ export function DesignReview() {
   const query = new URLSearchParams(window.location.search);
   const initial = query.get("direction");
   const [direction, setDirection] = useState<Direction>(
-    initial === "sidebar" || initial === "topbar" ? initial : "workbench",
+    initial === "topbar" || initial === "workbench" ? initial : "sidebar",
   );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [page, setPage] = useState<Page>("appearance");
   const [surface, setSurface] = useState(query.get("surface") === "glance" ? "glance" : "main");
   const [modules, setModules] = useState<ModuleFlags>({ usage: true, appearance: false });
@@ -737,35 +750,59 @@ export function DesignReview() {
         </div>
         {surface === "main" ? (
           <section
-            className={cn("product-window", `layout-${direction}`)}
+            className={cn(
+              "product-window",
+              `layout-${direction}`,
+              direction === "sidebar" && sidebarCollapsed && "sidebar-collapsed",
+            )}
             aria-label={`${selected.name}完整窗口`}
           >
             <header className="window-titlebar">
-              <div className="traffic-lights" aria-hidden="true">
-                <span />
-                <span />
-                <span />
+              <div className="window-controls">
+                <div className="traffic-lights" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                {direction === "sidebar" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="sidebar-toggle"
+                    aria-label={sidebarCollapsed ? "展开侧栏" : "收起侧栏"}
+                    aria-expanded={!sidebarCollapsed}
+                    aria-controls="review-navigation"
+                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  >
+                    {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+                  </Button>
+                )}
               </div>
               <span className="window-name">Codex Coco</span>
-              <span className="window-local">
-                <ShieldCheck aria-hidden="true" />
-                本地运行
-              </span>
+              {direction !== "sidebar" && (
+                <span className="window-local">
+                  <ShieldCheck aria-hidden="true" />
+                  本地运行
+                </span>
+              )}
             </header>
             <div className="window-layout">
-              <aside className="navigation-region">
-                <div className="navigation-caption">工作空间</div>
+              <aside id="review-navigation" className="navigation-region">
+                {direction !== "sidebar" && <div className="navigation-caption">工作空间</div>}
                 <Navigation
                   page={page}
+                  compact={direction === "sidebar"}
                   onChange={(next) => {
                     setPage(next);
                     setMessage("已切换示意页面，不会读取或修改真实数据。");
                   }}
                 />
-                <div className="navigation-footer">
-                  <span className="local-dot" />
-                  {Object.values(modules).filter(Boolean).length} 个模块已启用
-                </div>
+                {direction !== "sidebar" && (
+                  <div className="navigation-footer">
+                    <span className="local-dot" />
+                    {Object.values(modules).filter(Boolean).length} 个模块已启用
+                  </div>
+                )}
               </aside>
               <main className="product-content">
                 {page === "usage" && !modules.usage ? (
@@ -797,13 +834,15 @@ export function DesignReview() {
                 <Inspector state={state} modules={modules} onModules={() => setPage("modules")} />
               )}
             </div>
-            <footer className="window-footer">
-              <span>
-                <span className="local-dot" />
-                {state === "error" ? "保留上次结果" : "示意数据"}
-              </span>
-              <span>不会连接账号或修改外部 Codex</span>
-            </footer>
+            {direction !== "sidebar" && (
+              <footer className="window-footer">
+                <span>
+                  <span className="local-dot" />
+                  {state === "error" ? "保留上次结果" : "示意数据"}
+                </span>
+                <span>不会连接账号或修改外部 Codex</span>
+              </footer>
+            )}
           </section>
         ) : (
           <Glance
