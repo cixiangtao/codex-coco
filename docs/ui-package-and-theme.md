@@ -25,7 +25,6 @@ packages/
     src/
       components/          shadcn/ui 基础控件与通用组合
       hooks/               不依赖桌面宿主的界面 hooks
-      lib/                 cn 等界面工具
       theme/               主题类型、解析、预设、Provider
       styles/              语义变量、Tailwind 映射与基础样式
     components.json
@@ -43,6 +42,8 @@ pnpm-lock.yaml
 ## 组件和样式约定
 
 按钮、输入、选择、弹层等基础控件归组件包；与额度、主题注入、账号等业务数据绑定的复合组件留在对应业务模块。无业务依赖且确实重复使用的组合，再提升到共享包。
+
+类名合并统一使用 `import { cn } from "cn"`，不建立本地封装或重导出。
 
 组件采用语义类名和集中维护的变体。页面使用 className 组织布局；组件的颜色、状态和排版差异通过 token 与组件变体表达，避免每个页面重写样式。组件状态、键盘交互与可访问名称随源码一起维护。
 

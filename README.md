@@ -89,3 +89,7 @@ UI 包不依赖 Electron、Node、IPC 或存储。应用负责偏好持久化、
 [产品约定](PRODUCT.md) · [基建方案](docs/foundation-plan.md) · [当前架构](docs/architecture.md) · [UI 与主题](docs/ui-package-and-theme.md) · [验证记录](docs/verification.md) · [功能重建计划](docs/migration.md) · [原型清理记录](docs/prototype-reset.md) · [来源与许可证](THIRD_PARTY_NOTICES.md)
 
 MIT。Codex Coco 是独立项目，与 OpenAI 没有隶属或官方支持关系。
+
+## 窗口方案评审
+
+执行 `pnpm run design:review`，打开本机 <http://127.0.0.1:5190/>，比较固定侧栏、顶部导航和工具台分栏三个完整窗口方案，以及跨模块菜单栏悬浮窗。可切换明暗主题、主色与用量异常状态。全部使用合成数据与页内交互，正常 Electron 入口仍是基建验证页。`pnpm run design:build` 单独检查评审页构建。方案尚未定稿，详见 [窗口方案评审](docs/design-review.md)。

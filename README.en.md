@@ -43,3 +43,7 @@ There is no account access, usage request, appearance injection, telemetry or cl
 See the [architecture](docs/architecture.md), [theme proposal and implementation status](docs/ui-package-and-theme.md), [verification record](docs/verification.md), and [foundation plan](docs/foundation-plan.md).
 
 MIT. Codex Coco is an independent project and is not affiliated with OpenAI.
+
+## Window design review
+
+Run `pnpm run design:review` and open <http://127.0.0.1:5190/> to compare sidebar, top navigation and split workbench proposals, plus a cross-module menu-bar popover. The review supports light/dark modes, custom primary colors and usage error states. All data is synthetic and interactions remain in memory. The normal Electron entry still opens the foundation verification page. Build the isolated proposal with `pnpm run design:build`. No visual direction has been approved; see the [review notes](docs/design-review.md).
