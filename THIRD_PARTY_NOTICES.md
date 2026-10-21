@@ -24,7 +24,7 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 
 ## 外观模块的 Codex 选择器与布景语义
 
-`apps/desktop/src/modules/appearance/css.ts` 参考 codex-skin 的三层布景与 Codex DOM 选择器，来源为本地只读仓库 `codex-skin`，提交 `9b88ab8a72417b9a69ac4dea1abda4f4a990c354`。原项目使用 MIT 许可，Copyright (c) 2026 cixiangtao。适用 MIT 许可全文见根目录 LICENSE（相同作者与授权文本）。
+`apps/desktop/src/modules/appearance/css.ts` 参考 codex-skin 的三层布景与 Codex DOM 选择器，来源为本地只读仓库 `codex-skin`，提交 `9b88ab8a72417b9a69ac4dea1abda4f4a990c354`。原项目使用 MIT 许可，Copyright (c) 2026 anys。适用 MIT 许可全文见 resources/licenses/codex-skin.txt；根 LICENSE 也保留该声明。
 
 新实现使用 Codex Coco 自己的配置、内容寻址图片库、模块任务和 CDP 连接。未复制旧守护进程、HTTP 设置服务器或配置目录，不操作旧服务；新增菜单栏素材记录如下。样式节点和观察器使用独立标识，撤销仅删除 Codex Coco 自己的布景。
 
@@ -44,7 +44,7 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 
 `apps/desktop/resources/tray/` 中的 19 个 GIF 从 codex-usage 的上述提交承接；原项目记录其来自 [BenignX/BuZhiYin](https://github.com/BenignX/BuZhiYin)，提交 `76aa03fdbdbc905ac42ee4afe9fed35dca351c6b`，MIT，Copyright (c) 2023 BenignX。完整授权见 resources/licenses/BuZhiYin.txt，随桌面资源分发。
 
-pixel-cat 与 pixel-ghost 各四帧 PNG 从 codex-skin 同一来源提交的菜单栏像素素材导出，MIT，Copyright (c) 2026 cixiangtao；许可全文见根 LICENSE。GIF 解码、动画计时、CPU 联动、图片存储和系统适配由 Codex Coco 重写，没有复制两个旧应用的运行时。
+pixel-cat 与 pixel-ghost 各四帧 PNG 从 codex-skin 同一来源提交的菜单栏像素素材导出，MIT，Copyright (c) 2026 anys；许可全文见根 LICENSE。GIF 解码、动画计时、CPU 联动、图片存储和系统适配由 Codex Coco 重写，没有复制两个旧应用的运行时。
 
 ## 外观图库素材
 

@@ -50,7 +50,7 @@
 
 正式主窗口采用已认可的固定图标侧栏与菜单提示，布局基线见 DESIGN.md；base-nova 和工程配色预设不代表最终品牌视觉。按任务工作线程、本地有界诊断与可复现性能采样已接入；独立局部主题作用域仍是后续基建目标；不要把本轮基线描述为 F01–F15 全部完成。
 
-模块接入使用 application/module-host.ts 的 BuiltinModule 合同。后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册；模块自己的纯 contract.ts 与 renderer/ 分别接受合同和浏览器边界检查。配置仅包含可公开的偏好，不保存凭据或私有数据；配置变化供下一次操作使用。CODEX_COCO_FIXTURES=1 仅允许未打包验证环境额外加载合成模块，打包应用始终禁用示例。业务注册表目前包含默认停用的用量与外观模块。
+模块接入使用 application/module-host.ts 的 BuiltinModule 合同。后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册；模块自己的纯 contract.ts 与 renderer/ 分别接受合同和浏览器边界检查。配置仅包含可公开的偏好，不保存凭据或私有数据；配置变化供下一次操作使用。CODEX_COCO_FIXTURES=1 仅允许未打包验证环境额外加载合成模块，打包应用始终禁用示例。业务注册表目前包含默认停用的用量、外观、系统与菜单栏三个模块。
 
 诊断只经 DiagnosticSink 写入固定字段；禁止传入原始异常、请求、配置、结果、路径或账号内容。新增事件与错误码需同步允许列表。默认最多三个 256 KiB 文件，内存队列同时受条数和字节限制；日志失败不阻塞业务。性能采样只由显式脚本触发，不增加常驻轮询；口径与基线见 docs/diagnostics-and-performance.md 和 docs/performance-baseline.md。
 
@@ -62,7 +62,7 @@
 
 用量只在主窗口明确操作或已保存自动刷新策略触发后启动短期 codex app-server，固定调用 initialize/initialized、account/read(refreshToken:false) 与 account/rateLimits/read；不读取原始令牌，不启动模型对话或登录。默认手动策略下启用或重启不读取；主窗口可显式保存 30–3600 秒自动刷新间隔，恢复已保存 opt-in 策略后按间隔执行。stdout 在后台限量解析，stderr 丢弃，子进程退出后才结算。BuiltinModule.glance 的公开字段须宿主严格校验；失败时摘要不携带旧额度。详见 docs/usage.md。
 
-二期从 2026-10-21 起要求覆盖两个旧项目的全部能力，按 docs/phase-two.md 逐项推进。用户允许先实现核心功能，UI 后期调整，不再以“只迁核心”缩小二期目标。外观当前固定本机 CDP 端口，三层布景与多窗口重应用已在受控 Electron 页面及打包版验证；真实聊天客户端未操作。外观启用无副作用，应用需明确操作；停用和退出清理自己的样式，不接管旧服务。
+二期从 2026-10-21 起要求覆盖两个旧项目的全部能力，按 docs/phase-two.md 逐项推进。用户允许先实现核心功能，UI 后期调整，不再以“只迁核心”缩小二期目标。外观支持固定或自动本机 CDP 端口、私有应用选择、显式启动/重启、图库预设与 opt-in 恢复。真实聊天客户端未操作；默认手动应用，保存与应用分离，停用和退出清理自己的样式，不接管旧服务。
 
 用量配置版本 2 将旧空配置迁移为手动读取、通知关闭。自动刷新通过宿主 requestOperation 执行，失败退避、单模块任务约束和停止清理保持有效。系统通知由桌面依赖注入，只接收固定标题和公开额度文案。菜单栏 statusText 为严格限长公开字段，不接收配置或原始账号；完整名称 Codex Coco 始终保留。配置保存通知 runtime.configurationChanged，观察者失败不能把已成功持久化的操作伪报为失败。
 
@@ -71,3 +71,7 @@
 重置卡已通过官方 account/rateLimits/read 与 account/rateLimitResetCredit/consume 接入。消费只允许主窗口明确确认，后台先重新核对账号与引用，发送前持久化 pending 幂等请求；重试必须复用 UUID，未确认请求不能被新请求覆盖。usage-reset-attempts.json 是私有业务状态，允许保存卡 ID 与匿名账号关联，权限 0600，禁止存储令牌。取消/重启后通过检查上次兑换恢复，不代用户消费真实卡。
 
 用量辅助工具已接入模型目录、结构化样本、摘要历史与 CLI 维护。真实模型调用和 CLI 更新仅由主窗口明确确认；自动额度刷新不能触发。样本固定问题通过临时目录、ephemeral、ignore-user-config、ignore-rules、project_doc_max_bytes=0 和禁用工具执行，取消等待所属进程组实际退出。测试必须用受控 CLI，不代用户跑真实推理或更新真实 CLI。模型回答只用于主窗口临时结果，历史/诊断/菜单栏不能复制回答文本。模块 renderer 的 Tailwind 源使用完整文件 glob，保留真实尺寸验收，防止类名未生成却截图误判。
+
+系统与菜单栏模块使用独立配置，GIF 通过 tray-worker 解码。动画或 CPU 联动只在启用时运行，停止清理所有计时器。开机启动限安装版且必须单独确认，保存图标偏好不修改 OS 登录项；停用不撤销 OS 登录项。共享快照只接受 GlanceSnapshot 公共投影，默认关闭。WidgetKit 源码类型检查不代表扩展已签名或注册。
+
+应用更新由应用宿主统一持有，按需加载 electron-updater，普通业务模块不能代为触发。默认无发布源、不查网络；自动检查 opt-in 只读版本，下载和安装分别确认，普通退出不自动安装。未签名本地包必须明确拒绝自替换。更新 IPC 仅主窗口开放，不把发行原始错误、路径或说明写入诊断。真实签名安装和 App Group 配置不在当前本地验收结果内。

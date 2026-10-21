@@ -4,13 +4,29 @@
 
 [English](README.en.md)
 
-Codex Coco 计划将用量监控与外观定制放进一个 Electron 应用，并为后续模块保留独立生命周期和配置边界。个人使用习惯、学习与持续打磨是项目的出发点。
+Codex Coco 将用量、外观和系统偏好放进一个 Electron 应用，为更多模块保留独立生命周期、配置和界面入口。个人使用习惯、学习与持续打磨是项目的出发点。
 
-**当前状态：已接入用量手动读取的本地开发版。** 主窗口采用固定图标侧栏，支持四页导航、菜单提示及真实主题设置。用量模块通过本机 Codex CLI 读取 ChatGPT 订阅额度，主窗口和菜单栏共享快照；默认停用，明确操作后才读取。外观已接入三层布景、图片导入和显式可撤销的本机连接。二期完整目标见 [能力清单](docs/phase-two.md)。旧原型已归档并移除，没有恢复其实现。
+**当前状态：二期核心功能已接入的本地开发版。** 仍只维护本地仓库，未发布、未签名、未公证。真实账号、真实 Codex 版本、系统登录项、签名更新与 Widget 注册的验收边界见 [二期清单](docs/phase-two.md) 和 [验证记录](docs/verification.md)。UI 先保持功能可用，视觉后续统一调整。旧原型已归档并移除，没有恢复旧引擎。
+
+## 当前能力
+
+| 入口     | 核心能力                                                                                                 |
+| -------- | -------------------------------------------------------------------------------------------------------- |
+| 用量     | CLI App Server 额度窗口、恢复时间、手动与 opt-in 后台刷新、失败退避、额度/恢复/重置卡到期通知            |
+| 本地统计 | sessions 与 archived_sessions 增量索引、去重、7/14/30 天趋势、只读 SQLite 估算回退、账号范围与无归属标记 |
+| 用量工具 | 重置卡显式兑换与幂等恢复、模型目录与推理强度、结构化样本、取消、摘要历史、CLI 检测与升级                 |
+| 外观     | 壁纸/主面板/侧栏三层、自定义图片、许可图库、12 组预设、组合预览、拖动和键盘定位、独立保存与应用          |
+| 外观连接 | 固定/自动本机端口、应用选择、显式启动和重启、多窗口与重载重应用、opt-in 启动恢复、实际样式验证与撤销     |
+| 菜单栏   | 跨模块只读速览、额度窗口与标签选择、原生及自定义图标、19 个 GIF、逐图速度、按需 CPU 联动                 |
+| 设置     | 浅色/深色/系统主题、自定义主色、安装版登录项确认、公开共享快照、更新偏好与配置恢复                       |
+| 原生扩展 | WidgetKit 源码与共享合同；已类型检查，仍需 Team、签名与 App Group 注册                                   |
+| 应用更新 | 检查、手动下载与校验、取消、明确安装重启；当前无发布源，未签名包明确拒绝自替换                           |
+
+详细边界：[用量](docs/usage.md) · [外观](docs/appearance.md) · [菜单栏](docs/menu-bar.md) · [应用更新](docs/updates.md)。模型样本用于固定题对比，不代表模型整体能力评价。
 
 ## 开发
 
-使用 Node.js 24、pnpm 12.14.0。需要下载 Electron 的平台二进制，首次安装可能较慢。
+使用 Node.js 24、pnpm 12.14.0。首次安装需要下载 Electron 的平台二进制。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -24,92 +40,70 @@ pnpm run build
 pnpm run start
 ```
 
-检查与本地打包：
+基础检查和完整本地包回归：
 
 ```sh
 pnpm run check
-pnpm run verify:desktop
-pnpm run verify:modules
-pnpm run verify:workers
-pnpm run verify:usage
-pnpm run verify:menu-bar
-pnpm run verify:diagnostics
-pnpm run pack
 pnpm run verify:packaged
 ```
 
-- `check`：Oxfmt、Oxlint、依赖边界、分进程类型、合同测试与生产构建。
-- `verify:desktop`：构建后启动真实 Electron，用临时配置验证主题、IPC、窗口同步、取消和重启恢复，结束后清理进程与数据。
-- `verify:menu-bar`：验证菜单栏开合回调、窗口权限、状态/主题同步、主窗口重开与读取失败恢复，全程使用临时数据。
-- `verify:modules`：构建后用两个合成模块验证任务、取消、独立配置、跨窗口、重启与损坏恢复，全程使用临时目录并自动清理。
-- `verify:workers`：验证真实 Electron 中独立线程构建入口的加载、进度、结果和实际退出，使用临时数据。
-- `verify:usage`：通过临时受控 stdio 服务验证启用、读取、失败恢复、取消、跨窗口与只读摘要，不读取真实账号。
-- `pack`：生成本机未签名的 macOS 应用目录；不是 npm 打包，不执行发布。
-- `verify:packaged`：重新生成本地应用目录，并对其中的应用执行主窗口、速览、线程资源与用量流程回归。此脚本目前针对 macOS arm64。
+`check` 执行 Oxfmt、Oxlint、Oxc AST 依赖边界、分进程类型检查、合同测试和生产构建。`verify:packaged` 重新生成 macOS arm64 未签名应用，并依次执行主窗口、速览、worker、用量、外观、刷新策略、本地趋势、重置卡、模型与 CLI 工具、系统偏好和更新回归。全部使用临时数据与受控服务。
 
-单独执行：`pnpm run format`、`pnpm run format:check`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run test`。始终写明 `pnpm run pack`，避免调用 pnpm 内置的 npm 包打包命令。
+常用独立验收命令：
+
+```sh
+pnpm run verify:desktop
+pnpm run verify:modules
+pnpm run verify:diagnostics
+pnpm run verify:appearance
+pnpm run verify:appearance-launcher
+pnpm run verify:desktop-preferences
+pnpm run verify:updates
+pnpm run verify:widget
+```
+
+`verify:appearance-launcher` 和 `verify:widget` 需要本机已有 Swift 编译器和 macOS SDK，不自动安装工具链。前者启动临时目标；后者仅类型检查原生扩展。其他用量专项脚本见 package.json。
+
+`pnpm run pack` 只生成本机应用目录，不发布；始终保留 `run`，避免调用 pnpm 内置的 npm 打包命令。独立格式化、检查、测试命令分别为 `format`、`format:check`、`lint`、`typecheck`、`test`。
 
 ## 工程边界
 
 ```text
 apps/desktop/src/
-  desktop/       Electron 主进程、preload、协议和系统入口
-  application/   模块生命周期与版本化配置
-  contracts/     纯数据类型、运行时校验与白名单桌面桥合同
-  renderer/      主窗口布局、页面、设置客户端和预览草稿
-  modules/       用量模块与显式开启的合成验收模块
+  desktop/       Electron 适配、preload、协议、原生窗口与系统入口
+  application/   模块生命周期、配置、诊断、共享存储与应用更新状态
+  contracts/     纯数据合同、校验及白名单桌面桥
+  renderer/      主窗口、设置客户端与窗口内草稿
+  modules/       usage、appearance、desktop-tools 和显式验收模块
 packages/ui/src/
-  components/    shadcn 自有组件源码
-  theme/         纯主题合同、解析器与受控 Provider
-  styles/        共享语义变量和 Tailwind 映射
+  components/    Tailwind + shadcn 自定义基础组件
+  theme/         主题合同、解析器与受控 Provider
+  styles/        语义变量与 Tailwind 映射
+native/widget/   WidgetKit 源码与接入说明
 ```
 
-Oxfmt 管格式，Oxlint 检查代码问题。基于 Oxc AST 的依赖检查阻止跨进程、跨模块和 UI 包到宿主的非法导入；TypeScript 对 Node、preload、合同、renderer、UI 包和测试分别检查。
+后台与页面分别静态注册。每个业务模块有独立版本化配置与写入队列，固定操作名、输入和公开结果均经校验；每个模块同时执行一个操作。取消、停用和退出等待资源实际释放，清理失败不伪称成功。默认三个业务模块均停用，不加载示例；未打包验收可显式使用 `CODEX_COCO_FIXTURES=1`，打包应用忽略该开关。
 
-## 模块接入基础
+重计算按任务创建 worker，不失败回退到主线程。UI 包不依赖 Electron、Node、IPC、业务后台或存储。Oxc AST 检查实际导入目标，阻止跨进程、跨模块和 UI 到宿主的非法依赖。详见 [模块开发](docs/module-development.md)、[工作线程](docs/worker-tasks.md) 与 [UI 和主题](docs/ui-package-and-theme.md)。
 
-后台与页面分别静态注册，固定操作名与输入、公开结果均由模块声明校验。每个模块有独立的版本化配置和写入队列；保存冲突、迁移备份与损坏恢复不影响其他模块。每个模块同时运行一个操作，取消须等待任务实际结束；超时未释放资源时保留错误，不伪装成停用成功。
+## 使用和数据
 
-普通启动注册默认停用的用量模块，不注册示例。`verify:modules` 显式开启未打包环境的 `CODEX_COCO_FIXTURES=1`，额外运行合成示例；打包应用忽略该开关。配置只保存可公开偏好，配置变更供下一次操作使用。接入方式见 [模块开发](docs/module-development.md)。
+用量需要本机可运行的 Codex CLI 和 ChatGPT 登录。默认手动策略不会在启用、重启或打开窗口时读取账号；只有明确操作或已保存的 opt-in 刷新策略触发读取。本地扫描也需明确操作或 opt-in 回退策略。Codex Coco 不直接读取登录令牌，不自动创建模型对话。样本推理、重置卡消费和 CLI 升级各自明确确认。
 
-重计算通过按任务创建的工作线程执行，取消、超时、停用及退出等待真实线程释放，不回退到主线程。合成模块已使用该路径；固定消息经过 JSON、大小与结构校验，业务结果仍由模块合同再次校验。详见 [工作线程](docs/worker-tasks.md)。
+主窗口承载完整模块能力，固定图标侧栏支持 hover 与键盘提示。点击菜单栏 Codex Coco 或按 Cmd+Shift+M 打开速览，失焦/Esc 收起。速览只收到白名单公开投影，不收到完整结果、配置、凭据、路径或模型回答，也不能执行写操作。失败时隐藏旧额度，恢复操作优先。
 
-## 菜单栏速览
+外观图片复制到独立内容寻址目录，不改原文件。保存配置、预设和预览不等于应用；明确应用后才修改目标样式。保存的自动恢复策略只在下次启用时恢复连接，不自动启动或重启 Codex。停用/退出撤销自己的样式，不停止其他主题工具、不改安装包。
 
-点击菜单栏中的 Codex Coco 开合悬浮窗，或使用应用菜单“显示或收起速览”（Cmd+Shift+M）。速览提供跨模块状态，失焦或按 Esc 收起，可跳转到主窗口的对应页面；关闭全部主窗口后，仍能从菜单栏重新打开。它跟随已保存主题，主窗口尚未保存的预览不会同步进去。
+默认配置位于 `~/Library/Application Support/Codex Coco/foundation/`；开发与验证可用 `CODEX_COCO_DATA_DIR` 隔离。设置和旧应用数据不混用，不读取两个旧仓库的配置。诊断只保存固定事件、耗时、错误码和关联 ID，排除原始异常、配置、账号、模型回答与私有路径。没有遥测或云同步。
 
-启用并手动读取后，速览展示用量窗口、剩余比例、恢复时间与读取时间。读取失败时隐藏旧额度，提供主窗口恢复入口；外观提供连接与同步状态摘要。新增注册模块会加入状态摘要，完整操作仍在主窗口。速览的刷新按钮只读取摘要，不发起账号请求。详见 [菜单栏与权限边界](docs/menu-bar.md)。
+应用更新默认空源和手动检查；后台检查只查版本，不自动下载或安装。当前没有公开发布渠道。Widget 共享默认关闭，实际原生扩展注册步骤见 [native/widget](native/widget/README.md)。
 
-## 用量读取
+## 验证和后续
 
-本机需要可运行的 Codex CLI，并使用 ChatGPT 账号登录。打开“用量 → 启用并读取用量”获取记录；后续手动刷新，也可取消。模块管理可以停用。恢复启用状态、重启和新开窗口不会自动读取账号。
+当前优先验证 macOS arm64，本地包仍使用 Electron 默认图标。受控 Electron 页面、CLI 与更新引擎验证不能替代真实账号、真实目标版本、签名安装或系统扩展验收。完整记录在 [验证记录](docs/verification.md)，待真实环境确认的条目在 [二期清单](docs/phase-two.md)。
 
-通过官方 App Server 的只读用量协议读取，Codex Coco 不直接读取或保存登录令牌，不创建对话。失败时先显示恢复路径，上次成功记录默认折叠；未知数据不会显示为零。当前没有自动刷新、趋势、多账号或通知。详见 [数据来源、权限与验证边界](docs/usage.md)。
+`profile:desktop` / `profile:packaged` 使用临时数据测启动及所有 Electron 进程的 CPU、工作集。功能增加后没有重新建立性能基线，不宣称本轮性能达标。参见 [测量口径](docs/diagnostics-and-performance.md)。历史界面对照可用 `design:review` 查看，包含合成数据，正式应用不加载该入口。
 
-## 当前主题能力
-
-浅色、深色、跟随系统；中性、蓝色和紫色工程预设；支持 HEX 自定义主色，自动生成文字、悬停/按下、选中和焦点变量。预设属于工程配色；主窗口布局基线见 [界面基线](DESIGN.md)。
-
-切换页面保留未保存输入，未保存修改只在当前窗口预览。保存后原子写入并通知其他窗口，过期 revision 会被拒绝；取消恢复最新保存状态。损坏或未来版本的配置保留原件，显式恢复时先备份。Dialog 继承文档根主题，支持键盘关闭和焦点返回。
-
-UI 包不依赖 Electron、Node、IPC 或存储。应用负责偏好持久化、恢复和窗口同步。Codex Coco 自身主题与未来外部 Codex 布景业务分别管理。
-
-## 诊断与性能
-
-本地结构化日志记录固定事件、耗时、错误码和关联 ID，不保存配置内容、原始异常或账号信息。默认最多三个 256 KiB 文件，内存队列最多 256 条/128 KiB，写入失败不阻塞应用；verify:diagnostics 验证真实桌面行为。
-
-`pnpm run profile:desktop` 测生产文件，`pnpm run profile:packaged` 测重新生成的 macOS 应用。两者使用独立临时数据，记录窗口启动及 Browser/Tab/GPU/Utility 等进程的 CPU、工作集；应用不常驻采样。结果用于本机比较，不代表跨设备性能达标。详见 [诊断与测量口径](docs/diagnostics-and-performance.md) 和 [性能基线](docs/performance-baseline.md)。
-
-## 数据与交付
-
-默认配置位于 `~/Library/Application Support/Codex Coco/foundation/`，与已归档原型的数据隔离。开发与验证可用 `CODEX_COCO_DATA_DIR` 指向其他目录。用量只在手动操作后通过 CLI 读取，公开结果不包含邮箱或令牌；外观仅在主窗口明确应用后连接本机 Codex，退出与停用时撤销自己的样式；没有遥测或云同步，不读取旧应用配置。
-
-目前先验证 macOS arm64。应用目录仍使用 Electron 默认图标，跳过签名，未公证，也没有更新或公开发布。两个旧仓库和已有应用数据保持原样；仓库只在本地维护，未配置远端。
-
-[产品约定](PRODUCT.md) · [基建方案](docs/foundation-plan.md) · [当前架构](docs/architecture.md) · [正式主窗口](docs/main-window.md) · [菜单栏速览](docs/menu-bar.md) · [UI 与主题](docs/ui-package-and-theme.md) · [验证记录](docs/verification.md) · [功能重建计划](docs/migration.md) · [原型清理记录](docs/prototype-reset.md) · [来源与许可证](THIRD_PARTY_NOTICES.md)
+[产品约定](PRODUCT.md) · [架构](docs/architecture.md) · [界面基线](DESIGN.md) · [来源与许可证](THIRD_PARTY_NOTICES.md)
 
 MIT。Codex Coco 是独立项目，与 OpenAI 没有隶属或官方支持关系。
-
-## 窗口方案评审
-
-执行 `pnpm run design:review`，打开本机 <http://127.0.0.1:5190/>，默认查看精简侧栏方案，也可比较顶部导航和工具台分栏，以及跨模块菜单栏悬浮窗。精简侧栏支持折叠，常用模块在上、模块管理和设置在下；可切换明暗主题、主色与用量异常状态。全部使用合成数据与页内交互，正常 Electron 入口已使用独立实现的精简侧栏和真实设置，不加载这些示意数据。`pnpm run design:build` 单独检查评审页构建。方案尚未定稿，详见 [窗口方案评审](docs/design-review.md)。

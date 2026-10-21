@@ -4,63 +4,46 @@ A Codex desktop companion, shaped around personal workflows.
 
 [中文](README.md)
 
-**Status: local development build with manual usage reads.** The fixed icon sidebar supports four-page navigation, themed tooltips and real theme settings. The usage module reads ChatGPT subscription quotas through the installed Codex CLI, sharing one snapshot between main windows and the menu bar. It is disabled by default and reads only on explicit action. The appearance module supports three independent layers, imported images and explicit reversible application through local CDP. See the [phase-two checklist](docs/phase-two.md) for the complete scope. The previous prototype remains removed and archived.
+**Status: local development build with phase-two core features implemented.** This remains a local-only repository. There is no public release, update feed, code signing or notarization. UI refinement follows core functionality. Controlled tests do not substitute for real-account, current-Codex, signed-update or Widget registration acceptance; see the [phase-two checklist](docs/phase-two.md).
+
+## Features
+
+- Usage: CLI App Server quota windows, reset timing, opt-in background refresh and notifications, incremental local JSONL trends, deduplication, account scoping and read-only SQLite estimates.
+- Usage tools: explicitly confirmed reset-card redemption with persisted idempotent recovery, model/effort discovery, structured fixed samples, cancellation, summary history and CLI maintenance.
+- Appearance: three independent layers, content-addressed image imports, licensed gallery, named presets, local composition preview, pointer/keyboard positioning and separate save/apply actions.
+- Connections: fixed or allocated loopback ports, private application selection, explicit launch/restart, multi-window/reload synchronization, opt-in recovery, computed-style verification and revocation.
+- Menu bar: read-only cross-module summaries, quota labels, native/custom icons, 19 licensed GIFs, per-icon speed and optional CPU-linked animation.
+- Settings: light/dark/system modes, custom primary color, explicit packaged-app login-item changes, public shared snapshots and update preferences.
+- WidgetKit: native extension source and shared-state contract, typechecked but not signed or registered.
+- Application updates: version checks, confirmed download/checksum validation, cancellation and explicit native installation/relaunch. Unsigned builds reject replacement; no feed is configured by default.
 
 ## Development
 
-Use Node.js 24 and pnpm 12.14.0. Initial installation downloads the platform Electron binary.
+Use Node.js 24 and pnpm 12.14.0.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm run dev
 pnpm run check
-pnpm run verify:desktop
-pnpm run verify:modules
-pnpm run verify:workers
-pnpm run verify:usage
-pnpm run verify:menu-bar
+pnpm run verify:packaged
 ```
 
-`check` runs Oxfmt, Oxlint, AST dependency-boundary checks, separate TypeScript configurations, contract tests and the production build. `verify:desktop` launches real Electron with temporary application data and checks production loading, theme preview/save/cancel, IPC validation, window synchronization and restart persistence.
+`check` runs Oxfmt, Oxlint, Oxc AST dependency checks, process-specific TypeScript checks, contract tests and production builds. `verify:packaged` builds a local unsigned macOS arm64 directory and runs eleven controlled desktop workflows. `pnpm run pack` never publishes; keep `run` to avoid pnpm's npm-package command.
 
-`pnpm run build` builds production files; `pnpm run start` opens them. `pnpm run pack` creates an unsigned local macOS application directory. `pnpm run verify:packaged` packages and tests the main window, popover, worker resource and usage workflow, currently on macOS arm64. Use the explicit `run` syntax so `pack` does not invoke pnpm's npm-package archive command.
+Optional `verify:appearance-launcher` and `verify:widget` require an existing Swift compiler and macOS SDK; they do not install a toolchain. See package.json for individual desktop and usage verification commands. Run production files using `pnpm run build` followed by `pnpm run start`.
 
-`verify:modules` exercises two synthetic built-in modules through real Electron: whitelisted operations, progress, cancellation, independent versioned configuration, cross-window conflicts, window reopening, restart persistence and backed-up recovery. It uses temporary data. Fixtures require an explicit opt-in in unpackaged environments and are always disabled in packaged builds. The usage business module is registered separately and disabled by default. See [module development](docs/module-development.md).
+## Architecture and data
 
-Each worker task owns a separate thread and waits for its actual exit before settlement. Cancellation, timeout, module disable and shutdown terminate the worker without main-thread fallback. JSON messages have strict schemas and a size limit; module-specific output validation still applies. `verify:workers` checks the emitted entry in real Electron, including packaged resources. See [worker tasks](docs/worker-tasks.md).
+`apps/desktop` owns the Electron host, application services, contracts, renderer and independent `usage`, `appearance`, `desktop-tools` modules. `packages/ui` owns Tailwind/shadcn components and theme primitives without Node, Electron, IPC or storage dependencies. `native/widget` contains the native extension source. Task workers have static build entries, bounded messages and real cancellation/exit verification.
 
-## Menu-bar popover
+Business modules are disabled by default. Usage reads and local scanning require explicit actions or saved opt-in policies; model inference, credit redemption and CLI updates require their own confirmations. Credentials stay with the CLI. Sample answers are excluded from persisted history, diagnostics and menu-bar projections.
 
-Click Codex Coco in the menu bar, or use the application menu action (Cmd+Shift+M). The popover closes on blur or Escape and opens the requested page in an existing or newly created main window. It displays public module states and saved usage metrics, following saved themes without preview-draft leakage. Failed reads hide old quotas and link to recovery in the main window. Appearance remains unimplemented. Module operations and settings writes remain restricted to main windows.
+The main window hosts full operations; the menu-bar popover receives only public summaries and cannot write. Failures hide old quota values. Appearance saving and previewing do not apply changes. Opt-in restoration reconnects without automatically launching or restarting Codex; shutdown removes only Codex Coco styles.
 
-## Manual usage reads
+Settings default to `~/Library/Application Support/Codex Coco/foundation/`; override with `CODEX_COCO_DATA_DIR` for isolated development. Old repositories, settings and services are untouched. Diagnostics exclude private paths, account data, configuration contents and raw exceptions. There is no telemetry or cloud synchronization.
 
-Install and sign in to the Codex CLI with a ChatGPT account, then open Usage and explicitly enable/read. The read-only App Server flow does not create conversations or directly read tokens. It shows quota windows, remaining percentages, reset times and capture time. Reads can be cancelled; failures prioritize recovery and collapse prior records. Restarting, enabling alone and opening another window do not trigger reads. Automatic refresh, trends, multi-account management and notifications are not implemented.
+Update checks are manual by default; opt-in checks never download automatically, and downloaded packages are not installed on ordinary quit. Native signed installation and Widget App Group registration still need a future authorized distribution setup. The current application uses Electron's default icon and remains unsigned/unnotarized. See [updates](docs/updates.md), [appearance](docs/appearance.md), [verification](docs/verification.md), [architecture](docs/architecture.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
-`verify:usage` uses a controlled temporary stdio service rather than a real account, including packaged-app checks. A separate isolated, signed-out local CLI handshake was verified without requesting quotas. See [source and verification boundaries](docs/usage.md).
-
-`pnpm run verify:menu-bar` exercises this path with isolated data. See [lifecycle, permissions and verification boundaries](docs/menu-bar.md).
-
-## Diagnostics and profiling
-
-Local structured diagnostics retain only allowlisted metadata and correlation IDs, without payloads, configuration values or raw exceptions. Disk retention is bounded to three 256 KiB files; the queue is bounded to 256 records and 128 KiB. Logging failures do not block the application. Run `pnpm run verify:diagnostics` for desktop verification.
-
-`pnpm run profile:desktop` measures production files; `pnpm run profile:packaged` builds and measures the local macOS application. Reports include startup milestones and all Electron process CPU/working-set samples, using temporary data and no resident sampling timer. These are machine-specific reference measurements, not performance budgets. See [methodology](docs/diagnostics-and-performance.md) and [baseline](docs/performance-baseline.md).
-
-## Structure and themes
-
-`apps/desktop` owns Electron integration, module lifecycles, settings and the renderer. The private `packages/ui` package owns customized shadcn components, Tailwind semantic tokens and a controlled ThemeProvider. It has no Electron, Node, IPC or storage dependency.
-
-Themes support light/dark/system modes, engineering presets and custom HEX primary colors. Page navigation preserves unsaved input. Preview drafts remain local to their window; saving persists and broadcasts a validated revision. Conflicting writes are rejected. Invalid or future-version settings are preserved, and explicit recovery backs up the original. Theme settings are separate from future external Codex appearance customization.
-
-Default application settings live under `~/Library/Application Support/Codex Coco/foundation/`, isolated from the archived prototype. Override this with `CODEX_COCO_DATA_DIR` for development. Automated desktop verification uses and removes temporary directories.
-
-Usage reads occur only on explicit action through the CLI; public snapshots exclude emails and tokens. Appearance changes require an explicit main-window action and are removed when the module stops. There is no telemetry or cloud synchronization. The old repositories and existing application data are untouched. This remains a local-only repository. The generated application uses Electron's default icon, is unsigned and unnotarized, and has no public release or update channel.
-
-See the [main-window notes](docs/main-window.md), [design baseline](DESIGN.md), [architecture](docs/architecture.md), [theme proposal and implementation status](docs/ui-package-and-theme.md), [verification record](docs/verification.md), and [foundation plan](docs/foundation-plan.md).
+Performance scripts provide isolated machine-specific measurements. No new performance baseline was established for this feature batch.
 
 MIT. Codex Coco is an independent project and is not affiliated with OpenAI.
-
-## Window design review
-
-Run `pnpm run design:review` and open <http://127.0.0.1:5190/> to view the default slim sidebar, with top navigation and split workbench alternatives, plus a cross-module menu-bar popover. The slim sidebar groups usage/appearance at the top and management/settings at the bottom, and can collapse to icons. The review supports light/dark modes, custom primary colors and usage error states. All data is synthetic and interactions remain in memory. The normal Electron entry uses the implemented slim sidebar and real settings, independently of these synthetic proposals. Build the isolated proposal with `pnpm run design:build`. The sidebar direction has been selected for refinement; final visual details remain under review. See the [review notes](docs/design-review.md).

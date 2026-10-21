@@ -62,7 +62,7 @@ ModuleHost 在现有 ModuleManager 上装配内置模块、独立配置与操作
 
 后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册。模块自己的 contract.ts 接受纯合同检查，renderer/ 接受浏览器检查；各自不能导入模块后台，主进程类型入口排除模块 renderer。状态事件以模块 revision 单调排序并带 generation，客户端拒绝旧推送；每模块只保留当前/最近一次任务，不积累历史。
 
-两个合成实例只在未打包环境且 CODEX_COCO_FIXTURES=1 时额外注册。默认启动与打包应用均关闭示例，业务注册表包含默认停用的用量与外观模块。真实 Electron 的模块回归由 verify:modules 覆盖。有界诊断与显式性能采样已接入。
+两个合成实例只在未打包环境且 CODEX_COCO_FIXTURES=1 时额外注册。默认启动与打包应用均关闭示例，业务注册表包含默认停用的用量、外观、系统与菜单栏三个模块。真实 Electron 的模块回归由 verify:modules 覆盖。有界诊断与显式性能采样已接入。
 
 用量模块只在明确的 refresh 操作中启动 CLI App Server，固定握手、检查登录类型并读取额度，close 后才结算。运行时将响应投影成纯数字窗口与读取时间，不保存原始响应或令牌。来源异常为可恢复的严格公开结果，取消及清理继续由 ModuleHost 管理。主要页面与菜单栏分别消费完整公开快照和严格的 GlanceDetail；速览仍没有模块操作权限。详见 [用量模块](usage.md)。
 
@@ -83,3 +83,11 @@ DiagnosticLog 在主进程拥有磁盘队列，ModuleHost 仅通过 DiagnosticSi
 每个文件不超过 256 KiB，保留三个文件；内存队列最多 256 条/128 KiB。轮转和写入均为异步，IO 失败暂停本会话日志，不阻塞模块。退出完成模块和配置清理后，日志最多再等待一秒。正常取消与失败分别记录，进度更新不逐次落盘。
 
 窗口 ready 日志每个窗口只记录一次，计时覆盖窗口创建到 renderer 握手，不等同首帧。性能脚本经 Playwright 主进程上下文调用 getAppMetrics，不给 renderer 新增系统权限，也不引入常驻采样定时器。完整口径见 [诊断与性能](diagnostics-and-performance.md)。
+
+## 二期宿主服务
+
+用量的本地索引和菜单栏 GIF 分别使用 usage-worker 与 tray-worker 的独立构建入口。共享内容寻址图片存储只接收本机文件选择器提供的路径，对外提供经过校验的资产 ID 和有界缩略图。系统登录项、原生通知、文件选择和 Tray 更新由桌面适配注入，不从业务模块调用 Electron。
+
+应用更新由 application/updates.ts 管理状态、配置、冲突与后台检查，desktop/main/updates.ts 按需加载更新引擎。它是应用级服务，资源持续归宿主所有直到退出，不随某个业务模块的停用脱离管理。更新桥仅主窗口开放；默认无发布源和后台检查。下载、取消、完整性验证与显式签名安装的边界见 [应用更新](updates.md)。
+
+外观 v2 增加图库、预设、私有应用选择、固定/自动端口和 opt-in 恢复。后台同步保留上次明确应用的配置，保存新的配置不隐式改变目标。退出清理、图层验证与受控启动见 [外观模块](appearance.md)。
