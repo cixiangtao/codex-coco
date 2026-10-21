@@ -1,6 +1,6 @@
 # 当前架构与模块边界
 
-2026-10-21：新基建已从零实现，可运行真实 Electron 和本地应用目录。当前界面用于验证工程能力；没有用量或外观业务模块，正式布局仍待评审。
+2026-10-21：新基建已从零实现，可运行真实 Electron 和本地应用目录。正式主窗口已采用用户认可的精简侧栏，设置页接入真实主题配置；没有用量或外观业务模块与菜单栏速览。
 
 ## 目录
 
@@ -10,7 +10,7 @@ apps/desktop/
   src/desktop/preload/   沙箱 CJS 桥，只暴露固定方法
   src/application/      模块生命周期、操作宿主、应用与模块配置
   src/contracts/        纯数据合同、Zod 校验与 IPC 通道定义
-  src/renderer/         React 验证页、设置客户端与本地预览
+  src/renderer/         主窗口布局、页面、设置客户端与本地预览
   src/modules/registry  业务注册为空；显式验证开关注册合成模块
 packages/ui/
   src/components/       自有 shadcn 组件源码
@@ -39,6 +39,10 @@ SettingsStore 保存 schemaVersion、revision 与 theme。Zod 同时校验模式
 应用维护保存快照；每个 renderer 持有自己的预览草稿。取消恢复最新保存快照，保存成功后广播；有草稿的其他窗口保留预览并显示冲突。订阅先于 bootstrap 建立，旧 revision 推送不能回退状态。
 
 UI 包只维护组件、语义变量与受控 Provider。纯主题子路径可由后台和合同消费，不加载 React。窗口在有效主题应用后显示，原生背景按保存模式匹配；Dialog 挂到 body 并继承根主题。独立局部主题作用域尚未实现。
+
+## 主窗口状态
+
+renderer/shell 负责应用导航与折叠，renderer/pages 放置页面，client/theme-editor.ts 维护窗口级主题草稿。页面保持挂载并 hidden 切换，未保存主题与模块草稿跨导航保留；路由不修改 URL，不扩大桌面桥信任范围。未注册业务模块只显示真实建设状态。详见 [正式主窗口](main-window.md)。
 
 ## 模块生命周期
 

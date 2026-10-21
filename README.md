@@ -6,7 +6,7 @@
 
 Codex Coco 计划将用量监控与外观定制放进一个 Electron 应用，并为后续模块保留独立生命周期和配置边界。个人使用习惯、学习与持续打磨是项目的出发点。
 
-**当前状态：可运行的本地基建验证版。** 已从零搭建 Electron、React、TypeScript、独立 UI 包、主题基础与工程检查。用量和外观业务尚未接入，当前验证页不代表正式产品布局或已认可的视觉方向。旧原型已归档并移除，没有恢复其实现。
+**当前状态：正式主窗口与主题设置已接入的本地开发版。** 主窗口采用已认可的精简侧栏，支持四页导航和侧栏折叠；设置具备真实预览、保存、取消及跨窗口同步。用量、外观业务和菜单栏速览尚未接入，不显示模拟业务数据。旧原型已归档并移除，没有恢复其实现。
 
 ## 开发
 
@@ -50,7 +50,7 @@ apps/desktop/src/
   desktop/       Electron 主进程、preload、协议和系统入口
   application/   模块生命周期与版本化配置
   contracts/     纯数据类型、运行时校验与白名单桌面桥合同
-  renderer/      React 验证页、设置客户端和预览草稿
+  renderer/      主窗口布局、页面、设置客户端和预览草稿
   modules/       业务注册表为空；含显式开启的合成验收模块
 packages/ui/src/
   components/    shadcn 自有组件源码
@@ -68,9 +68,9 @@ Oxfmt 管格式，Oxlint 检查代码问题。基于 Oxc AST 的依赖检查阻�
 
 ## 当前主题能力
 
-浅色、深色、跟随系统；中性、蓝色和紫色工程预设；支持 HEX 自定义主色，自动生成文字、悬停/按下、选中和焦点变量。预设用于验证机制，正式视觉仍待评审。
+浅色、深色、跟随系统；中性、蓝色和紫色工程预设；支持 HEX 自定义主色，自动生成文字、悬停/按下、选中和焦点变量。预设属于工程配色；主窗口布局基线见 [界面基线](DESIGN.md)。
 
-未保存修改只在当前窗口预览。保存后原子写入并通知其他窗口，过期 revision 会被拒绝；取消恢复最新保存状态。损坏或未来版本的配置保留原件，显式恢复时先备份。Dialog 继承文档根主题，支持键盘关闭和焦点返回。
+切换页面保留未保存输入，未保存修改只在当前窗口预览。保存后原子写入并通知其他窗口，过期 revision 会被拒绝；取消恢复最新保存状态。损坏或未来版本的配置保留原件，显式恢复时先备份。Dialog 继承文档根主题，支持键盘关闭和焦点返回。
 
 UI 包不依赖 Electron、Node、IPC 或存储。应用负责偏好持久化、恢复和窗口同步。Codex Coco 自身主题与未来外部 Codex 布景业务分别管理。
 
@@ -86,10 +86,10 @@ UI 包不依赖 Electron、Node、IPC 或存储。应用负责偏好持久化、
 
 目前先验证 macOS arm64。应用目录仍使用 Electron 默认图标，跳过签名，未公证，也没有更新或公开发布。两个旧仓库和已有应用数据保持原样；仓库只在本地维护，未配置远端。
 
-[产品约定](PRODUCT.md) · [基建方案](docs/foundation-plan.md) · [当前架构](docs/architecture.md) · [UI 与主题](docs/ui-package-and-theme.md) · [验证记录](docs/verification.md) · [功能重建计划](docs/migration.md) · [原型清理记录](docs/prototype-reset.md) · [来源与许可证](THIRD_PARTY_NOTICES.md)
+[产品约定](PRODUCT.md) · [基建方案](docs/foundation-plan.md) · [当前架构](docs/architecture.md) · [正式主窗口](docs/main-window.md) · [UI 与主题](docs/ui-package-and-theme.md) · [验证记录](docs/verification.md) · [功能重建计划](docs/migration.md) · [原型清理记录](docs/prototype-reset.md) · [来源与许可证](THIRD_PARTY_NOTICES.md)
 
 MIT。Codex Coco 是独立项目，与 OpenAI 没有隶属或官方支持关系。
 
 ## 窗口方案评审
 
-执行 `pnpm run design:review`，打开本机 <http://127.0.0.1:5190/>，默认查看精简侧栏方案，也可比较顶部导航和工具台分栏，以及跨模块菜单栏悬浮窗。精简侧栏支持折叠，常用模块在上、模块管理和设置在下；可切换明暗主题、主色与用量异常状态。全部使用合成数据与页内交互，正常 Electron 入口仍是基建验证页。`pnpm run design:build` 单独检查评审页构建。方案尚未定稿，详见 [窗口方案评审](docs/design-review.md)。
+执行 `pnpm run design:review`，打开本机 <http://127.0.0.1:5190/>，默认查看精简侧栏方案，也可比较顶部导航和工具台分栏，以及跨模块菜单栏悬浮窗。精简侧栏支持折叠，常用模块在上、模块管理和设置在下；可切换明暗主题、主色与用量异常状态。全部使用合成数据与页内交互，正常 Electron 入口已使用独立实现的精简侧栏和真实设置，不加载这些示意数据。`pnpm run design:build` 单独检查评审页构建。方案尚未定稿，详见 [窗口方案评审](docs/design-review.md)。

@@ -4,7 +4,7 @@ A Codex desktop companion, shaped around personal workflows.
 
 [中文](README.md)
 
-**Status: runnable local foundation verification build.** The previous prototype was removed and archived. Electron, React, TypeScript, a shared UI package, theme preferences and engineering checks have now been built from scratch. Usage and appearance business modules are not implemented. The verification page is not the approved product design.
+**Status: local development build with a real main-window shell and theme settings.** The accepted slim sidebar is now part of the normal Electron entry, with four-page navigation and collapse support. Theme preview, cancel, save and cross-window synchronization use the existing host service. Usage, external appearance and the menu-bar popover are not implemented; no synthetic business data is shown. The previous prototype remains removed and archived.
 
 ## Development
 
@@ -34,16 +34,16 @@ Local structured diagnostics retain only allowlisted metadata and correlation ID
 
 `apps/desktop` owns Electron integration, module lifecycles, settings and the renderer. The private `packages/ui` package owns customized shadcn components, Tailwind semantic tokens and a controlled ThemeProvider. It has no Electron, Node, IPC or storage dependency.
 
-Themes support light/dark/system modes, engineering presets and custom HEX primary colors. Preview drafts remain local to their window; saving persists and broadcasts a validated revision. Conflicting writes are rejected. Invalid or future-version settings are preserved, and explicit recovery backs up the original. Theme settings are separate from future external Codex appearance customization.
+Themes support light/dark/system modes, engineering presets and custom HEX primary colors. Page navigation preserves unsaved input. Preview drafts remain local to their window; saving persists and broadcasts a validated revision. Conflicting writes are rejected. Invalid or future-version settings are preserved, and explicit recovery backs up the original. Theme settings are separate from future external Codex appearance customization.
 
 Default application settings live under `~/Library/Application Support/Codex Coco/foundation/`, isolated from the archived prototype. Override this with `CODEX_COCO_DATA_DIR` for development. Automated desktop verification uses and removes temporary directories.
 
 There is no account access, usage request, appearance injection, telemetry or cloud synchronization. The old repositories and existing application data are untouched. This remains a local-only repository. The generated application uses Electron's default icon, is unsigned and unnotarized, and has no public release or update channel.
 
-See the [architecture](docs/architecture.md), [theme proposal and implementation status](docs/ui-package-and-theme.md), [verification record](docs/verification.md), and [foundation plan](docs/foundation-plan.md).
+See the [main-window notes](docs/main-window.md), [design baseline](DESIGN.md), [architecture](docs/architecture.md), [theme proposal and implementation status](docs/ui-package-and-theme.md), [verification record](docs/verification.md), and [foundation plan](docs/foundation-plan.md).
 
 MIT. Codex Coco is an independent project and is not affiliated with OpenAI.
 
 ## Window design review
 
-Run `pnpm run design:review` and open <http://127.0.0.1:5190/> to view the default slim sidebar, with top navigation and split workbench alternatives, plus a cross-module menu-bar popover. The slim sidebar groups usage/appearance at the top and management/settings at the bottom, and can collapse to icons. The review supports light/dark modes, custom primary colors and usage error states. All data is synthetic and interactions remain in memory. The normal Electron entry still opens the foundation verification page. Build the isolated proposal with `pnpm run design:build`. The sidebar direction has been selected for refinement; final visual details remain under review. See the [review notes](docs/design-review.md).
+Run `pnpm run design:review` and open <http://127.0.0.1:5190/> to view the default slim sidebar, with top navigation and split workbench alternatives, plus a cross-module menu-bar popover. The slim sidebar groups usage/appearance at the top and management/settings at the bottom, and can collapse to icons. The review supports light/dark modes, custom primary colors and usage error states. All data is synthetic and interactions remain in memory. The normal Electron entry uses the implemented slim sidebar and real settings, independently of these synthetic proposals. Build the isolated proposal with `pnpm run design:build`. The sidebar direction has been selected for refinement; final visual details remain under review. See the [review notes](docs/design-review.md).

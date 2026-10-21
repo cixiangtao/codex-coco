@@ -17,7 +17,8 @@ apps/
       contracts/           应用级纯数据合同
       renderer/
         shell/             窗口布局与导航
-        theme/             主题设置与共享 UI 包的应用适配
+        pages/             设置页与模块页面
+        client/            设置快照、草稿与模块订阅
         client/            类型化桌面调用
       modules/             各业务模块的合同、运行时与页面
 packages/
@@ -110,4 +111,4 @@ system 模式随系统外观变化；明确选择 light 或 dark 时保持用户
 
 根 ThemeProvider 支持三种显示模式、三个工程预设与自定义 HEX 主色；应用实现预览、取消、原子保存、revision 冲突、跨窗口通知、重启恢复和损坏配置备份恢复。窗口在主题应用后显示，原生背景匹配保存模式；首帧闪烁尚未做逐帧测量。
 
-局部主题作用域及对应 portal 容器、图表和导航组件 token、Toast 组件、正式视觉预设尚未实现。已有 Dialog 继承文档根主题；不要把整张方案表描述成全部完成。实际证据见 [开发验证](verification.md)。
+正式主窗口已接入精简侧栏、真实设置和共享 Empty 空状态组件；局部主题作用域及对应 portal 容器、图表和导航组件 token、Toast 组件、正式视觉预设尚未实现。已有 Dialog 继承文档根主题；不要把整张方案表描述成全部完成。实际证据见 [开发验证](verification.md)。
