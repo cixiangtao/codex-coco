@@ -64,7 +64,7 @@ export async function verifyMenuBar(packagedExecutable) {
     assert.equal(summary.ok, true);
     assert.deepEqual(
       summary.value.items.slice(0, 2).map((item) => item.phase),
-      ["disabled", "unavailable"],
+      ["disabled", "disabled"],
     );
     assert.equal(summary.value.items.length, packagedExecutable ? 2 : 4);
     const bounds = await application.evaluate(({ BrowserWindow, screen }) => {
@@ -158,7 +158,7 @@ export async function verifyMenuBar(packagedExecutable) {
     await main.getByLabel("自定义主色", { exact: true }).fill("#123abc");
     await openPopover(application, popup);
     await popup.getByRole("button", { name: "打开外观", exact: true }).click();
-    await main.getByRole("heading", { name: "外观模块准备中", exact: true }).waitFor();
+    await main.getByText("布景尚未连接", { exact: true }).waitFor();
     await main.getByRole("navigation").getByRole("button", { name: "设置", exact: true }).click();
     assert.equal(await main.getByLabel("自定义主色", { exact: true }).inputValue(), "#123abc");
     await main.getByRole("button", { name: "保存主题", exact: true }).click();

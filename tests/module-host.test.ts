@@ -303,9 +303,9 @@ describe("module operation loop", () => {
     let resources = 0;
     const definition = createFoundationFixture("one");
     const start = definition.start;
-    definition.start = async (signal) => {
+    definition.start = async (signal, context) => {
       resources++;
-      const runtime = await start(signal);
+      const runtime = await start(signal, context);
       return {
         ...runtime,
         stop: async () => {

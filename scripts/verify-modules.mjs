@@ -60,7 +60,10 @@ try {
   session = await createModuleSession(directory, { ...process.env, CODEX_COCO_FIXTURES: "0" });
   assert.deepEqual(
     (await snapshots(session.page)).map(({ id, phase }) => ({ id, phase })),
-    [{ id: "usage", phase: "disabled" }],
+    [
+      { id: "usage", phase: "disabled" },
+      { id: "appearance", phase: "disabled" },
+    ],
   );
   await session.application.close();
   session = await createModuleSession(directory, environment);

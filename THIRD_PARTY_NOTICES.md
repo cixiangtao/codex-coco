@@ -21,3 +21,9 @@ packages/ui/src/components 中的基础组件由 shadcn CLI 4.22.1 从 [shadcn/u
 ## 依赖和本地应用
 
 Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用，确切版本以 pnpm-lock.yaml 为准。本地应用目录包含 Electron 自带的 LICENSE 和第三方 Chromium 通知。正式发行前还需根据最终依赖和资产完善发行通知；当前不将本文件作为已完成的发行清单。
+
+## 外观模块的 Codex 选择器与布景语义
+
+`apps/desktop/src/modules/appearance/css.ts` 参考 codex-skin 的三层布景与 Codex DOM 选择器，来源为本地只读仓库 `codex-skin`，提交 `9b88ab8a72417b9a69ac4dea1abda4f4a990c354`。原项目使用 MIT 许可，Copyright (c) 2026 cixiangtao。适用 MIT 许可全文见根目录 LICENSE（相同作者与授权文本）。
+
+新实现使用 Codex Coco 自己的配置、内容寻址图片库、模块任务和 CDP 连接。未复制旧守护进程、HTTP 设置服务器、配置目录、图片或菜单栏素材，不操作旧服务。样式节点和观察器使用独立标识，撤销仅删除 Codex Coco 自己的布景。

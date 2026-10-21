@@ -5,7 +5,7 @@ import { ThemeProvider } from "@codex-coco/ui/theme";
 import { WindowShell } from "./shell/window-shell";
 import type { PageId } from "./shell/navigation";
 import { SettingsPage } from "./pages/settings-page";
-import { ModuleManagementPage, ModuleStatusPage } from "./pages/module-status";
+import { ModuleManagementPage } from "./pages/module-status";
 import { useThemeEditor } from "./client/theme-editor";
 import { RegisteredModulePage } from "./modules-panel";
 
@@ -39,7 +39,7 @@ export function App({ initialPage }: { initialPage: PageId }) {
           </Alert>
         )}
         <section className="desktop-page" aria-label="外观页面" hidden={page !== "appearance"}>
-          <ModuleStatusPage moduleId="appearance" onPage={setPage} />
+          <RegisteredModulePage moduleId="appearance" />
         </section>
         <section className="desktop-page" aria-label="用量页面" hidden={page !== "usage"}>
           <RegisteredModulePage moduleId="usage" />

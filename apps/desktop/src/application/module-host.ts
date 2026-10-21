@@ -30,6 +30,10 @@ export interface OperationContext {
   config: JsonValue;
   report(progress: number): void;
 }
+export interface ModuleStartContext {
+  /** Requests a normal bounded task; busy, stopped and stale generations return false. */
+  requestOperation(name: string, input: JsonValue): boolean;
+}
 export interface ModuleRuntime {
   execute(name: string, input: JsonValue, context: OperationContext): Promise<JsonValue>;
   stop(): Promise<void>;
@@ -40,7 +44,7 @@ export interface BuiltinModule {
   title: string;
   config: ModuleConfigDefinition;
   operations: Readonly<Record<string, OperationDefinition>>;
-  start(signal: AbortSignal): Promise<ModuleRuntime>;
+  start(signal: AbortSignal, context: ModuleStartContext): Promise<ModuleRuntime>;
   /** Explicit public projection; complete task results never enter the glance bridge. */
   glance?(snapshot: ModuleSnapshot): GlanceDetail | null;
 }
@@ -111,7 +115,17 @@ export class ModuleHost {
         id: definition.id,
         start: async (signal) => {
           const entry = this.get(definition.id);
-          const runtime = await definition.start(signal);
+          const runtime = await definition.start(signal, {
+            requestOperation: (name, input) => {
+              if (signal.aborted || this.closed) return false;
+              try {
+                this.run({ moduleId: definition.id, operation: name, input });
+                return true;
+              } catch {
+                return false;
+              }
+            },
+          });
           if (!signal.aborted) entry.runtime = runtime;
           const abort = () => {
             if (entry.task && !entry.task.settled) this.abortTask(entry, entry.task);

@@ -1,6 +1,7 @@
 import type { BuiltinModule } from "../application/module-host";
 import { createFoundationFixture } from "./foundation-fixture/runtime";
 import type { WorkerFactory } from "../application/worker-task";
+import { createAppearanceModule, type AppearanceDependencies } from "./appearance/runtime";
 import { createUsageModule } from "./usage/runtime";
 
 /** Business runtimes are registered here after the foundation and interface are accepted. */
@@ -10,11 +11,16 @@ export const moduleDefinitions: readonly BuiltinModule[] = [createUsageModule()]
 export function registeredModules(
   fixtures: boolean,
   createWorker?: WorkerFactory,
+  appearance?: AppearanceDependencies,
 ): readonly BuiltinModule[] {
-  if (!fixtures) return moduleDefinitions;
+  const definitions = [
+    ...moduleDefinitions,
+    ...(appearance ? [createAppearanceModule(appearance)] : []),
+  ];
+  if (!fixtures) return definitions;
   if (!createWorker) throw new Error("FIXTURE_WORKER_REQUIRED");
   return [
-    ...moduleDefinitions,
+    ...definitions,
     createFoundationFixture(createWorker),
     createFoundationFixture(createWorker, "foundation-peer"),
   ];

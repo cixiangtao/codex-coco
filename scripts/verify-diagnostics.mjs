@@ -51,7 +51,10 @@ try {
   assert.equal(response.ok, true);
   assert.deepEqual(
     response.value.map(({ id, phase }) => ({ id, phase })),
-    [{ id: "usage", phase: "disabled" }],
+    [
+      { id: "usage", phase: "disabled" },
+      { id: "appearance", phase: "disabled" },
+    ],
   );
   assert.deepEqual(session.errors, []);
   await session.application.close();

@@ -1,4 +1,14 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, net, protocol, dialog } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  nativeTheme,
+  net,
+  protocol,
+  dialog,
+  nativeImage,
+} from "electron";
 import { randomUUID } from "node:crypto";
 import { Worker } from "node:worker_threads";
 import { DiagnosticLog } from "../../application/diagnostics";
@@ -49,6 +59,23 @@ let glance: GlanceSnapshot = { revision: 0, items: buildGlanceItems([]) };
 const definitions = registeredModules(
   !app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1",
   () => new Worker(join(here, "foundation-worker.js"), { stdout: true, stderr: true }),
+  {
+    directory: join(app.getPath("userData"), "appearance-assets"),
+    pickImage: async () => {
+      const result = await dialog.showOpenDialog({
+        title: "导入 Codex 布景图片",
+        properties: ["openFile"],
+        filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "webp", "gif", "avif"] }],
+      });
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+    thumbnail: (data) => {
+      const image = nativeImage.createFromDataURL(data);
+      if (image.isEmpty()) return null;
+      const preview = image.resize({ width: 480, quality: "good" }).toDataURL();
+      return preview.length < 400_000 ? preview : null;
+    },
+  },
 );
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
   modules: definitions.map((definition) => ({

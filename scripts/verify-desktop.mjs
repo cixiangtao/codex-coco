@@ -61,7 +61,10 @@ export async function verifyDesktopSession(session) {
   assert.equal(modules.ok, true);
   assert.deepEqual(
     modules.value.map(({ id, phase, config }) => ({ id, phase, enabled: config.enabled })),
-    [{ id: "usage", phase: "disabled", enabled: false }],
+    [
+      { id: "usage", phase: "disabled", enabled: false },
+      { id: "appearance", phase: "disabled", enabled: false },
+    ],
     "Normal and packaged launches register business modules without reading accounts",
   );
   const nav = page.getByRole("navigation", { name: "应用导航" });
@@ -71,7 +74,7 @@ export async function verifyDesktopSession(session) {
     "模块管理",
     "设置",
   ]);
-  await page.getByRole("heading", { name: "外观模块准备中", exact: true }).waitFor();
+  await page.getByText("布景尚未连接", { exact: true }).waitFor();
   assert.equal(await page.getByRole("button", { name: "连接 Codex", exact: true }).count(), 0);
   assert.equal(
     await page.locator(".traffic-lights").count(),
@@ -176,7 +179,7 @@ export async function verifyDesktopSession(session) {
   );
   await color.fill("invalid");
   await nav.getByRole("button", { name: "外观", exact: true }).click();
-  await page.getByRole("heading", { name: "外观模块准备中", exact: true }).waitFor();
+  await page.getByText("布景尚未连接", { exact: true }).waitFor();
   await nav.getByRole("button", { name: "设置", exact: true }).click();
   assert.equal(await color.inputValue(), "invalid", "Page navigation must retain draft input");
   assert.equal(
