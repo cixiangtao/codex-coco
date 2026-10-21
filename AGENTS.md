@@ -6,7 +6,7 @@
 
 2026-10-21：用户授权移除原型，从零建立新基建。原型源码、测试、依赖、构建配置、设计记录与生成物已从工作树清理，清理前做了仓库外可恢复归档。不要恢复原型或添加兼容层作为默认起点。
 
-已从零建立可运行的 Electron、React、TypeScript 工程，独立 UI 包与主题基础、版本化配置、模块生命周期和白名单桌面桥已接入。已将用户认可的精简侧栏接入正式主窗口，设置页使用真实配置服务；业务注册表仍为空，用量/外观业务与菜单栏速览尚未接入。实际状态与未完成目标见 docs/verification.md。
+已从零建立可运行的 Electron、React、TypeScript 工程，独立 UI 包与主题基础、版本化配置、模块生命周期和白名单桌面桥已接入。已将用户认可的精简侧栏接入正式主窗口，设置页使用真实配置服务；业务注册表仍为空，菜单栏跨模块速览已接入真实状态与主窗口跳转；用量/外观业务尚未接入。实际状态与未完成目标见 docs/verification.md。
 
 ## 长期约定
 
@@ -36,6 +36,7 @@
 - pnpm run check：Oxfmt、Oxlint、AST 依赖边界、分进程/包/测试类型检查、合同测试和生产构建。
 - pnpm run verify:diagnostics：真实 Electron 验证日志关联、隐私字段排除与写入失败隔离。
 - pnpm run profile:desktop / profile:packaged：显式采样生产文件/打包应用的启动和全进程资源，使用临时数据，不作为性能达标声明。
+- pnpm run verify:menu-bar：验证真实菜单栏回调、只读窗口权限、速览状态/主题同步、开合和主窗口重开。
 - pnpm run verify:modules：生产入口的真实模块链路回归，仅注册合成模块并使用临时数据，结束后清理。
 - pnpm run verify:desktop：生产入口的真实 Electron 回归，使用临时数据，结束后清理。
 - pnpm run pack：本机未签名的 macOS 应用目录；必须写 run，避免调用 pnpm 内置 pack。
@@ -52,3 +53,5 @@
 诊断只经 DiagnosticSink 写入固定字段；禁止传入原始异常、请求、配置、结果、路径或账号内容。新增事件与错误码需同步允许列表。默认最多三个 256 KiB 文件，内存队列同时受条数和字节限制；日志失败不阻塞业务。性能采样只由显式脚本触发，不增加常驻轮询；口径与基线见 docs/diagnostics-and-performance.md 和 docs/performance-baseline.md。
 
 窗口交互提案独立放在 renderer/design-review，通过 pnpm run design:review 查看，不接入正常 Electron 入口或真实业务。用户认可侧栏布局方向并要求参考 Codex 客户端精简导航，目前默认 A 精简侧栏并保留 B/C 对照；正式 Electron 已独立实现 A 的布局，视觉细节仍可打磨。主窗口承载完整模块能力，菜单栏悬浮窗跨模块速览。异常时优先展示恢复路径，旧数据默认收起。详见 docs/design-review.md。
+
+菜单栏速览通过主进程注册的窗口身份限制为只读，仅接收 application/glance.ts 的公开状态投影，不接收完整模块事件、配置或结果。跳转只接受固定 MainPage；新摘要数据或业务刷新接入时同步合同、权限与隐私测试。原生生命周期与边界见 docs/menu-bar.md。

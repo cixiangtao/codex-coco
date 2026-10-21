@@ -6,7 +6,7 @@
 
 Codex Coco 计划将用量监控与外观定制放进一个 Electron 应用，并为后续模块保留独立生命周期和配置边界。个人使用习惯、学习与持续打磨是项目的出发点。
 
-**当前状态：正式主窗口与主题设置已接入的本地开发版。** 主窗口采用已认可的精简侧栏，支持四页导航和侧栏折叠；设置具备真实预览、保存、取消及跨窗口同步。用量、外观业务和菜单栏速览尚未接入，不显示模拟业务数据。旧原型已归档并移除，没有恢复其实现。
+**当前状态：正式主窗口与主题设置已接入的本地开发版。** 主窗口采用已认可的精简侧栏，支持四页导航和侧栏折叠；设置具备真实预览、保存、取消及跨窗口同步。菜单栏已提供只读跨模块状态与主窗口跳转；用量、外观业务尚未接入，不显示模拟业务数据。旧原型已归档并移除，没有恢复其实现。
 
 ## 开发
 
@@ -30,6 +30,7 @@ pnpm run start
 pnpm run check
 pnpm run verify:desktop
 pnpm run verify:modules
+pnpm run verify:menu-bar
 pnpm run verify:diagnostics
 pnpm run pack
 pnpm run verify:packaged
@@ -37,9 +38,10 @@ pnpm run verify:packaged
 
 - `check`：Oxfmt、Oxlint、依赖边界、分进程类型、合同测试与生产构建。
 - `verify:desktop`：构建后启动真实 Electron，用临时配置验证主题、IPC、窗口同步、取消和重启恢复，结束后清理进程与数据。
+- `verify:menu-bar`：验证菜单栏开合回调、窗口权限、状态/主题同步、主窗口重开与读取失败恢复，全程使用临时数据。
 - `verify:modules`：构建后用两个合成模块验证任务、取消、独立配置、跨窗口、重启与损坏恢复，全程使用临时目录并自动清理。
 - `pack`：生成本机未签名的 macOS 应用目录；不是 npm 打包，不执行发布。
-- `verify:packaged`：重新生成本地应用目录，并对其中的应用执行同一套桌面回归。此脚本目前针对 macOS arm64。
+- `verify:packaged`：重新生成本地应用目录，并对其中的应用执行主窗口与速览回归。此脚本目前针对 macOS arm64。
 
 单独执行：`pnpm run format`、`pnpm run format:check`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run test`。始终写明 `pnpm run pack`，避免调用 pnpm 内置的 npm 包打包命令。
 
@@ -66,6 +68,12 @@ Oxfmt 管格式，Oxlint 检查代码问题。基于 Oxc AST 的依赖检查阻�
 
 普通启动不注册示例。`verify:modules` 显式开启未打包环境的 `CODEX_COCO_FIXTURES=1`，运行合成示例；打包应用忽略该开关。配置只保存可公开偏好，配置变更供下一次操作使用。接入方式见 [模块开发](docs/module-development.md)。
 
+## 菜单栏速览
+
+点击菜单栏中的 Codex Coco 开合悬浮窗，或使用应用菜单“显示或收起速览”（Cmd+Shift+M）。速览提供跨模块状态，失焦或按 Esc 收起，可跳转到主窗口的对应页面；关闭全部主窗口后，仍能从菜单栏重新打开。它跟随已保存主题，主窗口尚未保存的预览不会同步进去。
+
+当前没有真实账号余量或外部布景数据，首批两项明确显示尚未接入。新增注册模块会加入状态摘要，完整操作仍在主窗口。详见 [菜单栏与权限边界](docs/menu-bar.md)。
+
 ## 当前主题能力
 
 浅色、深色、跟随系统；中性、蓝色和紫色工程预设；支持 HEX 自定义主色，自动生成文字、悬停/按下、选中和焦点变量。预设属于工程配色；主窗口布局基线见 [界面基线](DESIGN.md)。
@@ -86,7 +94,7 @@ UI 包不依赖 Electron、Node、IPC 或存储。应用负责偏好持久化、
 
 目前先验证 macOS arm64。应用目录仍使用 Electron 默认图标，跳过签名，未公证，也没有更新或公开发布。两个旧仓库和已有应用数据保持原样；仓库只在本地维护，未配置远端。
 
-[产品约定](PRODUCT.md) · [基建方案](docs/foundation-plan.md) · [当前架构](docs/architecture.md) · [正式主窗口](docs/main-window.md) · [UI 与主题](docs/ui-package-and-theme.md) · [验证记录](docs/verification.md) · [功能重建计划](docs/migration.md) · [原型清理记录](docs/prototype-reset.md) · [来源与许可证](THIRD_PARTY_NOTICES.md)
+[产品约定](PRODUCT.md) · [基建方案](docs/foundation-plan.md) · [当前架构](docs/architecture.md) · [正式主窗口](docs/main-window.md) · [菜单栏速览](docs/menu-bar.md) · [UI 与主题](docs/ui-package-and-theme.md) · [验证记录](docs/verification.md) · [功能重建计划](docs/migration.md) · [原型清理记录](docs/prototype-reset.md) · [来源与许可证](THIRD_PARTY_NOTICES.md)
 
 MIT。Codex Coco 是独立项目，与 OpenAI 没有隶属或官方支持关系。
 
