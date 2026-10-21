@@ -60,6 +60,8 @@
 
 重计算通过 application/worker-task.ts 执行。Worker 工厂由组合根静态注入，不接受 renderer 或配置传入的代码路径；禁止失败后回退主线程。取消、停用与退出须等待实际线程退出，终止失败不得伪装清理成功。worker 返回严格 JSON 消息，公开输出仍须模块自己的 schema 校验。构建入口与打包资源一同验证，详见 docs/worker-tasks.md。
 
-用量只在主窗口明确操作后启动短期 codex app-server，固定调用 initialize/initialized、account/read(refreshToken:false) 与 account/rateLimits/read；不读取原始令牌，不启动模型对话或登录。启用或重启不自动读取。stdout 在后台限量解析，stderr 丢弃，子进程退出后才结算。BuiltinModule.glance 的公开字段须宿主严格校验；失败时摘要不携带旧额度。详见 docs/usage.md。
+用量只在主窗口明确操作或已保存自动刷新策略触发后启动短期 codex app-server，固定调用 initialize/initialized、account/read(refreshToken:false) 与 account/rateLimits/read；不读取原始令牌，不启动模型对话或登录。默认手动策略下启用或重启不读取；主窗口可显式保存 30–3600 秒自动刷新间隔，恢复已保存 opt-in 策略后按间隔执行。stdout 在后台限量解析，stderr 丢弃，子进程退出后才结算。BuiltinModule.glance 的公开字段须宿主严格校验；失败时摘要不携带旧额度。详见 docs/usage.md。
 
 二期从 2026-10-21 起要求覆盖两个旧项目的全部能力，按 docs/phase-two.md 逐项推进。用户允许先实现核心功能，UI 后期调整，不再以“只迁核心”缩小二期目标。外观当前固定本机 CDP 端口，三层布景与多窗口重应用已在受控 Electron 页面及打包版验证；真实聊天客户端未操作。外观启用无副作用，应用需明确操作；停用和退出清理自己的样式，不接管旧服务。
+
+用量配置版本 2 将旧空配置迁移为手动读取、通知关闭。自动刷新通过宿主 requestOperation 执行，失败退避、单模块任务约束和停止清理保持有效。系统通知由桌面依赖注入，只接收固定标题和公开额度文案。菜单栏 statusText 为严格限长公开字段，不接收配置或原始账号；完整名称 Codex Coco 始终保留。配置保存通知 runtime.configurationChanged，观察者失败不能把已成功持久化的操作伪报为失败。
