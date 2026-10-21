@@ -13,7 +13,7 @@ import {
 import { Alert, AlertTitle, AlertDescription } from "@codex-coco/ui/components/alert";
 import type { ModuleSnapshot } from "../../../contracts/modules";
 import { acceptModuleSnapshot } from "../../../renderer/client/modules";
-import { usageResultSchema } from "../contract";
+import { usageState } from "../contract";
 
 const failures = {
   MODELS_UNAVAILABLE: "模型列表不可用，请刷新列表或检查登录与 CLI 版本。",
@@ -32,8 +32,8 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
   const [confirm, setConfirm] = useState<
     "run-intelligence" | "update-cli" | "clear-intelligence-history" | null
   >(null);
-  const parsed = usageResultSchema.safeParse(snapshot.operation?.result);
-  const tools = parsed.success ? parsed.data.tools : null;
+  const state = usageState(snapshot);
+  const tools = state ? state.tools : null;
   const selected = tools?.models.find((value) => value.id === model);
   const busy =
     pending ||
@@ -172,7 +172,8 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
         {tools && tools.samples.length > 0 && (
           <>
             <p>
-              已完成 {completed.length}/{tools.samples.length} 个样本，正确 {correct} 个，正确率{" "}
+              已完成 {completed.length}/{tools.requestedRuns ?? tools.samples.length} 个样本，正确{" "}
+              {correct} 个，正确率{" "}
               {completed.length ? Math.round((correct / completed.length) * 100) : 0}%。
             </p>
             {tools.samples.map((sample) => (

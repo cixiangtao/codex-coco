@@ -31,6 +31,7 @@ const finalAnswerSchema = z.strictObject({
   explanation: z.string().max(8192),
 });
 export interface UsageToolsService {
+  reset?(): void;
   snapshot(): UsageTools;
   execute(
     name: string,
@@ -46,6 +47,7 @@ export function createUsageToolsService(options: {
   fetchImpl?: typeof fetch;
 }): UsageToolsService {
   let state: UsageTools = {
+    requestedRuns: null,
     installation: "unknown",
     models: [],
     samples: [],
@@ -128,6 +130,12 @@ export function createUsageToolsService(options: {
     throw new Error("MODELS_UNAVAILABLE");
   }
   return {
+    reset: () => {
+      state.models = [];
+      state.samples = [];
+      state.requestedRuns = null;
+      state.error = null;
+    },
     snapshot: () => usageToolsSchema.parse(state),
     execute: async (name, input, signal, report) => {
       state.error = null;
@@ -172,7 +180,13 @@ export function createUsageToolsService(options: {
             state.cliVersion = version;
             const executable = await realpath(
               options.command?.command ??
-                (await codexCommand(options.command?.env ?? process.env, signal)),
+                (await codexCommand(
+                  {
+                    ...(options.command?.env ?? process.env),
+                    ...(await options.command?.environment?.()),
+                  },
+                  signal,
+                )),
             );
             state.installation = executable.includes("/node_modules/")
               ? "package-manager"
@@ -220,6 +234,7 @@ export function createUsageToolsService(options: {
         }
         if (name !== "run-intelligence") throw new Error("UNKNOWN_TOOL_OPERATION");
         const request = intelligenceInputSchema.parse(input);
+        state.requestedRuns = request.runs;
         state.history = await history();
         state.samples = [];
         if (request.model && !state.models.some((model) => model.id === request.model))
@@ -335,27 +350,31 @@ export function createUsageToolsService(options: {
           }
         } finally {
           await rm(directory, { recursive: true, force: true });
+          // Cancellation keeps completed samples and their summary, without inventing a result
+          // for the interrupted sample. A cancellation before any answer leaves no history.
+          if (!signal.aborted || state.samples.some((sample) => sample.correct !== null)) {
+            const completed = state.samples.filter((sample) => sample.correct !== null);
+            const rates = completed
+              .filter((sample) => sample.outputTokens !== null && sample.elapsedMs > 0)
+              .map((sample) => sample.outputTokens! / (sample.elapsedMs / 1000));
+            state.history = [
+              {
+                id: randomUUID(),
+                capturedAt: Date.now(),
+                model: request.model ?? "CLI 默认模型",
+                effort: request.effort,
+                requested: request.runs,
+                completed: completed.length,
+                correct: completed.filter((sample) => sample.correct).length,
+                averageTokensPerSecond: rates.length
+                  ? rates.reduce((sum, value) => sum + value, 0) / rates.length
+                  : null,
+              },
+              ...state.history,
+            ].slice(0, 100);
+            await saveHistory();
+          }
         }
-        const completed = state.samples.filter((sample) => sample.correct !== null);
-        const rates = completed
-          .filter((sample) => sample.outputTokens !== null && sample.elapsedMs > 0)
-          .map((sample) => sample.outputTokens! / (sample.elapsedMs / 1000));
-        state.history = [
-          {
-            id: randomUUID(),
-            capturedAt: Date.now(),
-            model: request.model ?? "CLI 默认模型",
-            effort: request.effort,
-            requested: request.runs,
-            completed: completed.length,
-            correct: completed.filter((sample) => sample.correct).length,
-            averageTokensPerSecond: rates.length
-              ? rates.reduce((sum, value) => sum + value, 0) / rates.length
-              : null,
-          },
-          ...state.history,
-        ].slice(0, 100);
-        await saveHistory();
       } catch (error) {
         signal.throwIfAborted();
         state.error =

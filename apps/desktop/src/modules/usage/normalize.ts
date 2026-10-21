@@ -1,6 +1,31 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { usageSnapshotSchema, type UsageFailureCode, type UsageSnapshot } from "./contract";
+import {
+  planTypeSchema,
+  usageAccountSchema,
+  usageSnapshotSchema,
+  type UsageFailureCode,
+  type UsageSnapshot,
+} from "./contract";
+
+const accounts = new WeakMap<object, z.infer<typeof usageAccountSchema>>();
+/** Only a masked identifier and a known plan can accompany the numeric public snapshot. */
+export function attachUsageAccount(
+  raw: object,
+  identifier: string | null | undefined,
+  plan: unknown,
+) {
+  const trimmed = identifier?.trim() ?? "";
+  const parts = trimmed.split("@");
+  const label =
+    parts.length === 2 && parts[0] && parts[1]
+      ? `${parts[0].slice(0, 1)}***${parts[0].length > 1 ? parts[0].slice(-1) : ""}@${parts[1].slice(0, 80)}`
+      : /^\+?[\d -]{6,30}$/.test(trimmed)
+        ? `***${trimmed.replace(/\D/g, "").slice(-4)}`
+        : null;
+  const parsed = planTypeSchema.safeParse(plan);
+  accounts.set(raw, { label, plan: parsed.success ? parsed.data : null });
+}
 
 /** Fixed source failures are safe to map into a public result; original errors remain private. */
 export class UsageReadError extends Error {
@@ -13,7 +38,18 @@ const rawWindow = z.object({
   windowDurationMins: z.number().int().positive().nullish(),
   resetsAt: z.number().int().nonnegative().max(8_640_000_000_000).nullish(),
 });
-const rawBucket = z.object({ primary: rawWindow.nullish(), secondary: rawWindow.nullish() });
+const rawBucket = z.object({
+  primary: rawWindow.nullish(),
+  secondary: rawWindow.nullish(),
+  planType: z.unknown().optional(),
+  credits: z
+    .object({
+      hasCredits: z.boolean(),
+      unlimited: z.boolean(),
+      balance: z.string().max(80).nullish(),
+    })
+    .nullish(),
+});
 const responseSchema = z.object({
   rateLimitResetCredits: z.unknown().optional(),
   rateLimits: z.unknown().optional(),
@@ -64,6 +100,31 @@ export function normalizeUsage(raw: unknown, capturedAt: number): UsageSnapshot 
     source: "codex-app-server",
     capturedAt,
     buckets,
+    account: (() => {
+      const linked = typeof raw === "object" && raw !== null ? accounts.get(raw) : undefined;
+      const plan = planTypeSchema.safeParse(
+        entries.find(([id]) => id === "codex")?.[1].planType ?? entries[0]?.[1].planType,
+      );
+      return linked
+        ? { ...linked, plan: linked.plan ?? (plan.success ? plan.data : null) }
+        : plan.success
+          ? { label: null, plan: plan.data }
+          : null;
+    })(),
+    credits: (() => {
+      const credits =
+        entries.find(([id]) => id === "codex")?.[1].credits ?? entries[0]?.[1].credits;
+      if (!credits) return null;
+      const balance = credits.balance?.trim() ? Number(credits.balance) : NaN;
+      return {
+        hasCredits: credits.hasCredits,
+        unlimited: credits.unlimited,
+        balance:
+          Number.isFinite(balance) && balance >= 0 && balance <= Number.MAX_SAFE_INTEGER
+            ? balance
+            : null,
+      };
+    })(),
     resetCredits: rawCredits
       ? {
           availableCount: rawCredits.availableCount,

@@ -5,7 +5,7 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import { z } from "zod";
-import { UsageReadError } from "./normalize";
+import { attachUsageAccount, UsageReadError } from "./normalize";
 import type { UsageFailureCode } from "./contract";
 
 export type UsageReader = (signal: AbortSignal) => Promise<unknown>;
@@ -14,6 +14,7 @@ export interface ReaderOptions {
   command?: string;
   args?: string[];
   env?: NodeJS.ProcessEnv;
+  environment?(): Promise<NodeJS.ProcessEnv>;
   timeoutMs?: number;
 }
 const rpcSchema = z.object({
@@ -23,7 +24,13 @@ const rpcSchema = z.object({
   error: z.object({ code: z.number() }).optional(),
 });
 const accountSchema = z.object({
-  account: z.object({ type: z.string(), email: z.string().max(320).nullish() }).nullable(),
+  account: z
+    .object({
+      type: z.string(),
+      email: z.string().max(320).nullish(),
+      planType: z.unknown().optional(),
+    })
+    .nullish(),
 });
 const scopes = new WeakMap<object, string>();
 /** Ephemeral account correlation stays in the backend, outside the public quota response. */
@@ -71,7 +78,7 @@ export function createAppServerRequest(
 ): UsageReader {
   return async (signal) => {
     signal.throwIfAborted();
-    const environment = options.env ?? process.env;
+    const environment = { ...(options.env ?? process.env), ...(await options.environment?.()) };
     const command = options.command ?? (await codexCommand(environment, signal));
     signal.throwIfAborted();
     const child = spawn(command, options.args ?? ["app-server"], {
@@ -89,6 +96,7 @@ export function createAppServerRequest(
       let closed = false;
       let value: unknown;
       let accountScope: string | null = null;
+      let currentAccount: z.infer<typeof accountSchema>["account"];
       let failure: UsageFailureCode | null = null;
       let force: ReturnType<typeof setTimeout> | undefined;
       const kill = (signalName: NodeJS.Signals) => {
@@ -202,6 +210,7 @@ export function createAppServerRequest(
               accountScope = createHash("sha256")
                 .update(account.data.account.email.trim().toLowerCase())
                 .digest("hex");
+            currentAccount = account.data.account;
             expected = 2;
             if (request.expectedScope && accountScope !== request.expectedScope) {
               finish("READ_FAILED");
@@ -213,6 +222,12 @@ export function createAppServerRequest(
               ...(request.params ? { params: request.params } : {}),
             });
           } else {
+            if (
+              currentAccount?.type === "chatgpt" &&
+              typeof message.result === "object" &&
+              message.result !== null
+            )
+              attachUsageAccount(message.result, currentAccount.email, currentAccount.planType);
             if (accountScope && typeof message.result === "object" && message.result !== null)
               scopes.set(message.result, accountScope);
             finish(null, message.result);

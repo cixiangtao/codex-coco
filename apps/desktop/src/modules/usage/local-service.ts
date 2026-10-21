@@ -7,10 +7,12 @@ import { localScanResultSchema, type TrendSnapshot } from "./contract";
 import { z } from "zod";
 
 export interface LocalUsageService {
+  /** Host-only environment override; the selected directory never enters renderer snapshots. */
+  environment?(): Promise<NodeJS.ProcessEnv>;
   scan(
     signal: AbortSignal,
     report: (value: number) => void,
-    input: { days: 7 | 14 | 30; scope: string | null; force: boolean },
+    input: { days: 7 | 14 | 30; scope: string | null; force: boolean; refresh?: boolean },
   ): Promise<z.infer<typeof localScanResultSchema>>;
   chooseHome(): Promise<boolean>;
 }
@@ -41,15 +43,18 @@ export function createLocalUsageService(options: {
     return resolve(process.env.CODEX_HOME || join(homedir(), ".codex"));
   }
   return {
+    environment: async () => ({ CODEX_HOME: await home() }),
     scan: async (signal, report, input) => {
       const directory = await home();
       signal.throwIfAborted();
       if (
         !input.force &&
+        !input.refresh &&
         cached &&
         cached.home === directory &&
         cached.scope === input.scope &&
         cached.trend.days === input.days &&
+        new Date(cached.trend.capturedAt).toDateString() === new Date().toDateString() &&
         Date.now() - cached.trend.capturedAt < 600_000
       )
         return { trend: cached.trend, fallback: cached.fallback };
@@ -72,6 +77,20 @@ export function createLocalUsageService(options: {
     chooseHome: async () => {
       const path = await options.chooseDirectory();
       if (!path) return false;
+      if (!(await lstat(path)).isDirectory()) throw new Error("LOCAL_SOURCE_INVALID");
+      const markers = await Promise.all(
+        ["auth.json", "config.toml", "sessions", "archived_sessions", "state_5.sqlite"].map(
+          async (name) => {
+            try {
+              await lstat(join(path, name));
+              return true;
+            } catch {
+              return false;
+            }
+          },
+        ),
+      );
+      if (!markers.some(Boolean)) throw new Error("LOCAL_SOURCE_INVALID");
       await mkdir(options.directory, { recursive: true, mode: 0o700 });
       const temporary = `${choicePath}.${randomUUID()}.tmp`;
       try {

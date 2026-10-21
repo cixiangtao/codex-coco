@@ -4,7 +4,7 @@ const trace = (method) => {
   if (process.env.FAKE_USAGE_TRACE)
     appendFileSync(
       process.env.FAKE_USAGE_TRACE,
-      `${JSON.stringify({ method, pid: process.pid })}\n`,
+      `${JSON.stringify({ method, pid: process.pid, home: process.env.CODEX_HOME })}\n`,
     );
 };
 trace("spawn");
@@ -12,6 +12,16 @@ const mode = () =>
   process.env.FAKE_USAGE_MODE_FILE
     ? readFileSync(process.env.FAKE_USAGE_MODE_FILE, "utf8").trim()
     : (process.env.FAKE_USAGE_MODE ?? "ready");
+if (process.argv.includes("--version")) {
+  process.stdout.write("codex-cli 1.2.3\n");
+  process.exit(0);
+}
+if (process.argv.includes("exec")) {
+  trace("exec");
+  setInterval(() => {}, 1000);
+  process.stdin.resume();
+  await new Promise(() => {});
+}
 if (mode() === "ignore-term") {
   process.on("SIGTERM", () => trace("term"));
   setInterval(() => {}, 1000);
@@ -44,6 +54,7 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
           : {
               type: mode() === "api-key" ? "apiKey" : "chatgpt",
               email: "private@example.com",
+              planType: "plus",
               accessToken: "private-token",
             },
     });
@@ -95,6 +106,20 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
     // Deliberately split the JSON-RPC frame across chunks.
     process.stdout.write(response.slice(0, 41));
     setTimeout(() => process.stdout.write(response.slice(41)), 5);
+  } else if (request.method === "model/list") {
+    send(request.id, {
+      data: [
+        {
+          id: "test-model",
+          model: "test-model",
+          displayName: "受控模型",
+          supportedReasoningEfforts: [{ reasoningEffort: "high" }],
+          defaultReasoningEffort: "high",
+          isDefault: true,
+        },
+      ],
+      nextCursor: null,
+    });
   } else if (request.method === "account/rateLimitResetCredit/consume") {
     const key = request.params.idempotencyKey;
     let entries = [];

@@ -1,4 +1,30 @@
 import { z } from "zod";
+import type { ModuleSnapshot } from "../../contracts/modules";
+
+export const planTypeSchema = z.enum([
+  "free",
+  "go",
+  "plus",
+  "pro",
+  "prolite",
+  "promax",
+  "team",
+  "business",
+  "self_serve_business_prolite",
+  "self_serve_business_usage_based",
+  "ent26",
+  "enterprise_cbp_automation",
+  "enterprise_cbp_usage_based",
+  "enterprise",
+  "edu",
+  "edu_plus",
+  "edu_pro",
+  "unknown",
+]);
+export const usageAccountSchema = z.strictObject({
+  label: z.string().min(1).max(100).nullable(),
+  plan: planTypeSchema.nullable(),
+});
 
 export const usageConfigSchema = z
   .strictObject({
@@ -26,6 +52,7 @@ export const usageDefaults: UsageConfig = {
   showMenuBarLabels: true,
 };
 export const usageInputSchema = z.strictObject({});
+export const usageRefreshInputSchema = z.strictObject({ forceTrend: z.boolean().default(false) });
 const windowSchema = z.strictObject({
   kind: z.enum(["primary", "secondary"]),
   usedPercent: z.number().min(0),
@@ -70,6 +97,15 @@ export const resetFeedbackSchema = z.strictObject({
 export type ResetFeedback = z.infer<typeof resetFeedbackSchema>;
 export const usageSnapshotSchema = z
   .strictObject({
+    account: usageAccountSchema.nullable().default(null),
+    credits: z
+      .strictObject({
+        hasCredits: z.boolean(),
+        unlimited: z.boolean(),
+        balance: z.number().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
+      })
+      .nullable()
+      .default(null),
     resetCredits: resetCreditsSchema.nullable().default(null),
     capturedAt: z.number().int().nonnegative(),
     source: z.enum(["codex-app-server", "local-session"]),
@@ -114,6 +150,11 @@ export const trendSnapshotSchema = z.strictObject({
   reusedFiles: z.number().int().nonnegative(),
 });
 export type TrendSnapshot = z.infer<typeof trendSnapshotSchema>;
+export function trendTotals(trend: TrendSnapshot) {
+  const sum = (days: number) =>
+    trend.points.slice(-days).reduce((total, point) => total + point.tokens, 0);
+  return { today: sum(1), week: sum(7), month: sum(30) };
+}
 export const localScanResultSchema = z.strictObject({
   trend: trendSnapshotSchema,
   fallback: usageSnapshotSchema.nullable(),
@@ -155,6 +196,7 @@ export const intelligenceHistorySchema = z.strictObject({
   averageTokensPerSecond: z.number().nonnegative().nullable(),
 });
 export const usageToolsSchema = z.strictObject({
+  requestedRuns: z.number().int().min(1).max(5).nullable().default(null),
   installation: z.enum(["unknown", "standalone", "package-manager", "homebrew"]),
   models: z.array(modelOptionSchema).max(200),
   samples: z.array(sampleSchema).max(5),
@@ -220,6 +262,32 @@ export const usageResultSchema = z.discriminatedUnion("status", [
 export type UsageSnapshot = z.infer<typeof usageSnapshotSchema>;
 export type UsageResult = z.infer<typeof usageResultSchema>;
 export type UsageFailureCode = z.infer<typeof usageFailureSchema>;
+
+/** The task envelope describes execution; data survives unrelated tasks and cancellation. */
+export function usageState(snapshot: ModuleSnapshot): UsageResult | null {
+  const parsed = usageResultSchema.safeParse(
+    snapshot.state !== undefined ? snapshot.state : snapshot.operation?.result,
+  );
+  return parsed.success ? parsed.data : null;
+}
+export function usagePlanTitle(plan: z.infer<typeof planTypeSchema> | null | undefined) {
+  if (!plan || plan === "unknown") return "套餐未知";
+  return `ChatGPT ${plan
+    .split("_")
+    .map((word) => word[0]!.toUpperCase() + word.slice(1))
+    .join(" ")}`;
+}
+
+/** Match known quota durations before falling back to legacy positional windows. */
+export function usageMenuWindows(windows: UsageSnapshot["buckets"][number]["windows"]) {
+  return [300, 10080].flatMap((minutes, index) => {
+    const kind = index === 0 ? "primary" : "secondary";
+    const window =
+      windows.find((item) => item.windowMinutes === minutes) ??
+      windows.find((item) => item.kind === kind && item.windowMinutes === null);
+    return window ? [{ window, primary: index === 0, label: index === 0 ? "5h" : "7d" }] : [];
+  });
+}
 
 /** Only fixed copy reaches the UI; CLI diagnostics and account fields are never displayed. */
 export const usageFailures: Record<UsageFailureCode, { title: string; recovery: string }> = {

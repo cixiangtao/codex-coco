@@ -4,22 +4,47 @@ import { Alert, AlertTitle, AlertDescription } from "@codex-coco/ui/components/a
 import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
 import type { ModuleSnapshot } from "../../../contracts/modules";
 import { acceptModuleSnapshot } from "../../../renderer/client/modules";
-import { usageConfigSchema, usageResultSchema } from "../contract";
+import { usageConfigSchema, usageState, trendTotals, type TrendSnapshot } from "../contract";
+
+export function UsageTokenSummary({ trend }: { trend: TrendSnapshot }) {
+  const totals = trendTotals(trend);
+  return (
+    <dl className="grid grid-cols-3 gap-4" aria-label="用量统计摘要">
+      {(
+        [
+          ["今日估算", totals.today],
+          ["近 7 天", totals.week],
+          ["近 30 天", totals.month],
+        ] as const
+      ).map(([label, value]) => (
+        <div key={label}>
+          <dt className="text-muted-foreground">{label}</dt>
+          <dd>
+            <strong>{trend.source === "none" ? "暂无数据" : value.toLocaleString("zh-CN")}</strong>
+            {trend.source !== "none" && " tokens"}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 /** Local activity is explicitly read and labeled; no messages or account identifiers enter this view. */
 export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const config = usageConfigSchema.safeParse(snapshot.config.value);
-  const parsed = usageResultSchema.safeParse(snapshot.operation?.result);
-  const trend = parsed.success ? parsed.data.trend : null;
+  const state = usageState(snapshot);
+  const trend = state ? state.trend : null;
   const busy =
     pending ||
     snapshot.operation?.phase === "running" ||
     snapshot.operation?.phase === "cancelling";
   const enabled = snapshot.phase === "running";
-  const total = trend?.points.reduce((sum, point) => sum + point.tokens, 0) ?? 0;
-  const maximum = Math.max(1, ...(trend?.points.map((point) => point.tokens) ?? []));
+  const days = config.success ? config.data.trendDays : 30;
+  const points = trend?.points.slice(-days) ?? [];
+  const total = points.reduce((sum, point) => sum + point.tokens, 0);
+  const maximum = Math.max(1, ...points.map((point) => point.tokens));
   async function run(operation: string, input: Record<string, boolean> = {}) {
     setPending(true);
     setMessage("");
@@ -62,6 +87,10 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
         仅提取本机 Codex 记录中的计数，不展示或上传对话。没有账号归属的记录可能来自这台 Mac
         上使用过的其他账号。
       </p>
+      <p className="text-muted-foreground">
+        额度、模型与本地统计使用同一 Codex 数据目录。切换目录后请刷新用量；请选择包含
+        sessions、config.toml 或登录数据的目录。
+      </p>
       <ToggleGroup
         aria-label="趋势日期范围"
         value={[String(config.success ? config.data.trendDays : 30)]}
@@ -102,10 +131,19 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
             void run("choose-local-home");
           }}
         >
-          选择本地记录目录
+          选择 Codex 数据目录
         </Button>
       </div>
       {message && <output aria-live="polite">{message}</output>}
+      {snapshot.operation?.name === "choose-local-home" &&
+        snapshot.operation.phase === "failed" && (
+          <Alert variant="destructive">
+            <AlertTitle>Codex 数据目录未能更新</AlertTitle>
+            <AlertDescription>
+              请选择 Codex 数据目录，而非 sessions 子目录，并检查读取权限。此前的目录设置已保留。
+            </AlertDescription>
+          </Alert>
+        )}
       {snapshot.operation?.name === "scan-trend" && busy && (
         <output aria-live="polite">正在扫描 {Math.round(snapshot.operation.progress)}%</output>
       )}
@@ -119,9 +157,10 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
       )}
       {trend && (
         <>
+          {state?.status !== "ready" && <UsageTokenSummary trend={trend} />}
           <p>
             <strong>
-              {trend.days} 天 · {total.toLocaleString("zh-CN")} tokens
+              {days} 天 · {total.toLocaleString("zh-CN")} tokens
             </strong>
             <span className="text-muted-foreground">
               {" "}
@@ -156,7 +195,7 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
           {trend.source !== "none" && (
             <>
               <div className="flex h-32 items-end gap-1" aria-hidden="true">
-                {trend.points.map((point) => (
+                {points.map((point) => (
                   <div
                     key={point.day}
                     className="min-w-0 flex-1 rounded-t bg-primary"
@@ -179,7 +218,7 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {trend.points.map((point) => (
+                    {points.map((point) => (
                       <tr key={point.day}>
                         <th scope="row">{point.day}</th>
                         <td>{point.tokens.toLocaleString("zh-CN")}</td>

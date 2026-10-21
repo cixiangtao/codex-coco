@@ -5,6 +5,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { createUsageToolsService } from "../apps/desktop/src/modules/usage/tools";
+import { createUsageModule } from "../apps/desktop/src/modules/usage/runtime";
+import { ModuleHost } from "../apps/desktop/src/application/module-host";
+import type { ModuleSnapshot } from "../apps/desktop/src/contracts/modules";
 const directories: string[] = [];
 const fixture = fileURLToPath(new URL("./fixtures/usage-tools.mjs", import.meta.url));
 afterEach(async () => {
@@ -35,6 +38,77 @@ async function setup() {
   return { directory, mode, trace, options, service: createUsageToolsService(options) };
 }
 describe("explicit intelligence and CLI tools", () => {
+  it("saves partial history before clearing temporary answers during module stop", async () => {
+    const f = await setup();
+    const host = new ModuleHost(
+      [createUsageModule(undefined, undefined, undefined, undefined, f.service)],
+      f.directory,
+    );
+    let stopping: Promise<ModuleSnapshot> | undefined;
+    const unsubscribe = host.subscribe((snapshot) => {
+      if (
+        !stopping &&
+        snapshot.operation?.name === "run-intelligence" &&
+        snapshot.operation.phase === "running" &&
+        snapshot.operation.progress > 0
+      ) {
+        stopping = host.setEnabled({ moduleId: "usage", enabled: false });
+      }
+    });
+    try {
+      await host.load();
+      await host.setEnabled({ moduleId: "usage", enabled: true });
+      host.run({
+        moduleId: "usage",
+        operation: "run-intelligence",
+        input: { model: null, effort: null, runs: 3 },
+      });
+      await expect.poll(() => Boolean(stopping)).toBe(true);
+      await stopping;
+      expect(host.snapshots()[0]?.phase).toBe("disabled");
+      expect(f.service.snapshot().samples).toEqual([]);
+      const history = JSON.parse(
+        await readFile(join(f.directory, "intelligence-history.json"), "utf8"),
+      );
+      expect(history[0]).toMatchObject({ requested: 3, completed: 1, correct: 1 });
+    } finally {
+      unsubscribe();
+      await host.shutdown();
+    }
+  });
+  it("persists completed samples when a multi-sample run is cancelled", async () => {
+    const f = await setup();
+    const controller = new AbortController();
+    await expect(
+      f.service.execute(
+        "run-intelligence",
+        { model: null, effort: null, runs: 3 },
+        controller.signal,
+        (progress) => {
+          if (progress > 0) controller.abort();
+        },
+      ),
+    ).rejects.toThrow();
+    expect(f.service.snapshot().samples).toHaveLength(1);
+    expect(f.service.snapshot().requestedRuns).toBe(3);
+    expect(f.service.snapshot().history[0]).toMatchObject({
+      requested: 3,
+      completed: 1,
+      correct: 1,
+    });
+    const restarted = createUsageToolsService(f.options);
+    await restarted.execute(
+      "load-intelligence-history",
+      {},
+      new AbortController().signal,
+      () => undefined,
+    );
+    expect(restarted.snapshot().history[0]).toMatchObject({
+      requested: 3,
+      completed: 1,
+      correct: 1,
+    });
+  });
   it("paginates models, runs structured samples with tools disabled and persists only summary history", async () => {
     const f = await setup();
     const signal = new AbortController().signal;

@@ -11,6 +11,7 @@ import {
   usageResultSchema,
   usageWindowTitle,
   remainingPercent,
+  usageMenuWindows,
 } from "../apps/desktop/src/modules/usage/contract";
 import { ModuleHost } from "../apps/desktop/src/application/module-host";
 import { buildGlanceItems } from "../apps/desktop/src/application/glance";
@@ -59,6 +60,30 @@ afterEach(async () => {
 });
 
 describe("public usage normalization", () => {
+  it("matches swapped 5-hour and weekly windows by duration and normalizes plan and credits", () => {
+    const value = normalizeUsage(
+      {
+        rateLimits: {
+          planType: "pro",
+          credits: { hasCredits: true, unlimited: false, balance: "12.50" },
+          primary: { usedPercent: 80, windowDurationMins: 10080 },
+          secondary: { usedPercent: 10, windowDurationMins: 300 },
+        },
+      },
+      123,
+    );
+    expect(
+      usageMenuWindows(value.buckets[0]!.windows).map(({ window, label }) => [
+        label,
+        remainingPercent(window.usedPercent),
+      ]),
+    ).toEqual([
+      ["5h", 90],
+      ["7d", 20],
+    ]);
+    expect(value.account?.plan).toBe("pro");
+    expect(value.credits).toEqual({ hasCredits: true, unlimited: false, balance: 12.5 });
+  });
   it("prefers mapped buckets, preserves window semantics and discards all account and token fields", () => {
     const data = normalizeUsage(
       {
@@ -111,6 +136,7 @@ describe("read-only App Server connection", () => {
     const { read, trace } = await source();
     const data = normalizeUsage(await read(new AbortController().signal), Date.now());
     expect(data.buckets[0]!.windows).toHaveLength(2);
+    expect(data.account).toEqual({ label: "p***e@example.com", plan: "plus" });
     const log = await events(trace);
     expect(log.map((item) => item.method)).toEqual([
       "spawn",

@@ -1,6 +1,6 @@
 import { UsageToolsPanel } from "./tools-panel";
 import { UsageResetCards } from "./reset-cards";
-import { UsageTrend } from "./trend";
+import { UsageTrend, UsageTokenSummary } from "./trend";
 import { UsagePreferences } from "./preferences";
 import { useEffect, useState } from "react";
 import { Activity, RefreshCw } from "lucide-react";
@@ -20,10 +20,12 @@ import {
   remainingPercent,
   usageBucketTitle,
   usageFailures,
-  usageResultSchema,
+  usageState,
   usageConfigSchema,
   usageWindowTitle,
+  usagePlanTitle,
   type UsageSnapshot,
+  type TrendSnapshot,
 } from "../contract";
 
 const dateTime = (time: number) =>
@@ -34,9 +36,27 @@ const dateTime = (time: number) =>
     minute: "2-digit",
     second: "2-digit",
   });
-function QuotaData({ data }: { data: UsageSnapshot }) {
+function QuotaData({ data, trend }: { data: UsageSnapshot; trend?: TrendSnapshot | null }) {
   return (
     <div className="usage-data">
+      <section aria-label="账号信息" className="flex flex-wrap items-center gap-3">
+        <h3>账号信息</h3>
+        <span>{data.account?.label ?? "账号标识不可用"}</span>
+        <strong>{usagePlanTitle(data.account?.plan)}</strong>
+      </section>
+      {data.credits && (
+        <p aria-label="额外额度">
+          额外额度：
+          {data.credits.unlimited
+            ? "不限量"
+            : data.credits.balance !== null
+              ? data.credits.balance.toLocaleString("zh-CN")
+              : data.credits.hasCredits
+                ? "有可用额度（余额未知）"
+                : "暂无可用额度"}
+        </p>
+      )}
+      {trend && <UsageTokenSummary trend={trend} />}
       <p className="usage-source">
         读取于{" "}
         <time dateTime={new Date(data.capturedAt).toISOString()}>{dateTime(data.capturedAt)}</time>{" "}
@@ -87,8 +107,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
   const automatic = config.success ? config.data.refreshIntervalSeconds : 0;
   const operation = snapshot.operation;
   const running = operation?.phase === "running" || operation?.phase === "cancelling";
-  const parsed = usageResultSchema.safeParse(operation?.result);
-  const result = operation?.phase === "succeeded" && parsed.success ? parsed.data : null;
+  const result = usageState(snapshot);
   const current = result?.status === "ready" ? result.data : null;
   const capturedAt = current?.capturedAt;
   const failed = result?.status === "error" ? result : null;
@@ -117,7 +136,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
       const response = await window.codexCoco.runModuleOperation({
         moduleId: "usage",
         operation: "refresh",
-        input: {},
+        input: { forceTrend: true },
       });
       if (response.ok) acceptModuleSnapshot(response.value);
       else setMessage(response.error.message);
@@ -175,10 +194,14 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
             {running
               ? operation?.phase === "cancelling"
                 ? "正在取消读取…"
-                : "正在读取额度…"
-              : automatic > 0
-                ? `已开启自动刷新，间隔 ${automatic} 秒；失败时会延长。`
-                : "手动刷新，不在后台轮询。"}
+                : operation?.name === "refresh"
+                  ? "正在读取额度…"
+                  : "正在处理辅助任务…"
+              : operation?.phase === "cancelled"
+                ? "任务已取消，已读取的数据已保留。"
+                : automatic > 0
+                  ? `已开启自动刷新，间隔 ${automatic} 秒；失败时会延长。`
+                  : "手动刷新，不在后台轮询。"}
           </output>
         </div>
       )}
@@ -217,7 +240,9 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
             </Button>
           </EmptyContent>
         </Empty>
-      ) : running ? (
+      ) : running &&
+        operation?.name === "refresh" &&
+        (!result || result.status === "tools" || result.status === "source") ? (
         <div className="usage-loading" aria-label="正在读取用量">
           <p>正在等待 Codex CLI 返回额度，读取完成后这里会更新。</p>
         </div>
@@ -270,7 +295,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
               </AlertDescription>
             </Alert>
           )}
-          <QuotaData data={current} />
+          <QuotaData data={current} trend={result?.trend ?? null} />
         </>
       ) : (
         <Empty className="desktop-module-empty">

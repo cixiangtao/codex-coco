@@ -92,7 +92,8 @@ try {
     await delay(25);
   } while (Date.now() < until);
   await page.getByRole("button", { name: "取消任务", exact: true }).click();
-  await page.getByRole("heading", { name: "读取已取消", exact: true }).waitFor();
+  await page.getByText("任务已取消，已读取的数据已保留。", { exact: true }).waitFor();
+  await page.getByText("Codex CLI：1.2.4 · 最新稳定版：1.2.4", { exact: true }).waitFor();
   for (const command of commands.filter((command) => command.args.includes("exec")))
     assert.throws(() => process.kill(command.pid, 0));
   assert.deepEqual(errors, []);

@@ -80,6 +80,18 @@ const updates = new ApplicationUpdates(
   app.getVersion(),
   createNativeUpdateEngine(join(app.getPath("userData"), "updates")),
 );
+const localUsage = createLocalUsageService({
+  createWorker: () => new Worker(join(here, "usage-worker.js"), { stdout: true, stderr: true }),
+  directory: join(app.getPath("userData"), "usage-local"),
+  chooseDirectory: async () => {
+    const result = await dialog.showOpenDialog({
+      title: "选择 Codex 数据目录",
+      properties: ["openDirectory"],
+    });
+    return result.canceled ? null : (result.filePaths[0] ?? null);
+  },
+});
+const usageEnvironment = { environment: localUsage.environment! };
 const definitions = registeredModules(
   !app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1",
   () => new Worker(join(here, "foundation-worker.js"), { stdout: true, stderr: true }),
@@ -133,19 +145,13 @@ const definitions = registeredModules(
     native.show();
     return true;
   },
-  createLocalUsageService({
-    createWorker: () => new Worker(join(here, "usage-worker.js"), { stdout: true, stderr: true }),
-    directory: join(app.getPath("userData"), "usage-local"),
-    chooseDirectory: async () => {
-      const result = await dialog.showOpenDialog({
-        title: "选择本地 Codex 记录目录",
-        properties: ["openDirectory"],
-      });
-      return result.canceled ? null : (result.filePaths[0] ?? null);
-    },
+  localUsage,
+  createResetService(join(app.getPath("userData"), "usage-reset-attempts.json"), usageEnvironment),
+  createUsageToolsService({
+    directory: join(app.getPath("userData"), "usage-tools"),
+    rpc: usageEnvironment,
+    command: usageEnvironment,
   }),
-  createResetService(join(app.getPath("userData"), "usage-reset-attempts.json")),
-  createUsageToolsService({ directory: join(app.getPath("userData"), "usage-tools") }),
   desktopPreferences.dependencies,
 );
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {

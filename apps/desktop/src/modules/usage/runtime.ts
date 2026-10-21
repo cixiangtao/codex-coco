@@ -12,8 +12,13 @@ import {
   usageDefaults,
   usageFailures,
   usageInputSchema,
+  usageRefreshInputSchema,
   usageResultSchema,
   usageWindowTitle,
+  usageMenuWindows,
+  usagePlanTitle,
+  usageState,
+  trendTotals,
   trendInputSchema,
   type UsageResult,
   type TrendSnapshot,
@@ -25,12 +30,14 @@ import {
 
 /** Reads remain opt-in; an explicitly saved policy schedules bounded tasks without renderer timers. */
 export function createUsageModule(
-  read: UsageReader = createUsageReader(),
+  read: UsageReader | undefined = undefined,
   notify?: UsageNotifier,
   local?: LocalUsageService,
   resetService?: ResetService,
   tools?: UsageToolsService,
 ): BuiltinModule {
+  const reader =
+    read ?? createUsageReader(local?.environment ? { environment: local.environment } : {});
   const output = usageResultSchema.transform((value) =>
     usageResultSchema.parse({ ...value, tools: tools?.snapshot() ?? null }),
   );
@@ -49,6 +56,7 @@ export function createUsageModule(
         }),
       },
     },
+    state: usageResultSchema.nullable(),
     operations: {
       ...Object.fromEntries(
         [
@@ -68,7 +76,7 @@ export function createUsageModule(
           },
         ]),
       ),
-      refresh: { input: usageInputSchema, output, timeoutMs: 60_000 },
+      refresh: { input: usageRefreshInputSchema, output, timeoutMs: 60_000 },
       "consume-reset": { input: resetInputSchema, output, timeoutMs: 40_000 },
       "reset-status": { input: usageInputSchema, output, timeoutMs: 5000 },
       "scan-trend": { input: trendInputSchema, output, timeoutMs: 60_000 },
@@ -82,6 +90,7 @@ export function createUsageModule(
       signal.throwIfAborted();
       let previous: UsageSnapshot | null = null;
       let stopped = false;
+      let executing = false;
       let config = usageConfigSchema.parse(host.configuration());
       let failures = 0;
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -90,6 +99,22 @@ export function createUsageModule(
       let trend: TrendSnapshot | null = null;
       let latest: UsageResult | null = null;
       let reset: ResetFeedback | null = null;
+      const current = (): UsageResult | null =>
+        latest
+          ? usageResultSchema.parse({ ...latest, trend, reset, tools: tools?.snapshot() ?? null })
+          : trend
+            ? {
+                status: "local",
+                data: null,
+                reason: null,
+                trend,
+                reset,
+                tools: tools?.snapshot() ?? null,
+              }
+            : tools || reset
+              ? { status: "tools", trend, reset, tools: tools?.snapshot() ?? null }
+              : null;
+      const result = () => current() ?? { status: "tools" as const, trend, reset, tools: null };
       const schedule = () => {
         clearTimeout(timer);
         if (!stopped && !signal.aborted && config.refreshIntervalSeconds > 0) {
@@ -105,12 +130,14 @@ export function createUsageModule(
       signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
       schedule();
       return {
+        state: current,
         configurationChanged: (value) => {
           config = usageConfigSchema.parse(value);
           schedule();
         },
         execute: async (name, input, context) => {
           if (stopped) throw new Error("USAGE_STOPPED");
+          executing = true;
           clearTimeout(timer);
           const settings = usageConfigSchema.parse(context.config);
           try {
@@ -126,26 +153,17 @@ export function createUsageModule(
             ) {
               if (!tools) throw new Error("TOOLS_UNAVAILABLE");
               await tools.execute(name, input, context.signal, context.report);
-              return latest ?? { status: "tools", tools: tools.snapshot(), trend, reset };
+              return result();
             }
             if (name === "reset-status") {
               reset = (await resetService?.latest()) ?? null;
-              return latest
-                ? { ...latest, reset }
-                : {
-                    status: "error",
-                    reason: "NO_LIMITS",
-                    checkedAt: Date.now(),
-                    previous,
-                    trend,
-                    reset,
-                  };
+              return result();
             }
             if (name === "consume-reset") {
               const redemption = resetInputSchema.parse(input);
               if (!resetService) throw new Error("RESET_UNAVAILABLE");
               try {
-                const before = await read(context.signal);
+                const before = await reader(context.signal);
                 reset = await resetService.consume(
                   redemption,
                   before,
@@ -161,7 +179,7 @@ export function createUsageModule(
                     trend,
                     reset,
                   };
-                const refreshed = await read(context.signal);
+                const refreshed = await reader(context.signal);
                 previous = normalizeUsage(refreshed, Date.now());
                 latest = { status: "ready", data: previous, trend, reset, tools: null };
                 return latest;
@@ -187,30 +205,50 @@ export function createUsageModule(
               if (!local) throw new Error("LOCAL_UNAVAILABLE");
               const changed = await local.chooseHome();
               context.signal.throwIfAborted();
-              if (changed) trend = null;
-              if (latest?.status === "ready" || latest?.status === "error")
-                return { ...latest, trend };
-              return { status: "source", changed, trend };
+              if (changed) {
+                tools?.reset?.();
+                previous = null;
+                trend = null;
+                latest = null;
+                reset = null;
+                accountScope = null;
+                notifications = new UsageNotifications(notify);
+              }
+              return current() ?? { status: "source", changed, trend };
             }
             if (name === "scan-trend") {
               if (!local) throw new Error("LOCAL_UNAVAILABLE");
               const scan = await local.scan(context.signal, context.report, {
-                days: settings.trendDays,
+                days: 30,
                 scope: accountScope,
                 force: trendInputSchema.parse(input).force,
               });
               trend = scan.trend;
-              if (latest?.status === "ready" || latest?.status === "error")
-                return { ...latest, trend };
-              return { status: "local", data: scan.fallback, reason: null, trend };
+              if (
+                !latest ||
+                latest.status === "local" ||
+                latest.status === "source" ||
+                latest.status === "tools"
+              )
+                latest = {
+                  status: "local",
+                  data: scan.fallback,
+                  reason: null,
+                  trend,
+                  reset,
+                  tools: null,
+                };
+              return result();
             }
-            const raw = await read(context.signal);
+            const raw = await reader(context.signal);
             context.signal.throwIfAborted();
             const nextScope = usageAccountScope(raw);
-            if (nextScope !== null && nextScope !== accountScope) {
+            if (nextScope !== accountScope) {
+              if (accountScope !== null) tools?.reset?.();
               previous = null;
               trend = null;
               latest = null;
+              reset = null;
               notifications = new UsageNotifications(notify);
               accountScope = nextScope;
             }
@@ -222,7 +260,23 @@ export function createUsageModule(
               notificationsEnabled: settings.notificationsEnabled && config.notificationsEnabled,
             });
             latest = { status: "ready", data, trend, reset, tools: null };
-            return latest;
+            // Quota success remains usable even if independent local history is unavailable.
+            context.report(5);
+            if (local) {
+              try {
+                trend = (
+                  await local.scan(context.signal, context.report, {
+                    days: 30,
+                    scope: accountScope,
+                    force: false,
+                    refresh: usageRefreshInputSchema.parse(input).forceTrend,
+                  })
+                ).trend;
+              } catch {
+                context.signal.throwIfAborted();
+              }
+            }
+            return result();
           } catch (error) {
             context.signal.throwIfAborted();
             if (name !== "refresh") throw error;
@@ -235,7 +289,7 @@ export function createUsageModule(
             if (settings.localFallbackEnabled && local) {
               try {
                 const scan = await local.scan(context.signal, context.report, {
-                  days: settings.trendDays,
+                  days: 30,
                   scope: accountScope,
                   force: false,
                 });
@@ -266,11 +320,14 @@ export function createUsageModule(
             };
             return latest;
           } finally {
+            executing = false;
+            if (stopped) tools?.reset?.();
             schedule();
           }
         },
         stop: async () => {
           stopped = true;
+          if (!executing) tools?.reset?.();
           clearTimeout(timer);
           previous = null;
           trend = null;
@@ -279,29 +336,32 @@ export function createUsageModule(
       };
     },
     glance: (snapshot) => {
-      const operation = snapshot.operation;
-      if (!operation) return { description: "已启用，打开主窗口手动读取 Codex CLI 的订阅额度。" };
-      if (operation.phase === "running" || operation.phase === "cancelling")
-        return {
-          description:
-            operation.phase === "running" ? "正在读取额度，请稍候。" : "正在取消读取，请稍候。",
-        };
-      if (operation.phase === "cancelled")
-        return { description: "读取已取消，可在主窗口重新读取。" };
-      const parsed = usageResultSchema.safeParse(operation.result);
-      if (!parsed.success) return null;
-      if (
-        parsed.data.tools?.error &&
-        [
-          "list-models",
-          "run-intelligence",
-          "load-intelligence-history",
-          "clear-intelligence-history",
-          "check-cli",
-          "update-cli",
-        ].includes(operation.name)
-      )
-        return { phase: "error", description: "用量辅助工具操作未完成，请在主窗口检查。" };
+      const state = usageState(snapshot);
+      if (!state) return { description: "已启用，打开主窗口手动读取 Codex CLI 的订阅额度。" };
+      const parsed = { data: state };
+      const totals = state.trend && state.trend.source !== "none" ? trendTotals(state.trend) : null;
+      const statistics = totals
+        ? [
+            {
+              id: "tokens:today",
+              label: "今日估算",
+              value: `${totals.today.toLocaleString("zh-CN")} tokens`,
+              detail: "本机记录，包含无归属计数",
+            },
+            {
+              id: "tokens:week",
+              label: "近 7 天",
+              value: `${totals.week.toLocaleString("zh-CN")} tokens`,
+              detail: "本机记录，包含无归属计数",
+            },
+            {
+              id: "tokens:month",
+              label: "近 30 天",
+              value: `${totals.month.toLocaleString("zh-CN")} tokens`,
+              detail: "本机记录，包含无归属计数",
+            },
+          ]
+        : [];
       if (parsed.data.status === "error")
         return { phase: "error", description: usageFailures[parsed.data.reason].title };
       if (parsed.data.status === "tools")
@@ -323,42 +383,57 @@ export function createUsageModule(
           description: parsed.data.reason
             ? "服务额度读取失败，主窗口可查看本机历史记录。"
             : "已读取本机趋势；本机记录不代表当前服务额度。",
+          ...(!parsed.data.reason ? { metrics: statistics } : {}),
         };
       const data = parsed.data.data;
       return {
-        description: "来自 Codex CLI，额度为最近一次读取的记录。",
+        description: `${data.account?.label ?? "账号标识不可用"} · ${usagePlanTitle(data.account?.plan)} · 最近一次额度记录`,
         statusText: (() => {
           const settings = usageConfigSchema.safeParse(snapshot.config.value);
           if (!settings.success) return "";
           return data.buckets
             .filter((bucket) => bucket.id === "codex")
             .flatMap((bucket) =>
-              bucket.windows
-                .filter((window) =>
-                  window.kind === "primary"
+              usageMenuWindows(bucket.windows)
+                .filter(({ primary }) =>
+                  primary
                     ? settings.data.showPrimaryInMenuBar
                     : settings.data.showSecondaryInMenuBar,
                 )
                 .map(
-                  (window) =>
-                    `${settings.data.showMenuBarLabels ? usageWindowTitle(window) + " " : ""}${Number(remainingPercent(window.usedPercent).toFixed(0))}%`,
+                  ({ window, label }) =>
+                    `${settings.data.showMenuBarLabels ? label + " " : ""}${Number(remainingPercent(window.usedPercent).toFixed(0))}%`,
                 ),
             )
-            .join(" · ")
-            .slice(0, 120);
+            .join(" · ");
         })(),
         capturedAt: data.capturedAt,
-        metrics: data.buckets.flatMap((bucket, index) =>
-          bucket.windows.map((window) => ({
-            id: `${bucket.id}:${window.kind}`,
-            label: `${usageBucketTitle(bucket.id, index)} · ${usageWindowTitle(window)}`,
-            value: `剩余 ${Number(remainingPercent(window.usedPercent).toFixed(1))}%`,
-            detail:
-              window.resetsAt === null
-                ? "恢复时间未知"
-                : `${new Date(window.resetsAt * 1000).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 恢复`,
-          })),
-        ),
+        metrics: [
+          ...data.buckets
+            .flatMap((bucket, index) =>
+              bucket.windows.map((window) => ({
+                id: `${bucket.id}:${window.kind}`,
+                label: `${usageBucketTitle(bucket.id, index)} · ${usageWindowTitle(window)}`,
+                value: `剩余 ${Number(remainingPercent(window.usedPercent).toFixed(1))}%`,
+                detail:
+                  window.resetsAt === null
+                    ? "恢复时间未知"
+                    : `${new Date(window.resetsAt * 1000).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 恢复`,
+              })),
+            )
+            .slice(0, 36),
+          ...statistics,
+          ...(data.resetCredits
+            ? [
+                {
+                  id: "reset:available",
+                  label: "重置卡",
+                  value: `${data.resetCredits.availableCount} 张可用`,
+                  detail: "在主窗口核对并兑换",
+                },
+              ]
+            : []),
+        ],
       };
     },
   };

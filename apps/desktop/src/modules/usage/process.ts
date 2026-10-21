@@ -5,6 +5,7 @@ export interface CommandOptions {
   command?: string;
   prefixArgs?: string[];
   env?: NodeJS.ProcessEnv;
+  environment?(): Promise<NodeJS.ProcessEnv>;
 }
 /** Owns a bounded process group. No shell, raw errors or stderr cross the service boundary. */
 export async function runCodexCommand(
@@ -12,7 +13,7 @@ export async function runCodexCommand(
   options: { cwd: string; input?: string; signal: AbortSignal; timeoutMs: number },
   host: CommandOptions = {},
 ) {
-  const environment = host.env ?? process.env;
+  const environment = { ...(host.env ?? process.env), ...(await host.environment?.()) };
   const command = host.command ?? (await codexCommand(environment, options.signal));
   options.signal.throwIfAborted();
   const child = spawn(command, [...(host.prefixArgs ?? []), ...args], {
@@ -50,8 +51,9 @@ export async function runCodexCommand(
       if (size > 1024 * 1024) stop("COMMAND_LIMIT");
       return !failure;
     };
-    child.stdout.on("data", (chunk: Buffer) => {
-      if (budget(chunk.length)) output += chunk.toString("utf8");
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      if (budget(Buffer.byteLength(chunk, "utf8"))) output += chunk;
     });
     child.stderr.on("data", (chunk: Buffer) => budget(chunk.length));
     child.on("error", () => stop("COMMAND_FAILED"));

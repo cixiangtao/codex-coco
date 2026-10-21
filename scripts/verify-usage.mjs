@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, readdir, writeFile, rm } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { setTimeout as delay } from "node:timers/promises";
 import { createDesktopSession } from "./verify-desktop.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -47,13 +48,15 @@ async function snapshot(page) {
   assert.equal(response.ok, true);
   return response.value.find((item) => item.id === "usage");
 }
-async function task(page, phase) {
-  await page.waitForFunction(async (expected) => {
-    const result = await window.codexCoco.modules();
-    return (
-      result.ok && result.value.find((item) => item.id === "usage").operation?.phase === expected
-    );
-  }, phase);
+async function task(page, phase, previousId) {
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    const current = await snapshot(page);
+    if (current.operation?.phase === phase && (!previousId || current.operation.id !== previousId))
+      return current;
+    await delay(30);
+  }
+  assert.fail(`Usage did not reach ${phase}`);
 }
 async function capture(page, name) {
   await page.screenshot({ path: join(output, name), scale: "css", animations: "disabled" });
@@ -83,7 +86,15 @@ try {
   await nav.getByRole("button", { name: "用量", exact: true }).click();
   await page.getByRole("heading", { name: "按需读取用量", exact: true }).waitFor();
   assert.deepEqual(await traces(), []);
+  await writeFile(mode, "hang");
   await page.getByRole("button", { name: "启用并读取用量", exact: true }).click();
+  await page.getByLabel("正在读取用量", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "取消读取", exact: true }).click();
+  await task(page, "cancelled");
+  await page.getByRole("heading", { name: "读取已取消", exact: true }).waitFor();
+  await assertChildrenExited();
+  await writeFile(mode, "ready");
+  await page.getByRole("button", { name: "刷新用量", exact: true }).click();
   await page.getByText("剩余 75%", { exact: true }).waitFor();
   await page.getByText("剩余 40%", { exact: true }).waitFor();
   assert.equal((await snapshot(page)).phase, "running");
@@ -142,10 +153,11 @@ try {
   await page.getByText("查看上次成功记录（非当前状态）", { exact: true }).click();
   await page.getByText("剩余 75%", { exact: true }).waitFor();
   await writeFile(mode, "ready");
+  const failedOperationId = (await snapshot(page)).operation.id;
   await page.getByRole("button", { name: "重新读取", exact: true }).click();
   await page.getByText("剩余 75%", { exact: true }).waitFor();
-  await task(page, "succeeded");
-  assert.equal((await snapshot(page)).operation.result.status, "ready");
+  const recovered = await task(page, "succeeded", failedOperationId);
+  assert.equal(recovered.operation.result.status, "ready");
 
   await nav.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("button", { name: "深色", exact: true }).click();
@@ -171,10 +183,12 @@ try {
   await writeFile(mode, "hang");
   await page.getByRole("button", { name: "重新读取", exact: true }).click();
   await page.getByRole("button", { name: "取消读取", exact: true }).click();
-  await page.getByRole("heading", { name: "读取已取消", exact: true }).waitFor();
+  await task(page, "cancelled");
+  await page.getByText("任务已取消，已读取的数据已保留。", { exact: true }).waitFor();
+  await page.getByText("Codex CLI 尚未登录", { exact: true }).waitFor();
   await assertChildrenExited();
-  await page.getByRole("button", { name: "刷新用量", exact: true }).click();
-  await page.getByLabel("正在读取用量", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "重新读取", exact: true }).click();
+  await task(page, "running");
   await application.close();
   session = undefined;
   await assertChildrenExited();

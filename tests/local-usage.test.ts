@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   mkdtemp,
   mkdir,
@@ -18,6 +18,7 @@ import { Worker } from "node:worker_threads";
 import { scanLocalUsage } from "../apps/desktop/src/modules/usage/local-index";
 import { localScanResultSchema } from "../apps/desktop/src/modules/usage/contract";
 import { runWorkerTask } from "../apps/desktop/src/application/worker-task";
+import { createLocalUsageService } from "../apps/desktop/src/modules/usage/local-service";
 
 const directories: string[] = [];
 const now = new Date("2026-10-21T12:00:00+08:00").getTime();
@@ -63,12 +64,74 @@ async function fixture() {
 const total = (data: Awaited<ReturnType<typeof scanLocalUsage>>) =>
   data.trend.points.reduce((sum, point) => sum + point.tokens, 0);
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all(
     directories.splice(0).map((path) => rm(path, { recursive: true, force: true })),
   );
 });
 
 describe("local usage counters and incremental indexing", () => {
+  it("rejects a non-Codex directory without replacing the previous private choice", async () => {
+    const f = await fixture();
+    const invalid = join(f.home, "empty");
+    await mkdir(invalid);
+    let choice = f.home;
+    const service = createLocalUsageService({
+      createWorker: () => {
+        throw new Error("Not used");
+      },
+      directory: join(f.home, "private-choice"),
+      chooseDirectory: async () => choice,
+    });
+    await service.chooseHome();
+    choice = invalid;
+    await expect(service.chooseHome()).rejects.toThrow("LOCAL_SOURCE_INVALID");
+    expect(await service.environment!()).toEqual({ CODEX_HOME: f.home });
+  });
+  it("expires the ten-minute cache at local midnight and retains a privately chosen source", async () => {
+    const f = await fixture();
+    await writeFile(join(f.home, "sessions/day.jsonl"), meta("day") + event(31, 31));
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    vi.setSystemTime(midnight.getTime() - 30_000);
+    const createWorker = vi.fn(
+      () =>
+        new Worker(new URL("../apps/desktop/src/modules/usage/worker.ts", import.meta.url), {
+          execArgv: [],
+          stdout: true,
+          stderr: true,
+        }),
+    );
+    const service = createLocalUsageService({
+      createWorker,
+      directory: join(f.home, "private"),
+      chooseDirectory: async () => f.home,
+    });
+    await service.chooseHome();
+    expect(await service.environment!()).toEqual({ CODEX_HOME: f.home });
+    const input = { days: 30 as const, scope: null, force: false };
+    const first = await service.scan(new AbortController().signal, () => undefined, input);
+    await service.scan(new AbortController().signal, () => undefined, input);
+    expect(createWorker).toHaveBeenCalledTimes(1);
+    expect(first.trend.points.at(-1)?.tokens).toBe(31);
+    vi.setSystemTime(midnight.getTime() + 30_000);
+    const next = await service.scan(new AbortController().signal, () => undefined, input);
+    expect(createWorker).toHaveBeenCalledTimes(2);
+    expect(next.trend.points.at(-1)?.tokens).toBe(0);
+    expect(next.trend.points.at(-2)?.tokens).toBe(31);
+  });
+  it("counts model-specific token events without treating their quota as the general quota", async () => {
+    const f = await fixture();
+    await writeFile(
+      join(f.home, "sessions/model.jsonl"),
+      meta("model") + event(45, 45).replace('"limit_id":"codex"', '"limit_id":"codex_spark"'),
+    );
+    const result = await f.scan();
+    expect(total(result)).toBe(45);
+    expect(result.trend.source).toBe("session-events");
+    expect(result.fallback).toBeNull();
+  });
   it("deduplicates archive copies, repeated events and inherited fork prefixes", async () => {
     const f = await fixture();
     const parent = meta("parent") + event(100, 100) + event(160, 60, 1000);

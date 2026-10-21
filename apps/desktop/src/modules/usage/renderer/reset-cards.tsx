@@ -10,7 +10,7 @@ import {
 } from "@codex-coco/ui/components/dialog";
 import type { ModuleSnapshot } from "../../../contracts/modules";
 import { acceptModuleSnapshot } from "../../../renderer/client/modules";
-import { usageResultSchema } from "../contract";
+import { usageState } from "../contract";
 
 const outcomes = {
   reset: "重置卡已兑换",
@@ -25,8 +25,7 @@ export function UsageResetCards({ snapshot }: { snapshot: ModuleSnapshot }) {
   const [selected, setSelected] = useState<string | null | undefined>(undefined);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const parsed = usageResultSchema.safeParse(snapshot.operation?.result);
-  const state = parsed.success ? parsed.data : null;
+  const state = usageState(snapshot);
   const credits = state?.status === "ready" ? state.data.resetCredits : null;
   const feedback = state?.reset;
   const busy =

@@ -47,7 +47,7 @@ const entrySchema = z.strictObject({
 });
 type Entry = z.infer<typeof entrySchema>;
 const cacheSchema = z.strictObject({
-  version: z.literal(1),
+  version: z.literal(2),
   home: z.string(),
   files: z.record(z.string(), entrySchema),
 });
@@ -105,6 +105,7 @@ function accountScope(...objects: Record<string, unknown>[]) {
   return null;
 }
 function quota(raw: Record<string, unknown>, capturedAt: number): UsageSnapshot | null {
+  if (typeof raw.limit_id === "string" && raw.limit_id !== "codex") return null;
   const windows = (["primary", "secondary"] as const).flatMap((kind) => {
     const value = record(raw[kind]);
     const used = value.used_percent;
@@ -147,7 +148,6 @@ function consumeLine(line: Buffer, entry: Entry, minimumTimestamp: number) {
   if (!Number.isFinite(timestamp) || timestamp < 0) return;
   const info = record(payload.info);
   const rates = record(payload.rate_limits);
-  if (typeof rates.limit_id === "string" && rates.limit_id !== "codex") return;
   const scope = accountScope(rates, payload, info);
   const local = quota(rates, timestamp);
   if (local && (!entry.latest || entry.latest.data.capturedAt <= timestamp))
@@ -429,7 +429,7 @@ export async function scanLocalUsage(
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") limited = true;
     }
   }
-  const bytes = JSON.stringify({ version: 1, home: hash(request.home), files: next });
+  const bytes = JSON.stringify({ version: 2, home: hash(request.home), files: next });
   if (Buffer.byteLength(bytes) <= MAX_CACHE) {
     const temporary = `${cachePath}.${randomUUID()}.tmp`;
     try {
