@@ -8,7 +8,7 @@ import {
   fixtureResultSchema,
 } from "../apps/desktop/src/modules/foundation-fixture/contract";
 import { ModuleHost, type BuiltinModule } from "../apps/desktop/src/application/module-host";
-import { createFoundationFixture } from "../apps/desktop/src/modules/foundation-fixture/runtime";
+import { createFoundationFixture, createFixtureWorker } from "./support/fixture";
 import { registeredModules } from "../apps/desktop/src/modules/registry";
 import type { ModuleSnapshot } from "../apps/desktop/src/contracts/modules";
 
@@ -50,7 +50,7 @@ afterEach(async () => {
 describe("module operation loop", () => {
   it("keeps normal registrations empty and creates no files merely by loading fixtures", async () => {
     expect(registeredModules(false)).toEqual([]);
-    expect(registeredModules(true)).toHaveLength(2);
+    expect(registeredModules(true, createFixtureWorker)).toHaveLength(2);
     const { host, directory } = await fixture();
     expect(await readdir(directory)).toEqual([]);
     expect(host.snapshots().map((item) => item.phase)).toEqual(["disabled", "disabled"]);

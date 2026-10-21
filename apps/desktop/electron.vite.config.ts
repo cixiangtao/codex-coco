@@ -11,7 +11,10 @@ export default defineConfig({
     build: {
       externalizeDeps: false,
       rollupOptions: {
-        input: resolve(root, "src/desktop/main/index.ts"),
+        input: {
+          index: resolve(root, "src/desktop/main/index.ts"),
+          "foundation-worker": resolve(root, "src/modules/foundation-fixture/worker.ts"),
+        },
         external: ["electron", /^node:/],
       },
     },

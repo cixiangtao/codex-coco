@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeTheme, net, protocol, dialog } from "electron";
 import { randomUUID } from "node:crypto";
+import { Worker } from "node:worker_threads";
 import { DiagnosticLog } from "../../application/diagnostics";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -45,7 +46,10 @@ const contexts = new Map<number, WindowContext>();
 let lastMainId: number | undefined;
 let menuBar: MenuBarController | undefined;
 let glance: GlanceSnapshot = { revision: 0, items: buildGlanceItems([]) };
-const definitions = registeredModules(!app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1");
+const definitions = registeredModules(
+  !app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1",
+  () => new Worker(join(here, "foundation-worker.js"), { stdout: true, stderr: true }),
+);
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
   modules: definitions.map((definition) => ({
     id: definition.id,

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { DiagnosticLog } from "../apps/desktop/src/application/diagnostics";
 import { ModuleHost } from "../apps/desktop/src/application/module-host";
-import { createFoundationFixture } from "../apps/desktop/src/modules/foundation-fixture/runtime";
+import { createFoundationFixture } from "./support/fixture";
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();

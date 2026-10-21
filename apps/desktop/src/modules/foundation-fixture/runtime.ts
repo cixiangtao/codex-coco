@@ -1,10 +1,13 @@
-import { setTimeout } from "node:timers/promises";
 import { z } from "zod";
 import type { BuiltinModule } from "../../application/module-host";
+import { runWorkerTask, type WorkerFactory } from "../../application/worker-task";
 import { fixtureConfigSchema, fixtureInputSchema, fixtureResultSchema } from "./contract";
 
 /** An explicit opt-in fixture exercising the same registration contract as future built-ins. */
-export function createFoundationFixture(id = "foundation-fixture"): BuiltinModule {
+export function createFoundationFixture(
+  createWorker: WorkerFactory,
+  id = "foundation-fixture",
+): BuiltinModule {
   return {
     id,
     title: id === "foundation-fixture" ? "模块验收示例" : "独立模块示例",
@@ -28,14 +31,7 @@ export function createFoundationFixture(id = "foundation-fixture"): BuiltinModul
       return {
         execute: async (_name, input, context) => {
           if (stopped) throw new Error("FIXTURE_STOPPED");
-          const { steps } = fixtureInputSchema.parse(input);
-          const { label } = fixtureConfigSchema.parse(context.config);
-          for (let completed = 1; completed <= steps; completed++) {
-            await setTimeout(80, undefined, { signal: context.signal });
-            context.signal.throwIfAborted();
-            context.report(Math.round((completed / steps) * 100));
-          }
-          return { label, completed: steps };
+          return runWorkerTask(createWorker, { input, config: context.config }, context);
         },
         stop: async () => {
           stopped = true;
