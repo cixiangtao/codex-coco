@@ -67,3 +67,5 @@
 用量配置版本 2 将旧空配置迁移为手动读取、通知关闭。自动刷新通过宿主 requestOperation 执行，失败退避、单模块任务约束和停止清理保持有效。系统通知由桌面依赖注入，只接收固定标题和公开额度文案。菜单栏 statusText 为严格限长公开字段，不接收配置或原始账号；完整名称 Codex Coco 始终保留。配置保存通知 runtime.configurationChanged，观察者失败不能把已成功持久化的操作伪报为失败。
 
 用量配置当前 v3 增加 localFallbackEnabled（默认 false）与 trendDays（7/14/30）。本机扫描仅由主窗口明确请求或已保存的本地回退策略触发，在 usage-worker 中执行；独立静态构建入口必须随打包验证。source.json 中的目录属于私有服务状态，不进入公共模块配置。公开趋势只有按日数值、来源、范围和完整性；JSONL 与 SQLite 估算不可混加；无归属记录不得冒充当前账号统计。
+
+重置卡已通过官方 account/rateLimits/read 与 account/rateLimitResetCredit/consume 接入。消费只允许主窗口明确确认，后台先重新核对账号与引用，发送前持久化 pending 幂等请求；重试必须复用 UUID，未确认请求不能被新请求覆盖。usage-reset-attempts.json 是私有业务状态，允许保存卡 ID 与匿名账号关联，权限 0600，禁止存储令牌。取消/重启后通过检查上次兑换恢复，不代用户消费真实卡。
