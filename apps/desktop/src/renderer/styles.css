@@ -16,7 +16,7 @@ body {
   grid-template-columns: var(--desktop-sidebar-width) minmax(0, 1fr);
   grid-template-rows: 52px minmax(0, 1fr);
   height: 100%;
-  background: var(--background);
+  background: var(--muted);
 }
 .desktop-sidebar-collapsed {
   --desktop-sidebar-width: 56px;
@@ -43,13 +43,9 @@ body {
   align-items: center;
   height: 100%;
   padding-inline: 88px 12px;
-  background: var(--muted);
 }
 .desktop-window-tools button {
   -webkit-app-region: no-drag;
-}
-.desktop-sidebar-collapsed .desktop-window-tools {
-  background: var(--background);
 }
 .desktop-draft-indicator {
   justify-self: end;
@@ -60,7 +56,6 @@ body {
 .desktop-sidebar {
   min-height: 0;
   padding: 12px 10px;
-  background: var(--muted);
 }
 .desktop-sidebar nav {
   display: flex;
@@ -97,6 +92,9 @@ body {
   min-height: 0;
   min-width: 0;
   overflow: auto;
+  margin: 0 8px 8px 0;
+  border-radius: 12px;
+  background: var(--card);
   padding: 28px 40px 40px;
   scrollbar-gutter: stable;
   scroll-padding-block: 24px;
