@@ -1,3 +1,4 @@
+import { UsageResetCards } from "./reset-cards";
 import { UsageTrend } from "./trend";
 import { UsagePreferences } from "./preferences";
 import { useEffect, useState } from "react";
@@ -286,6 +287,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
           </EmptyHeader>
         </Empty>
       )}
+      <UsageResetCards snapshot={snapshot} />
       <UsageTrend snapshot={snapshot} />
     </div>
   );

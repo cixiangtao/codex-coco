@@ -17,6 +17,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SettingsError, SettingsStore } from "../../application/settings-store";
 import { ModuleError, ModuleHost } from "../../application/module-host";
+import { createResetService } from "../../modules/usage/reset";
 import { createLocalUsageService } from "../../modules/usage/local-service";
 import { registeredModules } from "../../modules/registry";
 import { channels, type Result } from "../../contracts/bridge";
@@ -97,6 +98,7 @@ const definitions = registeredModules(
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
   }),
+  createResetService(join(app.getPath("userData"), "usage-reset-attempts.json")),
 );
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
   modules: definitions.map((definition) => ({

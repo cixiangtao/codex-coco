@@ -14,6 +14,7 @@ const raw = {
   rateLimits: { primary: { usedPercent: 50, windowDurationMins: 300, resetsAt: 2_000_000_000 } },
 };
 const data = (usedPercent: number): UsageSnapshot => ({
+  resetCredits: null,
   source: "codex-app-server",
   capturedAt: 123,
   buckets: [

@@ -32,19 +32,58 @@ const windowSchema = z.strictObject({
   windowMinutes: z.number().int().positive().nullable(),
   resetsAt: z.number().int().nonnegative().max(8_640_000_000_000).nullable(),
 });
-export const usageSnapshotSchema = z.strictObject({
-  capturedAt: z.number().int().nonnegative(),
-  source: z.enum(["codex-app-server", "local-session"]),
-  buckets: z
+export const resetCreditsSchema = z.strictObject({
+  availableCount: z.number().int().min(0).max(1_000_000),
+  credits: z
     .array(
       z.strictObject({
-        id: z.string().regex(/^[a-zA-Z0-9_.:-]{1,80}$/),
-        windows: z.array(windowSchema).min(1).max(2),
+        reference: z.string().regex(/^[a-f0-9]{64}$/),
+        expiresAt: z.number().int().nonnegative().max(8_640_000_000_000).nullable(),
       }),
     )
-    .min(1)
-    .max(20),
+    .max(100)
+    .nullable(),
 });
+export const resetInputSchema = z.strictObject({
+  attemptKey: z.uuid(),
+  reference: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+});
+export const resetFeedbackSchema = z.strictObject({
+  attemptKey: z.uuid(),
+  reference: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+  outcome: z.enum([
+    "reset",
+    "alreadyRedeemed",
+    "nothingToReset",
+    "noCredit",
+    "pending",
+    "rejected",
+  ]),
+  updatedAt: z.number().int().nonnegative(),
+});
+export type ResetFeedback = z.infer<typeof resetFeedbackSchema>;
+export const usageSnapshotSchema = z
+  .strictObject({
+    resetCredits: resetCreditsSchema.nullable().default(null),
+    capturedAt: z.number().int().nonnegative(),
+    source: z.enum(["codex-app-server", "local-session"]),
+    buckets: z
+      .array(
+        z.strictObject({
+          id: z.string().regex(/^[a-zA-Z0-9_.:-]{1,80}$/),
+          windows: z.array(windowSchema).min(1).max(2),
+        }),
+      )
+      .min(0)
+      .max(20),
+  })
+  .refine((value) => value.buckets.length > 0 || value.resetCredits !== null);
 export const usageFailureSchema = z.enum([
   "CLI_NOT_FOUND",
   "CLI_FAILED",
@@ -82,6 +121,7 @@ export const localScanResultSchema = z.strictObject({
 export const trendInputSchema = z.strictObject({ force: z.boolean() });
 export const usageResultSchema = z.discriminatedUnion("status", [
   z.strictObject({
+    reset: resetFeedbackSchema.nullable().default(null),
     status: z.literal("source"),
     changed: z.boolean(),
     trend: trendSnapshotSchema.nullable(),
@@ -90,6 +130,7 @@ export const usageResultSchema = z.discriminatedUnion("status", [
     status: z.literal("ready"),
     data: usageSnapshotSchema,
     trend: trendSnapshotSchema.nullable().default(null),
+    reset: resetFeedbackSchema.nullable().default(null),
   }),
   z.strictObject({
     status: z.literal("error"),
@@ -97,8 +138,10 @@ export const usageResultSchema = z.discriminatedUnion("status", [
     checkedAt: z.number().int().nonnegative(),
     previous: usageSnapshotSchema.nullable(),
     trend: trendSnapshotSchema.nullable().default(null),
+    reset: resetFeedbackSchema.nullable().default(null),
   }),
   z.strictObject({
+    reset: resetFeedbackSchema.nullable().default(null),
     status: z.literal("local"),
     data: usageSnapshotSchema.nullable(),
     reason: usageFailureSchema.nullable(),

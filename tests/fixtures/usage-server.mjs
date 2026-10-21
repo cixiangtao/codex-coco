@@ -17,7 +17,7 @@ if (mode() === "ignore-term") {
   setInterval(() => {}, 1000);
 }
 const send = (id, result) => process.stdout.write(`${JSON.stringify({ id, result })}\n`);
-createInterface({ input: process.stdin }).on("line", (line) => {
+createInterface({ input: process.stdin }).on("line", async (line) => {
   const request = JSON.parse(line);
   trace(request.method);
   if (request.method === "initialize") {
@@ -76,6 +76,18 @@ createInterface({ input: process.stdin }).on("line", (line) => {
           accessToken: "private-token",
         },
       },
+      rateLimitResetCredits: mode().startsWith("reset")
+        ? {
+            availableCount: 1,
+            credits: [
+              {
+                id: "private-credit-id",
+                status: "available",
+                expiresAt: Math.floor(Date.now() / 1000) + 3600,
+              },
+            ],
+          }
+        : null,
       email: "private@example.com",
       token: "private-token",
     };
@@ -83,5 +95,23 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     // Deliberately split the JSON-RPC frame across chunks.
     process.stdout.write(response.slice(0, 41));
     setTimeout(() => process.stdout.write(response.slice(41)), 5);
+  } else if (request.method === "account/rateLimitResetCredit/consume") {
+    const key = request.params.idempotencyKey;
+    let entries = [];
+    try {
+      entries = JSON.parse(readFileSync(process.env.FAKE_RESET_LEDGER, "utf8"));
+    } catch {}
+    const repeated = entries.includes(key);
+    if (!repeated) {
+      entries.push(key);
+      const { writeFileSync } = await import("node:fs");
+      writeFileSync(process.env.FAKE_RESET_LEDGER, JSON.stringify(entries));
+    }
+    if (mode() === "reset-hang") return;
+    if (mode() === "reset-pending")
+      process.stdout.write(
+        `${JSON.stringify({ id: request.id, error: { code: -32000, message: "private mutation result uncertain" } })}\n`,
+      );
+    else send(request.id, { outcome: repeated ? "alreadyRedeemed" : "reset" });
   } else process.exit(9);
 });

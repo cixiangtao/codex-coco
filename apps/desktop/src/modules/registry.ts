@@ -2,6 +2,7 @@ import type { BuiltinModule } from "../application/module-host";
 import { createFoundationFixture } from "./foundation-fixture/runtime";
 import type { WorkerFactory } from "../application/worker-task";
 import { createAppearanceModule, type AppearanceDependencies } from "./appearance/runtime";
+import type { ResetService } from "./usage/reset";
 import type { LocalUsageService } from "./usage/local-service";
 import type { UsageNotifier } from "./usage/notifications";
 import { createUsageModule } from "./usage/runtime";
@@ -16,9 +17,12 @@ export function registeredModules(
   appearance?: AppearanceDependencies,
   notifyUsage?: UsageNotifier,
   localUsage?: LocalUsageService,
+  resetService?: ResetService,
 ): readonly BuiltinModule[] {
   const definitions = [
-    ...(notifyUsage ? [createUsageModule(undefined, notifyUsage, localUsage)] : moduleDefinitions),
+    ...(notifyUsage
+      ? [createUsageModule(undefined, notifyUsage, localUsage, resetService)]
+      : moduleDefinitions),
     ...(appearance ? [createAppearanceModule(appearance)] : []),
   ];
   if (!fixtures) return definitions;

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { usageSnapshotSchema, type UsageFailureCode, type UsageSnapshot } from "./contract";
 
@@ -14,6 +15,7 @@ const rawWindow = z.object({
 });
 const rawBucket = z.object({ primary: rawWindow.nullish(), secondary: rawWindow.nullish() });
 const responseSchema = z.object({
+  rateLimitResetCredits: z.unknown().optional(),
   rateLimits: z.unknown().optional(),
   rateLimitsByLimitId: z.unknown().optional(),
 });
@@ -56,6 +58,52 @@ export function normalizeUsage(raw: unknown, capturedAt: number): UsageSnapshot 
     .sort(
       (a, b) => Number(b.id === "codex") - Number(a.id === "codex") || a.id.localeCompare(b.id),
     );
-  if (!buckets.length) throw new UsageReadError("NO_LIMITS");
-  return usageSnapshotSchema.parse({ source: "codex-app-server", capturedAt, buckets });
+  const rawCredits = resetCreditDetails(raw);
+  if (!buckets.length && !rawCredits) throw new UsageReadError("NO_LIMITS");
+  return usageSnapshotSchema.parse({
+    source: "codex-app-server",
+    capturedAt,
+    buckets,
+    resetCredits: rawCredits
+      ? {
+          availableCount: rawCredits.availableCount,
+          credits:
+            rawCredits.credits
+              ?.filter((credit) => credit.status === "available")
+              .map((credit) => ({
+                reference: creditReference(credit.id),
+                expiresAt: credit.expiresAt ?? null,
+              })) ?? null,
+        }
+      : null,
+  });
+}
+
+const rawResetSchema = z.object({
+  availableCount: z.number().int().min(0).max(1_000_000),
+  credits: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(512),
+        status: z.string().max(40),
+        expiresAt: z.number().int().nonnegative().max(8_640_000_000_000).nullish(),
+      }),
+    )
+    .max(100)
+    .nullish(),
+});
+/** Opaque credit identifiers stay private; only a bounded reference is rendered. */
+export function creditReference(id: string) {
+  return createHash("sha256").update(id).digest("hex");
+}
+export function resetCreditDetails(raw: unknown) {
+  const root = responseSchema.safeParse(raw);
+  if (
+    !root.success ||
+    root.data.rateLimitResetCredits === null ||
+    root.data.rateLimitResetCredits === undefined
+  )
+    return null;
+  const result = rawResetSchema.safeParse(root.data.rateLimitResetCredits);
+  return result.success ? result.data : null;
 }

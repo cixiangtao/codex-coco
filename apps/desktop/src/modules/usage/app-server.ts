@@ -9,7 +9,7 @@ import { UsageReadError } from "./normalize";
 import type { UsageFailureCode } from "./contract";
 
 export type UsageReader = (signal: AbortSignal) => Promise<unknown>;
-interface ReaderOptions {
+export interface ReaderOptions {
   /** Test/host injection only; paths and arguments never come from IPC or module configuration. */
   command?: string;
   args?: string[];
@@ -53,6 +53,22 @@ async function codexCommand(environment: NodeJS.ProcessEnv, signal: AbortSignal)
 
 /** One short-lived, read-only stdio connection. It never starts threads, turns or logins. */
 export function createUsageReader(options: ReaderOptions = {}): UsageReader {
+  return createAppServerRequest({ method: "account/rateLimits/read" }, options);
+}
+export interface AppServerRequest {
+  method:
+    | "account/rateLimits/read"
+    | "account/rateLimitResetCredit/consume"
+    | "model/list"
+    | "account/usage/read";
+  params?: Record<string, string | boolean | number>;
+  expectedScope?: string;
+}
+/** Host-only requests share the bounded stdio lifecycle; no method or raw parameters enter IPC. */
+export function createAppServerRequest(
+  request: AppServerRequest,
+  options: ReaderOptions = {},
+): UsageReader {
   return async (signal) => {
     signal.throwIfAborted();
     const environment = options.env ?? process.env;
@@ -183,7 +199,15 @@ export function createUsageReader(options: ReaderOptions = {}): UsageReader {
                 .update(account.data.account.email.trim().toLowerCase())
                 .digest("hex");
             expected = 2;
-            send({ method: "account/rateLimits/read", id: 2 });
+            if (request.expectedScope && accountScope !== request.expectedScope) {
+              finish("READ_FAILED");
+              continue;
+            }
+            send({
+              method: request.method,
+              id: 2,
+              ...(request.params ? { params: request.params } : {}),
+            });
           } else {
             if (accountScope && typeof message.result === "object" && message.result !== null)
               scopes.set(message.result, accountScope);

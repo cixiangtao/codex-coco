@@ -1,3 +1,4 @@
+import type { ResetService } from "./reset";
 import type { LocalUsageService } from "./local-service";
 import { UsageNotifications, type UsageNotifier } from "./notifications";
 import type { BuiltinModule } from "../../application/module-host";
@@ -15,6 +16,8 @@ import {
   trendInputSchema,
   type UsageResult,
   type TrendSnapshot,
+  resetInputSchema,
+  type ResetFeedback,
   type UsageSnapshot,
 } from "./contract";
 
@@ -23,6 +26,7 @@ export function createUsageModule(
   read: UsageReader = createUsageReader(),
   notify?: UsageNotifier,
   local?: LocalUsageService,
+  resetService?: ResetService,
 ): BuiltinModule {
   return {
     id: "usage",
@@ -41,6 +45,8 @@ export function createUsageModule(
     },
     operations: {
       refresh: { input: usageInputSchema, output: usageResultSchema, timeoutMs: 60_000 },
+      "consume-reset": { input: resetInputSchema, output: usageResultSchema, timeoutMs: 40_000 },
+      "reset-status": { input: usageInputSchema, output: usageResultSchema, timeoutMs: 5000 },
       "scan-trend": { input: trendInputSchema, output: usageResultSchema, timeoutMs: 60_000 },
       "choose-local-home": {
         input: usageInputSchema,
@@ -59,6 +65,7 @@ export function createUsageModule(
       let accountScope: string | null = null;
       let trend: TrendSnapshot | null = null;
       let latest: UsageResult | null = null;
+      let reset: ResetFeedback | null = null;
       const schedule = () => {
         clearTimeout(timer);
         if (!stopped && !signal.aborted && config.refreshIntervalSeconds > 0) {
@@ -83,6 +90,61 @@ export function createUsageModule(
           clearTimeout(timer);
           const settings = usageConfigSchema.parse(context.config);
           try {
+            if (name === "reset-status") {
+              reset = (await resetService?.latest()) ?? null;
+              return latest
+                ? { ...latest, reset }
+                : {
+                    status: "error",
+                    reason: "NO_LIMITS",
+                    checkedAt: Date.now(),
+                    previous,
+                    trend,
+                    reset,
+                  };
+            }
+            if (name === "consume-reset") {
+              const redemption = resetInputSchema.parse(input);
+              if (!resetService) throw new Error("RESET_UNAVAILABLE");
+              try {
+                const before = await read(context.signal);
+                reset = await resetService.consume(
+                  redemption,
+                  before,
+                  usageAccountScope(before),
+                  context.signal,
+                );
+                if (reset.outcome === "pending")
+                  return {
+                    status: "error",
+                    reason: "READ_FAILED",
+                    checkedAt: Date.now(),
+                    previous,
+                    trend,
+                    reset,
+                  };
+                const refreshed = await read(context.signal);
+                previous = normalizeUsage(refreshed, Date.now());
+                latest = { status: "ready", data: previous, trend, reset };
+                return latest;
+              } catch {
+                context.signal.throwIfAborted();
+                const stored = await resetService.latest();
+                reset =
+                  stored &&
+                  (stored.attemptKey === redemption.attemptKey || stored.outcome === "pending")
+                    ? stored
+                    : { ...redemption, outcome: "rejected", updatedAt: Date.now() };
+                return {
+                  status: "error",
+                  reason: "READ_FAILED",
+                  checkedAt: Date.now(),
+                  previous,
+                  trend,
+                  reset,
+                };
+              }
+            }
             if (name === "choose-local-home") {
               if (!local) throw new Error("LOCAL_UNAVAILABLE");
               const changed = await local.chooseHome();
@@ -121,7 +183,7 @@ export function createUsageModule(
               ...settings,
               notificationsEnabled: settings.notificationsEnabled && config.notificationsEnabled,
             });
-            latest = { status: "ready", data, trend };
+            latest = { status: "ready", data, trend, reset };
             return latest;
           } catch (error) {
             context.signal.throwIfAborted();
@@ -141,14 +203,14 @@ export function createUsageModule(
                 });
                 trend = scan.trend;
                 if (scan.fallback) {
-                  latest = { status: "local", data: scan.fallback, reason, trend };
+                  latest = { status: "local", data: scan.fallback, reason, trend, reset };
                   return latest;
                 }
               } catch {
                 context.signal.throwIfAborted();
               }
             }
-            latest = { status: "error", reason, checkedAt: Date.now(), previous, trend };
+            latest = { status: "error", reason, checkedAt: Date.now(), previous, trend, reset };
             return latest;
           } finally {
             schedule();

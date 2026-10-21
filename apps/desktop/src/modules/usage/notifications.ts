@@ -6,7 +6,7 @@ import {
 } from "./contract";
 
 export interface UsageNotification {
-  kind: "warning" | "critical" | "recovered" | "failure";
+  kind: "warning" | "critical" | "recovered" | "failure" | "expiry";
   title: string;
   body: string;
 }
@@ -16,12 +16,35 @@ export class UsageNotifications {
   private previous: "normal" | "warning" | "critical" | null = null;
   private cycle: number | null = null;
   private failureSent = false;
+  private expiring = new Set<string>();
   constructor(private readonly deliver: UsageNotifier = () => false) {}
   success(data: UsageSnapshot, config: UsageConfig) {
     this.failureSent = false;
     if (!config.notificationsEnabled) {
       this.previous = null;
       return;
+    }
+    const liveKeys = new Set(
+      (data.resetCredits?.credits ?? []).map((credit) => `${credit.reference}:${credit.expiresAt}`),
+    );
+    this.expiring = new Set([...this.expiring].filter((key) => liveKeys.has(key)));
+    for (const credit of data.resetCredits?.credits ?? []) {
+      if (
+        credit.expiresAt === null ||
+        credit.expiresAt * 1000 <= Date.now() ||
+        credit.expiresAt * 1000 - Date.now() > 86_400_000
+      )
+        continue;
+      const key = `${credit.reference}:${credit.expiresAt}`;
+      if (
+        !this.expiring.has(key) &&
+        this.safeDeliver({
+          kind: "expiry",
+          title: "Codex 重置卡即将过期",
+          body: "有重置卡将在 24 小时内过期，请打开 Codex Coco 查看。",
+        })
+      )
+        this.expiring.add(key);
     }
     const constrained = data.buckets
       .flatMap((bucket) => bucket.windows)
