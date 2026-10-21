@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const assetIdSchema = z.string().regex(/^[a-f0-9]{64}\.(png|jpg|webp|gif|avif)$/);
+import { imageAssetIdSchema as assetIdSchema } from "../../contracts/media";
+export { imageAssetIdSchema as assetIdSchema } from "../../contracts/media";
 const layerSchema = z.strictObject({
   enabled: z.boolean(),
   image: assetIdSchema.nullable(),
