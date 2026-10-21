@@ -1,3 +1,11 @@
+import { AppearancePreview } from "./preview";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@codex-coco/ui/components/dialog";
 import { useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
@@ -29,6 +37,9 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [previews, setPreviews] = useState<Partial<Record<Layer, string>>>({});
+  const [confirmRestart, setConfirmRestart] = useState(false);
+  const [presetTitle, setPresetTitle] = useState("");
+  const [libraryLayer, setLibraryLayer] = useState<Layer>("main");
   const task = snapshot.operation;
   const busy = pending || task?.phase === "running" || task?.phase === "cancelling";
   const enabled = snapshot.phase === "running";
@@ -41,14 +52,14 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
     setDirty(true);
     setMessage("");
   }
-  async function run(operation: string, layer?: Layer) {
+  async function run(operation: string, layer?: Layer, input: Record<string, string> = {}) {
     setPending(true);
     setMessage("");
     try {
       const response = await window.codexCoco.runModuleOperation({
         moduleId: "appearance",
         operation,
-        input: {},
+        input,
       });
       if (!response.ok) {
         setMessage(response.error.message);
@@ -56,7 +67,11 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
       }
       acceptModuleSnapshot(response.value);
       if (layer && response.value.operation) {
-        const completed = await waitForModuleOperation("appearance", response.value.operation.id);
+        const completed = await waitForModuleOperation(
+          "appearance",
+          response.value.operation.id,
+          300_000,
+        );
         const result = appearanceResultSchema.safeParse(completed.result);
         if (result.success && result.data.imported) {
           update({
@@ -164,6 +179,217 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
           </AlertDescription>
         </Alert>
       )}
+      <section className="flex flex-col gap-3" aria-label="Codex 启动与恢复">
+        <h3>Codex 启动与恢复</h3>
+        <p className="text-muted-foreground">
+          {result?.appSelected ? "已选择应用" : "尚未选择应用"} ·{" "}
+          {result?.connectedPort ? `本机端口 ${result.connectedPort}` : "尚未连接"}
+        </p>
+        <ToggleGroup
+          aria-label="调试端口方式"
+          variant="outline"
+          value={[draft.portMode]}
+          onValueChange={(items) => {
+            if (items[0] === "auto" || items[0] === "fixed")
+              update({ ...draft, portMode: items[0] });
+          }}
+        >
+          <ToggleGroupItem value="fixed">固定端口</ToggleGroupItem>
+          <ToggleGroupItem value="auto">自动分配</ToggleGroupItem>
+        </ToggleGroup>
+        <ToggleGroup
+          aria-label="启动后恢复已保存布景"
+          variant="outline"
+          value={[draft.restoreOnEnable ? "on" : "off"]}
+          onValueChange={(items) => {
+            if (items.length) update({ ...draft, restoreOnEnable: items[0] === "on" });
+          }}
+        >
+          <ToggleGroupItem value="off">手动应用</ToggleGroupItem>
+          <ToggleGroupItem value="on">启动后恢复已保存布景</ToggleGroupItem>
+        </ToggleGroup>
+        <p className="text-muted-foreground">
+          恢复只尝试连接已运行的目标，连接失败会退避；不会自动启动或重启应用。更换目标前请先撤销旧布景。
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="outline"
+            disabled={!enabled || busy}
+            onClick={() => {
+              void run("choose-application");
+            }}
+          >
+            选择 Codex 应用
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!enabled || busy || dirty}
+            onClick={() => {
+              void run("launch-application");
+            }}
+          >
+            启动所选应用
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!enabled || busy || dirty}
+            onClick={() => setConfirmRestart(true)}
+          >
+            明确重启所选应用
+          </Button>
+        </div>
+      </section>
+      <section className="flex flex-col gap-3" aria-label="布景图片库">
+        <h3>图片库</h3>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="outline"
+            disabled={!enabled || busy}
+            onClick={() => {
+              void run("list-gallery");
+            }}
+          >
+            载入图片库
+          </Button>
+          <ToggleGroup
+            aria-label="图库应用图层"
+            variant="outline"
+            value={[libraryLayer]}
+            onValueChange={(items) => {
+              if (items[0] && Object.hasOwn(labels, items[0])) setLibraryLayer(items[0] as Layer);
+            }}
+          >
+            {(["wallpaper", "main", "sidebar"] as const).map((layer) => (
+              <ToggleGroupItem key={layer} value={layer}>
+                {labels[layer]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {result?.gallery.map((item) => (
+            <div key={item.id} className="flex flex-col gap-2">
+              <button
+                type="button"
+                className="rounded-lg border p-2 text-left"
+                disabled={busy}
+                onClick={() => {
+                  update({
+                    ...draft,
+                    [libraryLayer]: { ...draft[libraryLayer], enabled: true, image: item.id },
+                  });
+                  setPreviews((previous) => ({ ...previous, [libraryLayer]: item.preview }));
+                }}
+              >
+                <img src={item.preview} alt={item.title} className="h-24 w-full object-contain" />
+                <span>{item.title}</span>
+              </button>
+              {!item.builtin && (
+                <Button
+                  variant="ghost"
+                  disabled={busy || dirty}
+                  onClick={() => {
+                    void run("remove-image", undefined, { id: item.id });
+                  }}
+                >
+                  删除图片副本
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+      <AppearancePreview
+        value={draft}
+        images={Object.fromEntries(
+          (["wallpaper", "main", "sidebar"] as const).map((layer) => [
+            layer,
+            previews[layer] ??
+              result?.gallery.find((item) => item.id === draft[layer].image)?.preview,
+          ]),
+        )}
+        onChange={update}
+      />
+      <section className="flex flex-col gap-3" aria-label="布景预设">
+        <h3>布景预设</h3>
+        <div className="flex gap-3">
+          <Input
+            aria-label="预设名称"
+            placeholder="预设名称"
+            value={presetTitle}
+            maxLength={60}
+            onChange={(event) => setPresetTitle(event.target.value)}
+          />
+          <Button
+            variant="outline"
+            disabled={busy || draft.presets.length >= 12 || !presetTitle.trim()}
+            onClick={() => {
+              const { presets, portMode, restoreOnEnable, ...look } = draft;
+              void portMode;
+              void restoreOnEnable;
+              update({
+                ...draft,
+                presets: [...presets, { id: crypto.randomUUID(), title: presetTitle.trim(), look }],
+              });
+              setPresetTitle("");
+            }}
+          >
+            保存为预设
+          </Button>
+        </div>
+        {draft.presets.map((preset) => (
+          <div className="flex items-center gap-3" key={preset.id}>
+            <span>{preset.title}</span>
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                update({ ...draft, ...preset.look, port: draft.port });
+                setPreviews({});
+              }}
+            >
+              载入预设
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() =>
+                update({ ...draft, presets: draft.presets.filter((item) => item.id !== preset.id) })
+              }
+            >
+              删除预设
+            </Button>
+          </div>
+        ))}
+        <p className="text-muted-foreground">
+          最多保存 12 组。预设与图层配置一起保存，载入后需明确应用。
+        </p>
+      </section>
+      <Dialog open={confirmRestart} onOpenChange={setConfirmRestart}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重启所选应用？</DialogTitle>
+            <DialogDescription>
+              请先保存目标应用中的工作。Codex Coco
+              会请求所选应用正常退出，等待退出后带本机调试参数启动；拒绝退出时不会强制终止。此操作只在明确确认后执行。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setConfirmRestart(false)}>
+              取消
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={() => {
+                setConfirmRestart(false);
+                void run("restart-application");
+              }}
+            >
+              确认重启
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="appearance-port">Codex 本机调试端口</FieldLabel>

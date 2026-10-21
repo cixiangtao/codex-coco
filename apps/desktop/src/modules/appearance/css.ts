@@ -29,12 +29,40 @@ ${selectors.map((s) => `${s}::before`).join(",")} { content:""; position:absolut
 }
 export const styleId = "codex-coco-appearance";
 /** Installs only our style; the page observer repairs removal and is explicitly disposable. */
+function cssHash(css: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < css.length; i++) hash = Math.imul(hash ^ css.charCodeAt(i), 16777619);
+  return String(hash >>> 0);
+}
 export function injectionExpression(css: string) {
   return `(() => { if (!location.href.startsWith('app://-/index.html') || location.href.includes('avatar-overlay')) return false;
   window.__codexCocoAppearanceCleanup?.();
   const install = () => { let s = document.getElementById(${JSON.stringify(styleId)}); if (!s) { s = document.createElement('style'); s.id = ${JSON.stringify(styleId)}; (document.head || document.documentElement).appendChild(s); } if(s.textContent !== ${JSON.stringify(css)}) s.textContent = ${JSON.stringify(css)}; };
-  install(); let timer; const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(install,120); }); observer.observe(document.documentElement,{childList:true,subtree:true});
+  install(); window.__codexCocoAppearanceHash = ${JSON.stringify(cssHash(css))}; let timer; const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(install,120); }); observer.observe(document.documentElement,{childList:true,subtree:true});
   window.__codexCocoAppearanceCleanup = () => { observer.disconnect(); clearTimeout(timer); }; return true; })()`;
 }
-export const removalExpression = `(() => { window.__codexCocoAppearanceCleanup?.(); delete window.__codexCocoAppearanceCleanup; document.getElementById(${JSON.stringify(styleId)})?.remove(); return !document.getElementById(${JSON.stringify(styleId)}); })()`;
-export const verificationExpression = `Boolean(document.getElementById(${JSON.stringify(styleId)})?.textContent && document.documentElement.dataset.codexWindowType === 'electron')`;
+export const removalExpression = `(() => { window.__codexCocoAppearanceCleanup?.(); delete window.__codexCocoAppearanceCleanup; delete window.__codexCocoAppearanceHash; document.getElementById(${JSON.stringify(styleId)})?.remove(); return !document.getElementById(${JSON.stringify(styleId)}); })()`;
+/** Verify actual pseudo-elements and surface effects as well as our exact style content. */
+export function verificationExpression(css?: string) {
+  return `(() => {
+    const style=document.getElementById(${JSON.stringify(styleId)}); if(!style?.textContent || document.documentElement.dataset.codexWindowType!=='electron') return false;
+    let hash=2166136261;for(let i=0;i<style.textContent.length;i++)hash=Math.imul(hash^style.textContent.charCodeAt(i),16777619);
+    if(String(hash>>>0)!==${css ? JSON.stringify(cssHash(css)) : "window.__codexCocoAppearanceHash"}) return false;
+    for(const [selector,marker] of [['[data-app-shell-main-surface], .app-shell-main-content-viewport','main-surface]::before'],['.app-shell-left-panel','clip-path:inset(0)']]) {
+      if(style.textContent.includes(marker)) {
+        const el=document.querySelector(selector); if(!el) return false;
+        const effect=getComputedStyle(el,'::before');if(effect.backgroundImage==='none'||effect.pointerEvents!=='none'||effect.position!=='absolute') return false;
+      }
+    }
+    for(const rule of Array.from(style.sheet?.cssRules??[])) {
+      if(!rule.selectorText?.includes('::before'))continue;
+      const el=document.querySelector(rule.selectorText.replaceAll('::before',''));if(!el)return false;
+      const actual=getComputedStyle(el,'::before');
+      for(const property of ['background-image','background-size','background-position','opacity','filter','pointer-events','position']) {
+        const expected=rule.style.getPropertyValue(property);if(expected && actual.getPropertyValue(property)!==expected)return false;
+      }
+    }
+    if(style.textContent.includes('background-attachment:fixed') && getComputedStyle(document.body).backgroundImage==='none') return false;
+    return true;
+  })()`;
+}

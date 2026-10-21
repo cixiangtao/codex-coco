@@ -1,6 +1,12 @@
+import type { AppearanceLauncher } from "./launcher";
+import type { GalleryItem } from "./contract";
 import type { BuiltinModule } from "../../application/module-host";
 import { AppearanceAssets } from "./assets";
-import { createAppearanceConnection, type AppearanceConnection } from "./cdp";
+import {
+  createAppearanceConnection,
+  AppearanceDiscoveryError,
+  type AppearanceConnection,
+} from "./cdp";
 import { buildAppearanceCss } from "./css";
 import {
   appearanceConfigSchema,
@@ -11,13 +17,19 @@ import {
   appearanceFailureSchema,
   appearanceFailures,
   type AppearanceResult,
+  type AppearanceConfig,
 } from "./contract";
 
 export interface AppearanceDependencies {
   directory: string;
   pickImage(): Promise<string | null>;
-  thumbnail?(dataUrl: string): string | null;
+  thumbnail?(id: string): Promise<string | null>;
   connection?: AppearanceConnection;
+  launcher?: AppearanceLauncher;
+  gallery?: {
+    list(signal: AbortSignal): Promise<GalleryItem[]>;
+    remove(id: string): Promise<void>;
+  };
 }
 /** Owns only Codex Coco styles. Enabling never launches, restarts or modifies another app. */
 export function createAppearanceModule(dependencies: AppearanceDependencies): BuiltinModule {
@@ -27,28 +39,50 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
     id: "appearance",
     title: "外观",
     config: {
-      version: 1,
+      version: 2,
       defaults: appearanceDefaults,
       schema: appearanceConfigSchema,
-      migrations: {},
+      migrations: { 1: (value) => appearanceConfigSchema.parse(value) },
     },
     operations: Object.fromEntries(
-      ["inspect", "apply", "sync", "verify", "remove", "import-image", "preview-image"].map(
-        (name) => [
-          name,
-          {
-            input: name === "preview-image" ? assetInputSchema : emptyAppearanceInput,
-            output: appearanceResultSchema,
-            timeoutMs: 15_000,
-          },
-        ],
-      ),
+      [
+        "inspect",
+        "apply",
+        "sync",
+        "verify",
+        "remove",
+        "import-image",
+        "preview-image",
+        "list-gallery",
+        "remove-image",
+        "choose-application",
+        "launch-application",
+        "restart-application",
+      ].map((name) => [
+        name,
+        {
+          input: ["preview-image", "remove-image"].includes(name)
+            ? assetInputSchema
+            : emptyAppearanceInput,
+          output: appearanceResultSchema,
+          timeoutMs: ["choose-application", "import-image"].includes(name) ? 300_000 : 30_000,
+        },
+      ]),
     ),
     start: async (signal, host) => {
       signal.throwIfAborted();
+      let stopped = false;
       let active = false;
       let port: number | null = null;
       let count = 0;
+      let cssCache = { key: "", css: "" };
+      let failures = 0;
+      let selected = false;
+      let gallery: GalleryItem[] = [];
+      let restoring = appearanceConfigSchema.parse(host.configuration()).restoreOnEnable;
+      let appliedConfig: AppearanceConfig | null = restoring
+        ? appearanceConfigSchema.parse(host.configuration())
+        : null;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const result = (extra: Partial<AppearanceResult> = {}): AppearanceResult => ({
         status: "ready",
@@ -58,14 +92,20 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
         reason: null,
         imported: null,
         preview: null,
+        appSelected: selected,
+        connectedPort: port,
+        gallery,
         ...extra,
       });
       const schedule = () => {
         clearTimeout(timer);
-        if (active && !signal.aborted)
-          timer = setTimeout(() => {
-            if (!host.requestOperation("sync", {})) schedule();
-          }, 3000);
+        if (!stopped && (active || restoring) && !signal.aborted)
+          timer = setTimeout(
+            () => {
+              if (!host.requestOperation("sync", {})) schedule();
+            },
+            Math.min(60_000, 3000 * 2 ** Math.min(failures, 5)),
+          );
       };
       const remove = async (cleanup: AbortSignal) => {
         active = false;
@@ -73,6 +113,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
         if (port !== null) {
           await connection.remove(port, cleanup);
           port = null;
+          appliedConfig = null;
           count = 0;
         }
       };
@@ -84,46 +125,126 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
         },
         { once: true },
       );
+      schedule();
       return {
+        configurationChanged: (value) => {
+          if (!appearanceConfigSchema.parse(value).restoreOnEnable) restoring = false;
+          schedule();
+        },
         execute: async (name, input, context) => {
-          const config = appearanceConfigSchema.parse(context.config);
+          const config =
+            name === "sync" && appliedConfig
+              ? appliedConfig
+              : appearanceConfigSchema.parse(context.config);
           let imported: string | null = null;
+          const previousPort = port;
           try {
+            if (dependencies.launcher) selected = await dependencies.launcher.selected();
+            if (name === "list-gallery") {
+              gallery = (await dependencies.gallery?.list(context.signal)) ?? [];
+              return result();
+            }
+            if (name === "remove-image") {
+              const id = assetInputSchema.parse(input).id;
+              if (
+                [config, ...config.presets.map((p) => p.look)].some((look) =>
+                  [look.wallpaper.image, look.main.image, look.sidebar.image].includes(id),
+                )
+              )
+                throw new Error("IMAGE_IN_USE");
+              await dependencies.gallery?.remove(id);
+              gallery = gallery.filter((item) => item.id !== id);
+              return result();
+            }
+            if (name === "choose-application") {
+              if (port !== null) throw new Error("REMOVE_FIRST");
+              if (!dependencies.launcher) throw new Error("LAUNCH_FAILED");
+              await dependencies.launcher.choose(context.signal);
+              selected = await dependencies.launcher.selected();
+              return result();
+            }
+            if (name === "launch-application" || name === "restart-application") {
+              if (!dependencies.launcher) throw new Error("LAUNCH_FAILED");
+              if (port !== null) await remove(context.signal);
+              const launched = await dependencies.launcher.launch(
+                config,
+                name === "restart-application",
+                context.signal,
+              );
+              const until = Date.now() + 12_000;
+              while (true) {
+                try {
+                  count = await connection.inspect(launched, context.signal);
+                  break;
+                } catch {
+                  context.signal.throwIfAborted();
+                  if (Date.now() > until) throw new Error("NOT_CONNECTED");
+                  await new Promise((resolve) => setTimeout(resolve, 200));
+                }
+              }
+              return result({ connectedPort: launched });
+            }
             if (name === "import-image") {
               const path = await dependencies.pickImage();
               context.signal.throwIfAborted();
               if (!path) return result();
               imported = await assets.import(path);
               context.signal.throwIfAborted();
-              const data = await assets.dataUrl(imported);
-              return result({ imported, preview: dependencies.thumbnail?.(data) ?? null });
+              await assets.bytes(imported);
+              const preview = (await dependencies.thumbnail?.(imported)) ?? null;
+              if (dependencies.thumbnail && !preview) throw new Error("IMAGE_INVALID");
+              return result({ imported, preview });
             }
             if (name === "preview-image") {
               imported = assetInputSchema.parse(input).id;
-              const data = await assets.dataUrl(imported);
-              return result({ imported, preview: dependencies.thumbnail?.(data) ?? null });
+              await assets.bytes(imported);
+              const preview = (await dependencies.thumbnail?.(imported)) ?? null;
+              if (dependencies.thumbnail && !preview) throw new Error("IMAGE_INVALID");
+              return result({ imported, preview });
             }
+            const targetPort = (await dependencies.launcher?.port(config)) ?? config.port;
             if (name === "inspect") {
-              const targets = await connection.inspect(config.port, context.signal);
-              return result({ targets });
+              const targets = await connection.inspect(targetPort, context.signal);
+              return result({ targets, connectedPort: targetPort });
             }
             if (name === "remove") {
-              if (port === null) port = config.port; // Explicit recovery can remove a surviving style from an earlier run.
+              if (port === null) port = targetPort; // Explicit recovery can remove a surviving style from an earlier run.
+              restoring = false;
               await remove(context.signal);
               return result();
             }
-            if (port !== null && port !== config.port) throw new Error("REMOVE_FIRST");
+            if (port !== null && port !== targetPort) throw new Error("REMOVE_FIRST");
             if (name === "verify") {
-              count = await connection.verify(config.port, context.signal);
+              count = await connection.verify(
+                targetPort,
+                context.signal,
+                cssCache.css || undefined,
+              );
               return result();
             }
-            const css = await buildAppearanceCss(config, assets);
+            const key = JSON.stringify([config.wallpaper, config.main, config.sidebar]);
+            if (cssCache.key !== key)
+              cssCache = { key, css: await buildAppearanceCss(config, assets) };
+            const css = cssCache.css;
+            if (name === "sync" && active) {
+              try {
+                count = await connection.verify(targetPort, context.signal, css);
+                failures = 0;
+                return result();
+              } catch {
+                context.signal.throwIfAborted();
+              }
+            }
             context.signal.throwIfAborted();
-            port = config.port; // Retain ownership even if only some windows accept the style.
+            port = targetPort; // Retain ownership even if only some windows accept the style.
+            appliedConfig = config;
             count = await connection.apply(port, css, context.signal);
             active = true;
+            failures = 0;
             return result();
           } catch (error) {
+            failures++;
+            if (error instanceof AppearanceDiscoveryError && previousPort === null) port = null;
             if (context.signal.aborted && port !== null) await remove(AbortSignal.timeout(2000));
             context.signal.throwIfAborted();
             const code = appearanceFailureSchema.safeParse(
@@ -145,6 +266,8 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
           }
         },
         stop: async () => {
+          stopped = true;
+          restoring = false;
           await remove(AbortSignal.timeout(2000));
         },
       };

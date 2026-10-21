@@ -83,6 +83,32 @@ try {
   await application.evaluate(({ dialog }, path) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
   }, image);
+  const library = await operation(page, "list-gallery");
+  assert.equal(library.gallery.length, 8);
+  assert(library.gallery.every((item) => item.preview.startsWith("data:image/jpeg;base64,")));
+  assert(!JSON.stringify(library).includes(directory));
+  await page
+    .getByRole("button")
+    .filter({ has: page.getByAltText(library.gallery[0].title, { exact: true }) })
+    .click();
+  const drag = page.getByRole("slider", { name: "主面板插画拖动定位", exact: true });
+  await drag.focus();
+  await drag.press("ArrowLeft");
+  assert.equal(await page.locator("#main-x").inputValue(), "81");
+  await page.getByRole("textbox", { name: "预设名称", exact: true }).fill("受控布景预设");
+  await page.getByRole("button", { name: "保存为预设", exact: true }).click();
+  await page.getByRole("button", { name: "仅保存配置", exact: true }).click();
+  await page.getByText("布景配置已保存。", { exact: true }).waitFor();
+  assert.equal(
+    (
+      await page.evaluate(
+        async () =>
+          (await window.codexCoco.modules()).value.find((m) => m.id === "appearance").config.value
+            .presets,
+      )
+    ).length,
+    1,
+  );
   const imported = await operation(page, "import-image");
   assert(imported.imported);
   assert(!JSON.stringify(imported).includes(directory));
@@ -141,6 +167,29 @@ try {
   for (const w of [targetPage, second])
     assert.equal(await w.locator("#codex-coco-appearance").count(), 0);
   assert.deepEqual(errors, []);
+  await page.evaluate(() =>
+    window.codexCoco.enableModule({ moduleId: "appearance", enabled: true }),
+  );
+  await page.evaluate(async () => {
+    const snapshot = (await window.codexCoco.modules()).value.find((m) => m.id === "appearance");
+    return window.codexCoco.saveModuleConfig({
+      moduleId: "appearance",
+      expectedRevision: snapshot.config.revision,
+      value: { ...snapshot.config.value, restoreOnEnable: true },
+    });
+  });
+  await operation(page, "apply");
+  await session.application.close();
+  assert.equal(await targetPage.locator("#codex-coco-appearance").count(), 0);
+  session = await createDesktopSession(
+    join(directory, "data"),
+    { ...process.env, CODEX_COCO_FIXTURES: "0" },
+    packaged
+      ? join(root, "apps/desktop/release/mac-arm64/Codex Coco.app/Contents/MacOS/Codex Coco")
+      : undefined,
+  );
+  await targetPage.locator("#codex-coco-appearance").waitFor({ state: "attached", timeout: 10000 });
+  assert.deepEqual(session.errors, []);
   console.log(
     JSON.stringify(
       {
@@ -148,6 +197,11 @@ try {
         packaged,
         controlledTargetOnly: true,
         layers: 3,
+        gallery: true,
+        keyboardPositioning: true,
+        namedPresets: true,
+        computedStyleVerification: true,
+        optInRestartRestoration: true,
         reload: true,
         newWindow: true,
         revoke: true,

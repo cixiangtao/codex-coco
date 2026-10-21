@@ -92,7 +92,7 @@ describe("appearance lifecycle", () => {
     const image = join(dir, "image.png");
     await writeFile(image, png);
     const connection = {
-      apply: vi.fn(async () => 2),
+      apply: vi.fn<AppearanceConnection["apply"]>(async () => 2),
       remove: vi.fn<AppearanceConnection["remove"]>(async () => 2),
       inspect: vi.fn(async () => 2),
       verify: vi.fn(async () => 2),
@@ -146,6 +146,20 @@ describe("appearance lifecycle", () => {
     expect(await f.execute("remove")).toMatchObject({ status: "error", reason: "RESTORE_FAILED" });
     await f.runtime.stop();
     expect(f.connection.remove.mock.calls.at(-1)?.[0]).toBe(9229);
+    await f.host.shutdown();
+  });
+  it("keeps the last applied look separate from configuration saved for a later application", async () => {
+    const f = await setup();
+    const imported = appearanceResultSchema.parse(await f.execute("import-image"));
+    f.config.main = { ...f.config.main, enabled: true, image: imported.imported, x: 20 };
+    await f.execute("apply");
+    f.config.main = { ...f.config.main, x: 90 };
+    f.connection.verify.mockRejectedValueOnce(new Error("RELOAD"));
+    await f.execute("sync");
+    expect(f.connection.apply.mock.calls.at(-1)?.[1]).toContain("20%");
+    await f.execute("apply");
+    expect(f.connection.apply.mock.calls.at(-1)?.[1]).toContain("90%");
+    await f.runtime.stop();
     await f.host.shutdown();
   });
   it("host rejects stale background requests once a runtime is disabled", async () => {

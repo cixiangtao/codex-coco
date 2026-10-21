@@ -8,11 +8,12 @@ const targetSchema = z.object({
 });
 const probe = `location.href.startsWith('app://-/index.html') && !location.href.includes('avatar-overlay') && document.documentElement.dataset.codexWindowType === 'electron' && Boolean(document.querySelector('[data-app-shell-main-surface], .app-shell-main-content-viewport'))`;
 /** Renderer operations are fixed at the host; no arbitrary expression or address comes from IPC. */
+export class AppearanceDiscoveryError extends Error {}
 export interface AppearanceConnection {
   apply(port: number, css: string, signal: AbortSignal): Promise<number>;
   remove(port: number, signal: AbortSignal): Promise<number>;
   inspect(port: number, signal: AbortSignal): Promise<number>;
-  verify(port: number, signal: AbortSignal): Promise<number>;
+  verify(port: number, signal: AbortSignal, css?: string): Promise<number>;
 }
 /** Rejects remote hosts, credentials, redirects and mismatched debugger ports. */
 export function validateDebuggerUrl(value: string, port: number) {
@@ -140,7 +141,17 @@ async function evaluate(url: string, expression: string, signal: AbortSignal) {
   });
 }
 async function visit(port: number, expression: string, signal: AbortSignal) {
-  const pages = await targets(port, signal);
+  let pages: string[];
+  try {
+    pages = await targets(port, signal);
+  } catch (error) {
+    signal.throwIfAborted();
+    throw new AppearanceDiscoveryError(
+      error instanceof Error && error.message === "INVALID_TARGET"
+        ? "INVALID_TARGET"
+        : "NOT_CONNECTED",
+    );
+  }
   const results = await Promise.allSettled(pages.map((url) => evaluate(url, expression, signal)));
   signal.throwIfAborted();
   if (results.some((r) => r.status === "rejected" || !r.value)) throw new Error("APPLY_FAILED");
@@ -151,6 +162,6 @@ export function createAppearanceConnection(): AppearanceConnection {
     apply: (port, css, signal) => visit(port, injectionExpression(css), signal),
     remove: (port, signal) => visit(port, removalExpression, signal),
     inspect: (port, signal) => visit(port, "true", signal),
-    verify: (port, signal) => visit(port, verificationExpression, signal),
+    verify: (port, signal, css) => visit(port, verificationExpression(css), signal),
   };
 }

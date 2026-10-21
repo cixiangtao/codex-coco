@@ -17,6 +17,8 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SettingsError, SettingsStore } from "../../application/settings-store";
 import { ModuleError, ModuleHost } from "../../application/module-host";
+import { createAppearanceLauncher } from "../../modules/appearance/launcher";
+import { createAppearanceGallery } from "../../modules/appearance/gallery";
 import { createDesktopPreferences } from "./desktop-preferences";
 import { createUsageToolsService } from "../../modules/usage/tools";
 import { createResetService } from "../../modules/usage/reset";
@@ -75,6 +77,28 @@ const definitions = registeredModules(
   () => new Worker(join(here, "foundation-worker.js"), { stdout: true, stderr: true }),
   {
     directory: join(app.getPath("userData"), "appearance-assets"),
+    launcher: createAppearanceLauncher({
+      file: join(app.getPath("userData"), "appearance-launcher.json"),
+      pick: async () => {
+        const choice = await dialog.showOpenDialog({
+          title: "选择 Codex 应用",
+          properties: ["openFile"],
+          filters: [{ name: "macOS 应用", extensions: ["app"] }],
+        });
+        return choice.canceled ? null : (choice.filePaths[0] ?? null);
+      },
+    }),
+    gallery: createAppearanceGallery({
+      directory: join(app.getPath("userData"), "appearance-assets"),
+      resources: app.isPackaged
+        ? join(process.resourcesPath, "codex-coco/backgrounds")
+        : join(app.getAppPath(), "resources/backgrounds"),
+      thumbnail: async (path) => {
+        const image = await nativeImage.createThumbnailFromPath(path, { width: 144, height: 100 });
+        if (image.isEmpty()) return null;
+        return `data:image/jpeg;base64,${image.toJPEG(55).toString("base64")}`;
+      },
+    }),
     pickImage: async () => {
       const result = await dialog.showOpenDialog({
         title: "导入 Codex 布景图片",
@@ -83,10 +107,13 @@ const definitions = registeredModules(
       });
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
-    thumbnail: (data) => {
-      const image = nativeImage.createFromDataURL(data);
+    thumbnail: async (id) => {
+      const image = await nativeImage.createThumbnailFromPath(
+        join(app.getPath("userData"), "appearance-assets", id),
+        { width: 480, height: 320 },
+      );
       if (image.isEmpty()) return null;
-      const preview = image.resize({ width: 480, quality: "good" }).toDataURL();
+      const preview = `data:image/jpeg;base64,${image.toJPEG(75).toString("base64")}`;
       return preview.length < 400_000 ? preview : null;
     },
   },
