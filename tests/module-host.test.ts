@@ -11,6 +11,8 @@ import { ModuleHost, type BuiltinModule } from "../apps/desktop/src/application/
 import { createFoundationFixture, createFixtureWorker } from "./support/fixture";
 import { registeredModules } from "../apps/desktop/src/modules/registry";
 import type { ModuleSnapshot } from "../apps/desktop/src/contracts/modules";
+import { runModuleOperationSchema } from "../apps/desktop/src/contracts/modules";
+import type { JsonValue } from "../apps/desktop/src/contracts/modules";
 
 const dirs: string[] = [];
 const hosts: ModuleHost[] = [];
@@ -48,6 +50,23 @@ afterEach(async () => {
 });
 
 describe("module operation loop", () => {
+  it("validates and bounds opt-in domain state without disrupting other module reads", async () => {
+    let state: JsonValue = { label: "public", completed: 1 };
+    const definition = createFoundationFixture("one");
+    const start = definition.start;
+    definition.state = fixtureResultSchema;
+    definition.start = async (...args) => ({ ...(await start(...args)), state: () => state });
+    const { host } = await fixture([definition, createFoundationFixture("two")]);
+    await enable(host);
+    expect(snapshot(host).state).toEqual({ label: "public", completed: 1 });
+    state = { label: "public", completed: 2, secret: "PRIVATE_TOKEN" };
+    expect(snapshot(host).state).toBeUndefined();
+    expect(snapshot(host, "two").phase).toBe("disabled");
+    definition.state = runModuleOperationSchema.shape.input;
+    state = "x".repeat(1024 * 1024 + 1);
+    expect(snapshot(host).state).toBeUndefined();
+    expect(JSON.stringify(host.snapshots())).not.toContain("PRIVATE_TOKEN");
+  });
   it("keeps normal registrations empty and creates no files merely by loading fixtures", async () => {
     expect(registeredModules(false).map((item) => item.id)).toEqual(["usage"]);
     expect(registeredModules(true, createFixtureWorker)).toHaveLength(3);

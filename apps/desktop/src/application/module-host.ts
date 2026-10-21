@@ -36,6 +36,7 @@ export interface ModuleStartContext {
   requestOperation(name: string, input: JsonValue): boolean;
 }
 export interface ModuleRuntime {
+  state?(): JsonValue;
   configurationChanged?(config: JsonValue): void;
   execute(name: string, input: JsonValue, context: OperationContext): Promise<JsonValue>;
   stop(): Promise<void>;
@@ -46,6 +47,8 @@ export interface BuiltinModule {
   title: string;
   config: ModuleConfigDefinition;
   operations: Readonly<Record<string, OperationDefinition>>;
+  /** Opt-in public state contract. Raw runtime state must never bypass this schema. */
+  state?: z.ZodType<JsonValue>;
   start(signal: AbortSignal, context: ModuleStartContext): Promise<ModuleRuntime>;
   /** Explicit public projection; complete task results never enter the glance bridge. */
   glance?(snapshot: ModuleSnapshot): GlanceDetail | null;
@@ -187,6 +190,16 @@ export class ModuleHost {
   }
   private snapshot(entry: Entry): ModuleSnapshot {
     const status = this.manager.statuses().find((item) => item.id === entry.definition.id)!;
+    let state: JsonValue | undefined;
+    if (entry.definition.state && entry.runtime?.state) {
+      try {
+        const parsed = entry.definition.state.parse(entry.runtime.state());
+        const json = JSON.stringify(parsed);
+        if (Buffer.byteLength(json, "utf8") <= 1024 * 1024) state = JSON.parse(json) as JsonValue;
+      } catch {
+        // A faulty optional projection cannot interrupt lifecycle, task or other module reads.
+      }
+    }
     return structuredClone({
       ...status,
       title: entry.definition.title,
@@ -194,6 +207,7 @@ export class ModuleHost {
       config: entry.config.snapshot(),
       operations: Object.keys(entry.definition.operations),
       operation: entry.task?.snapshot ?? null,
+      ...(state === undefined ? {} : { state }),
     });
   }
   snapshots() {

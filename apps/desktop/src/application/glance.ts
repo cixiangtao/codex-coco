@@ -29,7 +29,7 @@ export function buildGlanceItems(
     const phase =
       ["invalid", "future-version", "unavailable"].includes(snapshot.config.health) ||
       snapshot.error ||
-      snapshot.operation?.phase === "failed"
+      (snapshot.operation?.phase === "failed" && snapshot.state === undefined)
         ? "error"
         : snapshot.phase;
     const item: GlanceItem = {

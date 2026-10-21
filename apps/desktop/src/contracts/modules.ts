@@ -42,6 +42,8 @@ export interface ModuleSnapshot {
   config: ModuleConfigSnapshot;
   operations: string[];
   operation: ModuleOperationSnapshot | null;
+  /** Validated public domain state, independent of the most recent task's outcome. */
+  state?: JsonValue;
 }
 export type EnableModuleInput = z.infer<typeof enableModuleSchema>;
 export type SaveModuleConfigInput = z.infer<typeof saveModuleConfigSchema>;

@@ -23,6 +23,8 @@ execute 接收固定操作名、已校验的输入和 OperationContext。上下�
 
 每个模块同时运行一个操作，重复操作返回 MODULE_BUSY；不同模块可并发，配置写入不等待长任务。runModuleOperation 立即返回带任务 ID 的快照，最终结果通过 moduleChanged 推送，也可从 modules 获取。每模块只保留当前或最近一次任务，下一次操作替换它，不提供历史队列。
 
+业务数据需要跨操作保留时，可声明 BuiltinModule.state schema 并实现 runtime.state() 纯内存公开投影。宿主在快照时严格校验、限制为 1 MiB JSON，异常投影不阻塞其他模块。任务结果与状态分开，取消/失败仍清空任务 result，不清空合法的业务 state。界面不得用最近任务覆盖全部业务数据；凭据、原始账号、路径与模型历史回答不得加入持久业务状态。该投影只在本运行代次有效，不能替代模块自己的磁盘持久化策略。
+
 cancelModuleOperation 必须匹配模块与任务 ID。取消是请求，先进入 cancelling，任务实际结算后才进入 cancelled。模块停用和应用退出也会取消任务。截止时间到达会取消并报告 TASK_TIMEOUT；取消后仍不结算则报告 TASK_UNRESPONSIVE，隔离该运行时，清理失败保持 error。宿主不会终止其他应用，也不把 Promise 超时当作资源释放成功。
 
 状态推送包含模块 ID、单调 revision 与 generation。窗口先订阅再取初始快照，拒绝旧快照；关闭窗口只释放订阅，后台任务继续由宿主管理。
