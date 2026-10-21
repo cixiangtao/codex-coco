@@ -47,7 +47,8 @@ protocol.registerSchemesAsPrivileged([
 const here = dirname(fileURLToPath(import.meta.url));
 const rendererRoot = resolve(here, "../renderer");
 const productionUrl = "app://codex-coco/index.html";
-const developmentUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
+const developmentUrl =
+  import.meta.env.DEV && !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
 if (developmentUrl) {
   const url = new URL(developmentUrl);
   if (
