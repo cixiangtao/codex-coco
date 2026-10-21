@@ -11,15 +11,12 @@ body {
   overflow: hidden;
 }
 .desktop-shell {
-  --desktop-sidebar-width: 168px;
+  --desktop-sidebar-width: 56px;
   display: grid;
   grid-template-columns: var(--desktop-sidebar-width) minmax(0, 1fr);
   grid-template-rows: 52px minmax(0, 1fr);
   height: 100%;
   background: var(--muted);
-}
-.desktop-sidebar-collapsed {
-  --desktop-sidebar-width: 56px;
 }
 .desktop-titlebar {
   grid-column: 1 / -1;
@@ -36,16 +33,6 @@ body {
   text-align: center;
   font-size: 12px;
   font-weight: 550;
-}
-.desktop-window-tools {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  height: 100%;
-  padding-inline: 88px 12px;
-}
-.desktop-window-tools button {
-  -webkit-app-region: no-drag;
 }
 .desktop-draft-indicator {
   justify-self: end;
@@ -64,25 +51,18 @@ body {
   gap: 4px;
 }
 .desktop-nav-item {
-  justify-content: flex-start;
+  position: relative;
+  justify-content: center;
   width: 100%;
-  min-height: 36px;
-  gap: 10px;
+  padding-inline: 0;
 }
 .desktop-nav-utility {
   margin-top: auto;
 }
-.desktop-sidebar-collapsed .desktop-nav-item {
-  justify-content: center;
-  padding-inline: 0;
-}
-.desktop-sidebar-collapsed .desktop-nav-item > span,
-.desktop-sidebar-collapsed .desktop-draft-dot {
-  display: none;
-}
 .desktop-draft-dot {
-  margin-left: auto;
-  flex-shrink: 0;
+  position: absolute;
+  top: 4px;
+  right: 4px;
   width: 5px;
   height: 5px;
   border-radius: 50%;

@@ -80,18 +80,33 @@ export async function verifyDesktopSession(session) {
       .evaluate((element) => getComputedStyle(element).webkitAppRegion),
     "drag",
   );
-  const toggle = page.getByRole("button", { name: "收起侧栏", exact: true });
-  assert.equal(
-    await toggle.evaluate((element) => getComputedStyle(element).webkitAppRegion),
-    "no-drag",
-  );
-  await toggle.focus();
-  await page.keyboard.press("Enter");
-  assert.equal(
-    await page.getByRole("button", { name: "展开侧栏", exact: true }).getAttribute("aria-expanded"),
-    "false",
-  );
+  assert.equal(await page.getByRole("button", { name: /展开侧栏|收起侧栏/ }).count(), 0);
   assert.equal((await page.locator(".desktop-sidebar").boundingBox()).width, 56);
+  await page.bringToFront();
+  await page.mouse.move(400, 25);
+  for (const label of ["用量", "外观", "模块管理", "设置"]) {
+    const item = nav.getByRole("button", { name: label, exact: true });
+    assert.equal(await item.getAttribute("title"), null, "Avoid duplicate native tooltips");
+    await item.hover();
+    await page.getByRole("tooltip", { name: label, exact: true }).waitFor();
+    await page.keyboard.press("Escape");
+    await page.getByRole("tooltip").waitFor({ state: "hidden" });
+  }
+  await page.mouse.move(400, 25);
+  await nav.getByRole("button", { name: "用量", exact: true }).focus();
+  await page.keyboard.press("Tab");
+  await page.getByRole("tooltip", { name: "外观", exact: true }).waitFor();
+  await page.screenshot({
+    path: join(output, "navigation-tooltip.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  await page.keyboard.press("Enter");
+  await page.getByRole("tooltip").waitFor({ state: "hidden" });
+  assert.equal(
+    await nav.getByRole("button", { name: "外观", exact: true }).getAttribute("aria-current"),
+    "page",
+  );
   await nav.getByRole("button", { name: "用量", exact: true }).click();
   await page.getByRole("heading", { name: "用量模块准备中", exact: true }).waitFor();
   await page.getByRole("button", { name: "查看模块管理", exact: true }).click();
@@ -111,7 +126,6 @@ export async function verifyDesktopSession(session) {
       .evaluate((element) => getComputedStyle(element).height),
     "32px",
   );
-  await page.getByRole("button", { name: "展开侧栏", exact: true }).click();
   const initialBounds = await application.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].getBounds(),
   );
@@ -122,6 +136,19 @@ export async function verifyDesktopSession(session) {
   console.log("QA: mode and color preview");
   await page.getByRole("button", { name: "深色", exact: true }).click();
   await waitTheme(page, "dark");
+  await nav.getByRole("button", { name: "设置", exact: true }).hover();
+  await page.getByRole("tooltip", { name: "设置", exact: true }).waitFor();
+  await page.mouse.move(400, 25);
+  await nav.getByRole("button", { name: "模块管理", exact: true }).focus();
+  await page.keyboard.press("Tab");
+  await page.getByRole("tooltip", { name: "设置", exact: true }).waitFor();
+  await page.screenshot({
+    path: join(output, "navigation-tooltip-dark.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  await page.keyboard.press("Escape");
+  await page.getByRole("tooltip").waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "紫色", exact: true }).click();
   assert.equal(await primary(page), "#c5a4ff");
   await page.getByRole("button", { name: "蓝色", exact: true }).click();
@@ -255,7 +282,6 @@ export async function verifyDesktopSession(session) {
     scale: "css",
     animations: "disabled",
   });
-  await page.getByRole("button", { name: "收起侧栏", exact: true }).click();
   await nav.getByRole("button", { name: "模块管理", exact: true }).click();
   await page.screenshot({
     path: join(output, "collapsed.png"),
@@ -292,6 +318,8 @@ export async function verifyDesktopSession(session) {
       "compact.png",
       "appearance.png",
       "collapsed.png",
+      "navigation-tooltip.png",
+      "navigation-tooltip-dark.png",
     ].map((name) => join(output, name)),
   };
 }
