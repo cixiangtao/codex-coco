@@ -1,6 +1,6 @@
 # 当前架构与模块边界
 
-2026-10-21：新基建已从零实现，可运行真实 Electron 和本地应用目录。正式主窗口已采用用户认可的精简侧栏，设置页接入真实主题配置；菜单栏提供跨模块状态速览，尚无用量或外观业务。
+2026-10-21：新基建已从零实现，可运行真实 Electron 和本地应用目录。正式主窗口采用固定图标侧栏与真实主题配置。用量模块通过短期 CLI App Server 读取，菜单栏接收公开额度摘要；外观业务尚未接入。
 
 ## 目录
 
@@ -11,7 +11,7 @@ apps/desktop/
   src/application/      模块生命周期、操作宿主、应用与模块配置
   src/contracts/        纯数据合同、Zod 校验与 IPC 通道定义
   src/renderer/         主窗口布局、页面、设置客户端与本地预览
-  src/modules/registry  业务注册为空；显式验证开关注册合成模块
+  src/modules/registry  注册用量；显式验证开关额外注册合成模块
 packages/ui/
   src/components/       自有 shadcn 组件源码
   src/theme/            纯主题合同/解析、根 Provider
@@ -62,7 +62,9 @@ ModuleHost 在现有 ModuleManager 上装配内置模块、独立配置与操作
 
 后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册。模块自己的 contract.ts 接受纯合同检查，renderer/ 接受浏览器检查；各自不能导入模块后台，主进程类型入口排除模块 renderer。状态事件以模块 revision 单调排序并带 generation，客户端拒绝旧推送；每模块只保留当前/最近一次任务，不积累历史。
 
-两个合成实例只在未打包环境且 CODEX_COCO_FIXTURES=1 时注册。默认启动与打包应用均关闭示例，业务注册表仍为空。真实 Electron 的模块回归由 verify:modules 覆盖。有界诊断与显式性能采样已接入。
+两个合成实例只在未打包环境且 CODEX_COCO_FIXTURES=1 时额外注册。默认启动与打包应用均关闭示例，业务注册表包含默认停用的用量模块。真实 Electron 的模块回归由 verify:modules 覆盖。有界诊断与显式性能采样已接入。
+
+用量模块只在明确的 refresh 操作中启动 CLI App Server，固定握手、检查登录类型并读取额度，close 后才结算。运行时将响应投影成纯数字窗口与读取时间，不保存原始响应或令牌。来源异常为可恢复的严格公开结果，取消及清理继续由 ModuleHost 管理。主要页面与菜单栏分别消费完整公开快照和严格的 GlanceDetail；速览仍没有模块操作权限。详见 [用量模块](usage.md)。
 
 application/worker-task.ts 按任务创建独立线程，主进程组合根注入静态入口。取消、超时、停用与退出沿同一信号清理，任务结算等待线程实际退出；终止失败时保留等待，由宿主截止与隔离。严格的进度/结果/错误消息经过 JSON、大小和 schema 校验，模块公开输出仍独立校验。不在主线程回退执行，不常驻空闲线程；原始异常不进入窗口或日志。构建独立 worker 入口，生产文件与打包资源均有真实 Electron 验收，详见 [工作线程](worker-tasks.md)。
 

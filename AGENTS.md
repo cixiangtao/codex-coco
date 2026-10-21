@@ -6,7 +6,7 @@
 
 2026-10-21：用户授权移除原型，从零建立新基建。原型源码、测试、依赖、构建配置、设计记录与生成物已从工作树清理，清理前做了仓库外可恢复归档。不要恢复原型或添加兼容层作为默认起点。
 
-已从零建立可运行的 Electron、React、TypeScript 工程，独立 UI 包与主题基础、版本化配置、模块生命周期和白名单桌面桥已接入。已将用户认可的精简侧栏接入正式主窗口，设置页使用真实配置服务；业务注册表仍为空，菜单栏跨模块速览已接入真实状态与主窗口跳转；用量/外观业务尚未接入。实际状态与未完成目标见 docs/verification.md。
+已从零建立可运行的 Electron、React、TypeScript 工程，独立 UI 包与主题基础、版本化配置、模块生命周期和白名单桌面桥已接入。正式主窗口使用固定图标侧栏和真实主题设置；用量模块已接入默认停用的 CLI App Server 手动读取，主窗口与菜单栏共享公开额度。外观业务尚未接入。实际状态与未完成目标见 docs/verification.md。
 
 ## 长期约定
 
@@ -39,6 +39,7 @@
 - pnpm run verify:menu-bar：验证真实菜单栏回调、只读窗口权限、速览状态/主题同步、开合和主窗口重开。
 - pnpm run verify:modules：生产入口的真实模块链路回归，仅注册合成模块并使用临时数据，结束后清理。
 - pnpm run verify:workers：验证真实 Electron 中独立 worker 构建入口、进度、结果与实际退出；打包回归包含同一资源验证。
+- pnpm run verify:usage：临时 PATH 中的受控 stdio 服务验证读取、失败恢复、取消、重启与只读摘要；不得使用真实账号代替测试数据。
 - pnpm run verify:desktop：生产入口的真实 Electron 回归，使用临时数据，结束后清理。
 - pnpm run pack：本机未签名的 macOS 应用目录；必须写 run，避免调用 pnpm 内置 pack。
 - pnpm run verify:packaged：生成并验证 macOS arm64 本地应用本身。
@@ -49,7 +50,7 @@
 
 正式主窗口采用已认可的固定图标侧栏与菜单提示，布局基线见 DESIGN.md；base-nova 和工程配色预设不代表最终品牌视觉。按任务工作线程、本地有界诊断与可复现性能采样已接入；独立局部主题作用域仍是后续基建目标；不要把本轮基线描述为 F01–F15 全部完成。
 
-模块接入使用 application/module-host.ts 的 BuiltinModule 合同。后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册；模块自己的纯 contract.ts 与 renderer/ 分别接受合同和浏览器边界检查。配置仅包含可公开的偏好，不保存凭据或私有数据；配置变化供下一次操作使用。CODEX_COCO_FIXTURES=1 仅允许未打包验证环境加载合成模块，打包应用始终禁用示例。真实业务注册表仍为空。
+模块接入使用 application/module-host.ts 的 BuiltinModule 合同。后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册；模块自己的纯 contract.ts 与 renderer/ 分别接受合同和浏览器边界检查。配置仅包含可公开的偏好，不保存凭据或私有数据；配置变化供下一次操作使用。CODEX_COCO_FIXTURES=1 仅允许未打包验证环境额外加载合成模块，打包应用始终禁用示例。业务注册表目前包含默认停用的用量模块。
 
 诊断只经 DiagnosticSink 写入固定字段；禁止传入原始异常、请求、配置、结果、路径或账号内容。新增事件与错误码需同步允许列表。默认最多三个 256 KiB 文件，内存队列同时受条数和字节限制；日志失败不阻塞业务。性能采样只由显式脚本触发，不增加常驻轮询；口径与基线见 docs/diagnostics-and-performance.md 和 docs/performance-baseline.md。
 
@@ -58,3 +59,5 @@
 菜单栏速览通过主进程注册的窗口身份限制为只读，仅接收 application/glance.ts 的公开状态投影，不接收完整模块事件、配置或结果。跳转只接受固定 MainPage；新摘要数据或业务刷新接入时同步合同、权限与隐私测试。原生生命周期与边界见 docs/menu-bar.md。
 
 重计算通过 application/worker-task.ts 执行。Worker 工厂由组合根静态注入，不接受 renderer 或配置传入的代码路径；禁止失败后回退主线程。取消、停用与退出须等待实际线程退出，终止失败不得伪装清理成功。worker 返回严格 JSON 消息，公开输出仍须模块自己的 schema 校验。构建入口与打包资源一同验证，详见 docs/worker-tasks.md。
+
+用量只在主窗口明确操作后启动短期 codex app-server，固定调用 initialize/initialized、account/read(refreshToken:false) 与 account/rateLimits/read；不读取原始令牌，不启动模型对话或登录。启用或重启不自动读取。stdout 在后台限量解析，stderr 丢弃，子进程退出后才结算。BuiltinModule.glance 的公开字段须宿主严格校验；失败时摘要不携带旧额度。详见 docs/usage.md。

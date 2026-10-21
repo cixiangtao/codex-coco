@@ -4,7 +4,7 @@ A Codex desktop companion, shaped around personal workflows.
 
 [中文](README.md)
 
-**Status: local development build with a real main-window shell and theme settings.** The fixed icon sidebar supports four-page navigation and themed menu tooltips. Theme preview, cancel, save and cross-window synchronization use the existing host service. The native menu bar provides a read-only, cross-module status popover and main-window navigation. Per-task worker execution has passed synthetic-module verification. Usage and external appearance business modules are not implemented; no synthetic business data is shown. The previous prototype remains removed and archived.
+**Status: local development build with manual usage reads.** The fixed icon sidebar supports four-page navigation, themed tooltips and real theme settings. The usage module reads ChatGPT subscription quotas through the installed Codex CLI, sharing one snapshot between main windows and the menu bar. It is disabled by default and reads only on explicit action. External appearance customization is not implemented. The previous prototype remains removed and archived.
 
 ## Development
 
@@ -17,20 +17,27 @@ pnpm run check
 pnpm run verify:desktop
 pnpm run verify:modules
 pnpm run verify:workers
+pnpm run verify:usage
 pnpm run verify:menu-bar
 ```
 
 `check` runs Oxfmt, Oxlint, AST dependency-boundary checks, separate TypeScript configurations, contract tests and the production build. `verify:desktop` launches real Electron with temporary application data and checks production loading, theme preview/save/cancel, IPC validation, window synchronization and restart persistence.
 
-`pnpm run build` builds production files; `pnpm run start` opens them. `pnpm run pack` creates an unsigned local macOS application directory. `pnpm run verify:packaged` packages and tests the main window, popover and worker resource, currently on macOS arm64. Use the explicit `run` syntax so `pack` does not invoke pnpm's npm-package archive command.
+`pnpm run build` builds production files; `pnpm run start` opens them. `pnpm run pack` creates an unsigned local macOS application directory. `pnpm run verify:packaged` packages and tests the main window, popover, worker resource and usage workflow, currently on macOS arm64. Use the explicit `run` syntax so `pack` does not invoke pnpm's npm-package archive command.
 
-`verify:modules` exercises two synthetic built-in modules through real Electron: whitelisted operations, progress, cancellation, independent versioned configuration, cross-window conflicts, window reopening, restart persistence and backed-up recovery. It uses temporary data. Fixtures require an explicit opt-in in unpackaged environments and are always disabled in packaged builds. Business registrations remain empty. See [module development](docs/module-development.md).
+`verify:modules` exercises two synthetic built-in modules through real Electron: whitelisted operations, progress, cancellation, independent versioned configuration, cross-window conflicts, window reopening, restart persistence and backed-up recovery. It uses temporary data. Fixtures require an explicit opt-in in unpackaged environments and are always disabled in packaged builds. The usage business module is registered separately and disabled by default. See [module development](docs/module-development.md).
 
 Each worker task owns a separate thread and waits for its actual exit before settlement. Cancellation, timeout, module disable and shutdown terminate the worker without main-thread fallback. JSON messages have strict schemas and a size limit; module-specific output validation still applies. `verify:workers` checks the emitted entry in real Electron, including packaged resources. See [worker tasks](docs/worker-tasks.md).
 
 ## Menu-bar popover
 
-Click Codex Coco in the menu bar, or use the application menu action (Cmd+Shift+M). The popover closes on blur or Escape and opens the requested page in an existing or newly created main window. It displays public module states and follows saved themes, without preview-draft leakage. Usage and appearance show their actual unimplemented status. Module operations and settings writes remain restricted to main windows.
+Click Codex Coco in the menu bar, or use the application menu action (Cmd+Shift+M). The popover closes on blur or Escape and opens the requested page in an existing or newly created main window. It displays public module states and saved usage metrics, following saved themes without preview-draft leakage. Failed reads hide old quotas and link to recovery in the main window. Appearance remains unimplemented. Module operations and settings writes remain restricted to main windows.
+
+## Manual usage reads
+
+Install and sign in to the Codex CLI with a ChatGPT account, then open Usage and explicitly enable/read. The read-only App Server flow does not create conversations or directly read tokens. It shows quota windows, remaining percentages, reset times and capture time. Reads can be cancelled; failures prioritize recovery and collapse prior records. Restarting, enabling alone and opening another window do not trigger reads. Automatic refresh, trends, multi-account management and notifications are not implemented.
+
+`verify:usage` uses a controlled temporary stdio service rather than a real account, including packaged-app checks. A separate isolated, signed-out local CLI handshake was verified without requesting quotas. See [source and verification boundaries](docs/usage.md).
 
 `pnpm run verify:menu-bar` exercises this path with isolated data. See [lifecycle, permissions and verification boundaries](docs/menu-bar.md).
 
@@ -48,7 +55,7 @@ Themes support light/dark/system modes, engineering presets and custom HEX prima
 
 Default application settings live under `~/Library/Application Support/Codex Coco/foundation/`, isolated from the archived prototype. Override this with `CODEX_COCO_DATA_DIR` for development. Automated desktop verification uses and removes temporary directories.
 
-There is no account access, usage request, appearance injection, telemetry or cloud synchronization. The old repositories and existing application data are untouched. This remains a local-only repository. The generated application uses Electron's default icon, is unsigned and unnotarized, and has no public release or update channel.
+Usage reads occur only on explicit action through the CLI; public snapshots exclude emails and tokens. There is no appearance injection, telemetry or cloud synchronization. The old repositories and existing application data are untouched. This remains a local-only repository. The generated application uses Electron's default icon, is unsigned and unnotarized, and has no public release or update channel.
 
 See the [main-window notes](docs/main-window.md), [design baseline](DESIGN.md), [architecture](docs/architecture.md), [theme proposal and implementation status](docs/ui-package-and-theme.md), [verification record](docs/verification.md), and [foundation plan](docs/foundation-plan.md).
 

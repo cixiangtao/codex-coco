@@ -14,6 +14,10 @@ packages/ui/src/components 中的基础组件由 shadcn CLI 4.22.1 从 [shadcn/u
 
 根目录 LICENSE 保留既有版权声明。没有复制旧项目主题图片或 BuZhiYin GIF 集合；以后引用代码或资产时重新记录来源与许可。
 
+## 首版用量读取
+
+用量窗口与剩余比例的展示语义参考本地 codex-usage 上述提交中的 CodexUsageProvider.swift、Models.swift，按其 MIT 许可保留来源记录；该项目版权为 Copyright (c) 2026 cixiangtao，与根 LICENSE 一致。首版 TypeScript 实现重新编写，数据源改为 [OpenAI 官方 App Server 只读协议](https://learn.chatgpt.com/docs/app-server)。没有复制 Swift 网络/凭据读取、会话索引、重置卡实现或资产；不导入旧应用数据。测试使用新建的受控 stdio 服务与临时数据。
+
 ## 依赖和本地应用
 
 Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用，确切版本以 pnpm-lock.yaml 为准。本地应用目录包含 Electron 自带的 LICENSE 和第三方 Chromium 通知。正式发行前还需根据最终依赖和资产完善发行通知；当前不将本文件作为已完成的发行清单。
