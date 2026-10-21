@@ -69,3 +69,5 @@
 用量配置当前 v3 增加 localFallbackEnabled（默认 false）与 trendDays（7/14/30）。本机扫描仅由主窗口明确请求或已保存的本地回退策略触发，在 usage-worker 中执行；独立静态构建入口必须随打包验证。source.json 中的目录属于私有服务状态，不进入公共模块配置。公开趋势只有按日数值、来源、范围和完整性；JSONL 与 SQLite 估算不可混加；无归属记录不得冒充当前账号统计。
 
 重置卡已通过官方 account/rateLimits/read 与 account/rateLimitResetCredit/consume 接入。消费只允许主窗口明确确认，后台先重新核对账号与引用，发送前持久化 pending 幂等请求；重试必须复用 UUID，未确认请求不能被新请求覆盖。usage-reset-attempts.json 是私有业务状态，允许保存卡 ID 与匿名账号关联，权限 0600，禁止存储令牌。取消/重启后通过检查上次兑换恢复，不代用户消费真实卡。
+
+用量辅助工具已接入模型目录、结构化样本、摘要历史与 CLI 维护。真实模型调用和 CLI 更新仅由主窗口明确确认；自动额度刷新不能触发。样本固定问题通过临时目录、ephemeral、ignore-user-config、ignore-rules、project_doc_max_bytes=0 和禁用工具执行，取消等待所属进程组实际退出。测试必须用受控 CLI，不代用户跑真实推理或更新真实 CLI。模型回答只用于主窗口临时结果，历史/诊断/菜单栏不能复制回答文本。模块 renderer 的 Tailwind 源使用完整文件 glob，保留真实尺寸验收，防止类名未生成却截图误判。

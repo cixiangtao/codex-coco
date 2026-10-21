@@ -31,3 +31,7 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 ## 本地用量计数语义参考
 
 `modules/usage/local-index.ts` 的累计差值、初次 last_token_usage、fork 继承前缀与归档去重语义参考 codex-usage 同一来源提交（`b33578383a35b0f9d5d67fc67fbf98309b7702f5`，MIT，Copyright (c) 2026 cixiangtao）。实现为新的 TypeScript worker、独立有界索引和公开结果合同，没有复制 Swift 索引文件或读取旧应用配置。MIT 许可全文见根 LICENSE。
+
+## 固定样本题
+
+用量工具中的糖果题数量与 21 基准参考 codex-usage 的 CodexIntelligenceCheck.swift（同上 MIT 来源提交与作者）。新实现重写问题提示、结构化输出、进程隔离与统计，并独立用动态规划核对期望值，没有迁回 Swift 运行时或界面代码。
