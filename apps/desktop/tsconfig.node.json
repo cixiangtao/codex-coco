@@ -4,5 +4,6 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["src/desktop/main", "src/application", "src/modules", "electron.vite.config.ts"]
+  "include": ["src/desktop/main", "src/application", "src/modules", "electron.vite.config.ts"],
+  "exclude": ["src/modules/*/renderer/**"]
 }

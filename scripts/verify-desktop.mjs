@@ -57,6 +57,9 @@ export async function verifyDesktopSession(session) {
   const isolation = await page.evaluate(() => ({ node: typeof process, require: typeof require }));
   assert.equal(isolation.node, "undefined");
   assert.equal(isolation.require, "undefined");
+  const modules = await page.evaluate(() => window.codexCoco.modules());
+  assert.equal(modules.ok, true);
+  assert.deepEqual(modules.value, [], "Normal and packaged launches must not register fixtures");
   assert.equal(await page.getByRole("button", { name: "禁用按钮" }).isDisabled(), true);
   const buttonDisplay = await page
     .getByRole("button", { name: "默认按钮" })

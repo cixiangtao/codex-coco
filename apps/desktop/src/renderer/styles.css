@@ -1,5 +1,6 @@
 @import "@codex-coco/ui/styles.css";
 @source "./";
+@source "../modules/*/renderer";
 .foundation-shell {
   max-width: 880px;
   margin-inline: auto;

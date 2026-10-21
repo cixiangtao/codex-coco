@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, mkdir } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -49,5 +49,32 @@ it("rejects cross-module imports and module access to the Electron adapter", asy
     await Promise.all(
       [one, two].map((directory) => rm(directory, { recursive: true, force: true })),
     );
+  }
+});
+
+it("keeps module pages and pure contracts separated from runtime and host code", async () => {
+  const directory = await mkdtemp(join(root, "apps/desktop/src/modules/__boundary-ui-"));
+  const renderer = join(directory, "renderer");
+  await mkdir(renderer);
+  try {
+    await writeFile(join(directory, "runtime.ts"), "export const secret = 1;");
+    await writeFile(join(directory, "contract.ts"), 'export { secret } from "./runtime";');
+    await writeFile(
+      join(renderer, "probe.ts"),
+      'export { secret } from "../runtime";\nvoid import("node:fs");',
+    );
+    const result = await exec(process.execPath, ["scripts/check-boundaries.mjs"], {
+      cwd: root,
+    }).catch((error: unknown) => error);
+    expect(result).toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining("module-page cannot import"),
+    });
+    expect(result).toMatchObject({
+      stderr: expect.stringContaining("module-contract cannot import"),
+    });
+    expect(result).toMatchObject({ stderr: expect.stringContaining("node:fs") });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });

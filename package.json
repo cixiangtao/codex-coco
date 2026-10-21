@@ -18,6 +18,7 @@
     "lint:fix": "oxlint --fix .",
     "typecheck": "pnpm -r --if-present run typecheck && tsc -p tsconfig.tools.json",
     "test": "vitest run",
+    "verify:modules": "pnpm run build && node scripts/verify-modules.mjs",
     "verify:desktop": "pnpm run build && node scripts/verify-desktop.mjs",
     "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged"
   },

@@ -2,8 +2,8 @@ import { app, BrowserWindow, ipcMain, Menu, nativeTheme, net, protocol, dialog }
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SettingsError, SettingsStore } from "../../application/settings-store";
-import { ModuleManager } from "../../application/modules";
-import { moduleDefinitions } from "../../modules/registry";
+import { ModuleError, ModuleHost } from "../../application/module-host";
+import { registeredModules } from "../../modules/registry";
 import { channels, type Result } from "../../contracts/bridge";
 import { resolveTheme } from "@codex-coco/ui/theme/resolve";
 import { isTrustedPage } from "./security";
@@ -35,7 +35,10 @@ if (developmentUrl) {
 }
 const entryUrl = developmentUrl ?? productionUrl;
 const windows = new Map<number, BrowserWindow>();
-const modules = new ModuleManager(moduleDefinitions);
+const modules = new ModuleHost(
+  registeredModules(!app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1"),
+  join(app.getPath("userData"), "modules"),
+);
 let store: SettingsStore;
 let quitting = false;
 
@@ -89,16 +92,30 @@ function registerIpc() {
       try {
         return { ok: true, value: await operation(input) };
       } catch (error) {
-        if (error instanceof SettingsError)
+        if (error instanceof SettingsError || error instanceof ModuleError)
           return { ok: false, error: { code: error.code, message: error.message } };
-        console.error("SETTINGS_OPERATION_FAILED");
+        console.error("DESKTOP_OPERATION_FAILED");
         return {
           ok: false,
-          error: { code: "STORAGE_ERROR", message: "设置未能保存，请检查磁盘权限后重试。" },
+          error: { code: "STORAGE_ERROR", message: "操作未能完成，请检查磁盘权限后重试。" },
         };
       }
     });
   }
+  handle(channels.modules, (input) => {
+    if (input !== undefined) throw new ModuleError("INVALID_INPUT", "模块列表请求无效。");
+    return modules.snapshots();
+  });
+  handle(channels.enableModule, (input) => modules.setEnabled(input));
+  handle(channels.saveModuleConfig, (input) => modules.saveConfig(input));
+  handle(channels.resetModuleConfig, (input) => modules.resetConfig(input));
+  handle(channels.runModuleOperation, (input) => modules.run(input));
+  handle(channels.cancelModuleOperation, (input) => modules.cancel(input));
+  modules.subscribe((snapshot) => {
+    for (const win of windows.values()) {
+      if (!win.isDestroyed()) win.webContents.send(channels.moduleChanged, snapshot);
+    }
+  });
   handle(channels.bootstrap, (input) => {
     if (input !== undefined) throw new SettingsError("INVALID_INPUT", "启动请求无效。");
     return store.getSnapshot();
@@ -140,6 +157,7 @@ async function start() {
   });
   store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
   await store.load();
+  await modules.load();
   registerIpc();
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([

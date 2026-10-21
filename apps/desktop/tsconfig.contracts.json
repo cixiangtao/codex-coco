@@ -4,5 +4,5 @@
     "lib": ["ES2023"],
     "types": []
   },
-  "include": ["src/contracts"]
+  "include": ["src/contracts", "src/modules/*/contract.ts"]
 }

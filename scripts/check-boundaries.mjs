@@ -24,6 +24,8 @@ function scope(file) {
     if (/\/theme\/(contract|resolve)\.ts$/.test(name)) return "pure-ui";
     return "ui";
   }
+  if (/^apps\/desktop\/src\/modules\/[^/]+\/contract\.ts$/.test(name)) return "module-contract";
+  if (/^apps\/desktop\/src\/modules\/[^/]+\/renderer\//.test(name)) return "module-page";
   if (name === "apps/desktop/src/modules/registry.ts") return "module-registry";
   for (const part of [
     "contracts",
@@ -110,11 +112,25 @@ export async function checkBoundaries() {
       }
       const name = node.value;
       const system = name.startsWith("node:") || builtins.has(name);
-      const browser = ["renderer", "contracts", "ui", "pure-ui"].includes(from);
+      const browser = [
+        "renderer",
+        "module-page",
+        "module-contract",
+        "contracts",
+        "ui",
+        "pure-ui",
+      ].includes(from);
       if (
         (browser && (system || name === "electron")) ||
         (from === "desktop/preload" && system) ||
-        (["application", "modules", "module-registry", "pure-ui", "contracts"].includes(from) &&
+        ([
+          "application",
+          "modules",
+          "module-registry",
+          "pure-ui",
+          "contracts",
+          "module-contract",
+        ].includes(from) &&
           /^(electron|react|react-dom)(\/|$)/.test(name))
       ) {
         errors.push(`${location}: ${from} cannot import ${name}`);
@@ -125,20 +141,22 @@ export async function checkBoundaries() {
         continue;
       const target = scope(resolved);
       const allowed = {
-        renderer: ["renderer", "contracts", "ui", "pure-ui"],
+        renderer: ["renderer", "module-page", "module-contract", "contracts", "ui", "pure-ui"],
+        "module-page": ["module-page", "module-contract", "renderer", "contracts", "ui", "pure-ui"],
+        "module-contract": ["module-contract", "contracts", "pure-ui"],
         contracts: ["contracts", "pure-ui"],
         ui: ["ui", "pure-ui"],
         "pure-ui": ["pure-ui"],
         application: ["application", "contracts", "pure-ui"],
-        modules: ["modules", "application", "contracts", "pure-ui"],
+        modules: ["modules", "module-contract", "application", "contracts", "pure-ui"],
         "module-registry": ["modules", "application", "contracts", "pure-ui"],
         "desktop/preload": ["desktop/preload", "contracts", "pure-ui"],
       }[from];
       if (allowed && !allowed.includes(target))
         errors.push(`${location}: ${from} cannot import ${relative(root, resolved)}`);
       if (
-        from === "modules" &&
-        target === "modules" &&
+        ["modules", "module-page", "module-contract"].includes(from) &&
+        ["modules", "module-page", "module-contract"].includes(target) &&
         dirname(file).split(`${sep}modules${sep}`)[1]?.split(sep)[0] !==
           dirname(resolved).split(`${sep}modules${sep}`)[1]?.split(sep)[0]
       )

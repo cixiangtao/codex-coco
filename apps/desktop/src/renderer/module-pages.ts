@@ -1,0 +1,9 @@
+import { lazy, type ComponentType } from "react";
+import type { ModuleSnapshot } from "../contracts/modules";
+
+/** UI registration is separate from runtime registration and never imports backend code. */
+const fixturePage = lazy(() => import("../modules/foundation-fixture/renderer/page"));
+export const modulePages: Readonly<Record<string, ComponentType<{ snapshot: ModuleSnapshot }>>> = {
+  "foundation-fixture": fixturePage,
+  "foundation-peer": fixturePage,
+};

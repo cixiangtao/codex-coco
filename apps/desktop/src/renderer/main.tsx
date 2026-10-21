@@ -3,11 +3,20 @@ import { createRoot } from "react-dom/client";
 import { applyTheme } from "@codex-coco/ui/theme";
 import { App } from "./app";
 import { initializeSettings } from "./client/settings";
+import { initializeModules } from "./client/modules";
 import "./styles.css";
 
 async function start() {
-  const unsubscribe = await initializeSettings();
-  window.addEventListener("beforeunload", unsubscribe, { once: true });
+  const unsubscribeSettings = await initializeSettings();
+  const unsubscribeModules = await initializeModules();
+  window.addEventListener(
+    "beforeunload",
+    () => {
+      unsubscribeSettings();
+      unsubscribeModules();
+    },
+    { once: true },
+  );
   const result = await window.codexCoco.bootstrap();
   if (!result.ok) throw new Error(result.error.message);
   const theme = result.value.settings.theme;

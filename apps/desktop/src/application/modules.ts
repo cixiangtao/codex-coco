@@ -39,6 +39,7 @@ async function withDeadline<T>(promise: Promise<T>, timeoutMs: number) {
 export class ModuleManager {
   private entries = new Map<string, Entry>();
   private closed = false;
+  private listeners = new Set<() => void>();
   constructor(
     definitions: readonly ModuleDefinition[],
     private readonly timeoutMs = 2500,
@@ -57,8 +58,18 @@ export class ModuleManager {
     return [...this.entries.values()].map((entry) => ({ ...entry.status }));
   }
 
+  /** Observers receive transitions without acquiring ownership of runtime resources. */
+  subscribe(listener: () => void) {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+  private notify() {
+    for (const listener of this.listeners) listener();
+  }
   private enqueue(entry: Entry, task: () => Promise<void>) {
-    const result = entry.queue.then(task);
+    const result = entry.queue.then(task).finally(() => this.notify());
     entry.queue = result.catch(() => undefined);
     return result;
   }
@@ -84,6 +95,7 @@ export class ModuleManager {
         error: null,
       };
       entry.controller = controller;
+      this.notify();
       const pending = Promise.resolve()
         .then(() => entry.definition.start(controller.signal))
         .then(async (dispose) => {
@@ -123,6 +135,7 @@ export class ModuleManager {
         return;
       }
       entry.status.phase = "stopping";
+      this.notify();
       try {
         await withDeadline(entry.dispose(), this.timeoutMs);
         delete entry.dispose;

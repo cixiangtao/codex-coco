@@ -26,6 +26,7 @@ import {
   themePresetIds,
   type ThemePreference,
 } from "@codex-coco/ui/theme/contract";
+import { ModulesPanel } from "./modules-panel";
 import { useSavedSettings } from "./client/settings";
 
 const modeLabels = { light: "浅色", dark: "深色", system: "跟随系统" };
@@ -266,6 +267,7 @@ export function App() {
         </section>
         <Separator />
         <Preview />
+        <ModulesPanel />
       </main>
     </ThemeProvider>
   );
