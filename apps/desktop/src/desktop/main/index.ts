@@ -17,6 +17,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SettingsError, SettingsStore } from "../../application/settings-store";
 import { ModuleError, ModuleHost } from "../../application/module-host";
+import { createDesktopPreferences } from "./desktop-preferences";
 import { createUsageToolsService } from "../../modules/usage/tools";
 import { createResetService } from "../../modules/usage/reset";
 import { createLocalUsageService } from "../../modules/usage/local-service";
@@ -60,6 +61,15 @@ const contexts = new Map<number, WindowContext>();
 let lastMainId: number | undefined;
 let menuBar: MenuBarController | undefined;
 let glance: GlanceSnapshot = { revision: 0, items: buildGlanceItems([]) };
+const desktopPreferences = createDesktopPreferences({
+  directory: app.getPath("userData"),
+  resources: app.isPackaged
+    ? join(process.resourcesPath, "codex-coco")
+    : join(app.getAppPath(), "resources"),
+  workerPath: join(here, "tray-worker.js"),
+  menuBar: () => menuBar,
+  glance: () => glance,
+});
 const definitions = registeredModules(
   !app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1",
   () => new Worker(join(here, "foundation-worker.js"), { stdout: true, stderr: true }),
@@ -101,6 +111,7 @@ const definitions = registeredModules(
   }),
   createResetService(join(app.getPath("userData"), "usage-reset-attempts.json")),
   createUsageToolsService({ directory: join(app.getPath("userData"), "usage-tools") }),
+  desktopPreferences.dependencies,
 );
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
   modules: definitions.map((definition) => ({
@@ -217,6 +228,7 @@ function updateGlance() {
   if (JSON.stringify(items) === JSON.stringify(glance.items)) return;
   glance = { revision: glance.revision + 1, items };
   menuBar?.updateSummary(glance);
+  desktopPreferences.updateGlance(glance);
   for (const win of windows.values()) {
     if (!win.isDestroyed() && contexts.get(win.webContents.id)?.kind === "glance")
       win.webContents.send(channels.glanceChanged, glance);

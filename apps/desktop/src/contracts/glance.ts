@@ -27,6 +27,7 @@ export interface GlanceMetric {
   detail: string;
 }
 export const glanceDetailSchema = z.strictObject({
+  page: z.enum(["usage", "appearance", "modules", "settings"]).optional(),
   phase: z.enum(["unavailable", "disabled", "starting", "running", "stopping", "error"]).optional(),
   description: z.string().max(256),
   metrics: z

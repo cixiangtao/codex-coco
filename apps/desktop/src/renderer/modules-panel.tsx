@@ -10,6 +10,7 @@ function ModulePanel({ snapshot }: { snapshot: ModuleSnapshot }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const Page =
+    snapshot.id !== "desktop-tools" &&
     !navigation.some((item) => item.id === snapshot.id && item.group === "primary") &&
     Object.hasOwn(modulePages, snapshot.id)
       ? modulePages[snapshot.id]

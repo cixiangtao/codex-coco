@@ -63,10 +63,10 @@ export async function verifyMenuBar(packagedExecutable) {
     const summary = await popup.evaluate(() => window.codexCoco.glance());
     assert.equal(summary.ok, true);
     assert.deepEqual(
-      summary.value.items.slice(0, 2).map((item) => item.phase),
-      ["disabled", "disabled"],
+      summary.value.items.slice(0, 3).map((item) => item.phase),
+      ["disabled", "disabled", "disabled"],
     );
-    assert.equal(summary.value.items.length, packagedExecutable ? 2 : 4);
+    assert.equal(summary.value.items.length, packagedExecutable ? 3 : 5);
     const bounds = await application.evaluate(({ BrowserWindow, screen }) => {
       const win = BrowserWindow.getAllWindows().find((entry) => !entry.isResizable());
       const bounds = win.getBounds();

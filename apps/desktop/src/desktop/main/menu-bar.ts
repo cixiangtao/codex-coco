@@ -2,6 +2,8 @@ import { Menu, screen, Tray, type BrowserWindow } from "electron";
 import type { GlanceSnapshot } from "../../contracts/glance";
 import type { MainPage } from "../../contracts/windows";
 import { glanceBounds } from "./glance-bounds";
+import { TrayAnimation } from "./tray-animation";
+import type { TrayFrames } from "../../modules/desktop-tools/contract";
 import { createTrayIcon } from "./tray-icon";
 
 interface MenuBarOptions {
@@ -13,6 +15,9 @@ interface MenuBarOptions {
 /** Owns one lazy popover and the native tray, with no resident polling or business services. */
 export class MenuBarController {
   private tray: Tray | undefined;
+  private animation = new TrayAnimation((image) => {
+    if (!this.disposed) this.tray?.setImage(image);
+  });
   private popover: BrowserWindow | undefined;
   private ready = false;
   private wanted = false;
@@ -54,6 +59,16 @@ export class MenuBarController {
     }
     screen.on("display-metrics-changed", this.reposition);
     screen.on("display-removed", this.reposition);
+  }
+  configureIcon(
+    frames: TrayFrames,
+    options: { animate: boolean; followsCpu: boolean; speed: number; template: boolean },
+  ) {
+    if (!this.disposed) this.animation.configure(frames, options);
+  }
+  resetIcon() {
+    this.animation.stop();
+    if (!this.disposed) this.tray?.setImage(createTrayIcon());
   }
   updateSummary(snapshot: GlanceSnapshot) {
     if (!this.tray || process.platform !== "darwin") return;
@@ -125,6 +140,7 @@ export class MenuBarController {
   }
   dispose() {
     this.disposed = true;
+    this.animation.stop();
     this.hide();
     screen.removeListener("display-metrics-changed", this.reposition);
     screen.removeListener("display-removed", this.reposition);

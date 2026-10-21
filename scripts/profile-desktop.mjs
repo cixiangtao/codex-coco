@@ -182,6 +182,7 @@ try {
     assert.deepEqual(await moduleSummary(session.page), [
       { id: "usage", phase: "disabled", activeTask: false },
       { id: "appearance", phase: "disabled", activeTask: false },
+      { id: "desktop-tools", phase: "disabled", activeTask: false },
     ]);
     if (index >= 0) {
       await delay(500);

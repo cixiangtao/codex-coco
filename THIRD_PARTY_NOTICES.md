@@ -12,7 +12,7 @@ packages/ui/src/components 中的基础组件由 shadcn CLI 4.22.1 从 [shadcn/u
 
 已归档并移除的原型曾参考 [codex-usage](https://github.com/cixiangtao/codex-usage) 提交 b33578383a35b0f9d5d67fc67fbf98309b7702f5，及 [codex-skin](https://github.com/cixiangtao/codex-skin) 提交 9b88ab8a72417b9a69ac4dea1abda4f4a990c354。旧运行时和测试没有恢复到本轮新实现。
 
-根目录 LICENSE 保留既有版权声明。没有复制旧项目主题图片或 BuZhiYin GIF 集合；以后引用代码或资产时重新记录来源与许可。
+根目录 LICENSE 保留既有版权声明。二期按下述资产来源记录接入菜单栏素材；旧运行时仍未恢复。
 
 ## 首版用量读取
 
@@ -26,7 +26,7 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 
 `apps/desktop/src/modules/appearance/css.ts` 参考 codex-skin 的三层布景与 Codex DOM 选择器，来源为本地只读仓库 `codex-skin`，提交 `9b88ab8a72417b9a69ac4dea1abda4f4a990c354`。原项目使用 MIT 许可，Copyright (c) 2026 cixiangtao。适用 MIT 许可全文见根目录 LICENSE（相同作者与授权文本）。
 
-新实现使用 Codex Coco 自己的配置、内容寻址图片库、模块任务和 CDP 连接。未复制旧守护进程、HTTP 设置服务器、配置目录、图片或菜单栏素材，不操作旧服务。样式节点和观察器使用独立标识，撤销仅删除 Codex Coco 自己的布景。
+新实现使用 Codex Coco 自己的配置、内容寻址图片库、模块任务和 CDP 连接。未复制旧守护进程、HTTP 设置服务器或配置目录，不操作旧服务；新增菜单栏素材记录如下。样式节点和观察器使用独立标识，撤销仅删除 Codex Coco 自己的布景。
 
 ## 本地用量计数语义参考
 
@@ -39,3 +39,9 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 ## gifuct-js
 
 菜单栏 GIF 解码采用 gifuct-js 2.1.2（MIT，Copyright (c) 2015 Matt Way）及 js-binary-schema-parser 2.0.3。依赖只处理本地字节，不发起网络请求；重计算放在独立 worker。完整 gifuct-js 许可见 apps/desktop/resources/licenses/gifuct-js.txt，并随桌面资源分发。
+
+## 菜单栏素材
+
+`apps/desktop/resources/tray/` 中的 19 个 GIF 从 codex-usage 的上述提交承接；原项目记录其来自 [BenignX/BuZhiYin](https://github.com/BenignX/BuZhiYin)，提交 `76aa03fdbdbc905ac42ee4afe9fed35dca351c6b`，MIT，Copyright (c) 2023 BenignX。完整授权见 resources/licenses/BuZhiYin.txt，随桌面资源分发。
+
+pixel-cat 与 pixel-ghost 各四帧 PNG 从 codex-skin 同一来源提交的菜单栏像素素材导出，MIT，Copyright (c) 2026 cixiangtao；许可全文见根 LICENSE。GIF 解码、动画计时、CPU 联动、图片存储和系统适配由 Codex Coco 重写，没有复制两个旧应用的运行时。

@@ -63,6 +63,7 @@ try {
     [
       { id: "usage", phase: "disabled" },
       { id: "appearance", phase: "disabled" },
+      { id: "desktop-tools", phase: "disabled" },
     ],
   );
   await session.application.close();

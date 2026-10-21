@@ -46,7 +46,7 @@ export function buildGlanceItems(
     if (phase === "running" && detail) {
       item.phase = detail.phase ?? phase;
       item.description = detail.description;
-      item.page = target?.page ?? "modules";
+      item.page = detail.page ?? target?.page ?? "modules";
       if (detail.statusText !== undefined) item.statusText = detail.statusText;
       if (detail.metrics) item.metrics = detail.metrics;
       if (detail.capturedAt !== undefined) item.capturedAt = detail.capturedAt;

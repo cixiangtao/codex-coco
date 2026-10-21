@@ -1,3 +1,4 @@
+import { RegisteredModulePage } from "../modules-panel";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
 import {
@@ -167,6 +168,7 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
           </DialogContent>
         </Dialog>
       </section>
+      <RegisteredModulePage moduleId="desktop-tools" />
     </div>
   );
 }

@@ -64,6 +64,7 @@ export async function verifyDesktopSession(session) {
     [
       { id: "usage", phase: "disabled", enabled: false },
       { id: "appearance", phase: "disabled", enabled: false },
+      { id: "desktop-tools", phase: "disabled", enabled: false },
     ],
     "Normal and packaged launches register business modules without reading accounts",
   );
