@@ -1,3 +1,4 @@
+import { UpdateSettings } from "../update-settings";
 import { RegisteredModulePage } from "../modules-panel";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
@@ -168,6 +169,7 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
           </DialogContent>
         </Dialog>
       </section>
+      <UpdateSettings />
       <RegisteredModulePage moduleId="desktop-tools" />
     </div>
   );

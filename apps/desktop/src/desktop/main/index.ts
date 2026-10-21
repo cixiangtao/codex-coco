@@ -1,3 +1,5 @@
+import { ApplicationUpdates } from "../../application/updates";
+import { createNativeUpdateEngine } from "./updates";
 import {
   app,
   BrowserWindow,
@@ -72,6 +74,11 @@ const desktopPreferences = createDesktopPreferences({
   menuBar: () => menuBar,
   glance: () => glance,
 });
+const updates = new ApplicationUpdates(
+  join(app.getPath("userData"), "updates.json"),
+  app.getVersion(),
+  createNativeUpdateEngine(join(app.getPath("userData"), "updates")),
+);
 const definitions = registeredModules(
   !app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1",
   () => new Worker(join(here, "foundation-worker.js"), { stdout: true, stderr: true }),
@@ -345,6 +352,17 @@ function registerIpc() {
     },
     "glance",
   );
+  handle(channels.updates, (input) => {
+    if (input !== undefined) throw new SettingsError("INVALID_INPUT", "更新请求无效。");
+    return updates.snapshot();
+  });
+  handle(channels.saveUpdatePreferences, (input) => updates.save(input));
+  handle(channels.updateAction, (input) => updates.action(input));
+  updates.subscribe((snapshot) => {
+    for (const win of windows.values())
+      if (!win.isDestroyed() && contexts.get(win.webContents.id)?.kind === "main")
+        win.webContents.send(channels.updatesChanged, snapshot);
+  });
   handle(channels.modules, (input) => {
     if (input !== undefined) throw new ModuleError("INVALID_INPUT", "模块列表请求无效。");
     return modules.snapshots();
@@ -424,6 +442,7 @@ async function start() {
   store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
   await store.load();
   await modules.load();
+  await updates.load();
   updateGlance();
   registerIpc();
   menuBar = new MenuBarController({
@@ -479,7 +498,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   quitting = true;
   menuBar?.dispose();
-  void Promise.all([modules.shutdown(), store.flush()])
+  void Promise.all([modules.shutdown(), store.flush(), updates.shutdown()])
     .then(async ([statuses]) => {
       const incomplete = statuses.some((status) => status.phase === "error");
       diagnostics.record({

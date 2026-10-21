@@ -1,3 +1,4 @@
+import type { UpdateSnapshot, SaveUpdatePreferences, UpdateAction } from "./updates";
 import type { WindowContext, MainPage } from "./windows";
 import type { GlanceSnapshot } from "./glance";
 import type { SaveThemeInput, SettingsSnapshot } from "./settings";
@@ -10,6 +11,10 @@ import type {
 } from "./modules";
 
 export const channels = {
+  updates: "codex-coco:updates",
+  saveUpdatePreferences: "codex-coco:save-update-preferences",
+  updateAction: "codex-coco:update-action",
+  updatesChanged: "codex-coco:updates-changed",
   windowContext: "codex-coco:window-context",
   openMainPage: "codex-coco:open-main-page",
   dismissGlance: "codex-coco:dismiss-glance",
@@ -45,6 +50,10 @@ export type Result<T> =
 
 /** Whitelisted bridge; never exposes raw IPC channels, events or system APIs. */
 export interface DesktopBridge {
+  updates(): Promise<Result<UpdateSnapshot>>;
+  saveUpdatePreferences(input: SaveUpdatePreferences): Promise<Result<UpdateSnapshot>>;
+  updateAction(input: UpdateAction): Promise<Result<UpdateSnapshot>>;
+  onUpdatesChanged(listener: (snapshot: UpdateSnapshot) => void): () => void;
   windowContext(): Promise<Result<WindowContext>>;
   openMainPage(input: { page?: MainPage }): Promise<Result<void>>;
   dismissGlance(): Promise<Result<void>>;

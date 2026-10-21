@@ -1,3 +1,4 @@
+import type { UpdateSnapshot } from "../../contracts/updates";
 import type { MainPage } from "../../contracts/windows";
 import type { GlanceSnapshot } from "../../contracts/glance";
 import { contextBridge, ipcRenderer } from "electron";
@@ -6,6 +7,17 @@ import type { ModuleSnapshot } from "../../contracts/modules";
 import type { SettingsSnapshot } from "../../contracts/settings";
 
 const bridge: DesktopBridge = {
+  updates: () => ipcRenderer.invoke(channels.updates),
+  saveUpdatePreferences: (input) => ipcRenderer.invoke(channels.saveUpdatePreferences, input),
+  updateAction: (input) => ipcRenderer.invoke(channels.updateAction, input),
+  onUpdatesChanged: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, snapshot: UpdateSnapshot) =>
+      listener(snapshot);
+    ipcRenderer.on(channels.updatesChanged, handler);
+    return () => {
+      ipcRenderer.removeListener(channels.updatesChanged, handler);
+    };
+  },
   windowContext: () => ipcRenderer.invoke(channels.windowContext),
   openMainPage: (input) => ipcRenderer.invoke(channels.openMainPage, input),
   dismissGlance: () => ipcRenderer.invoke(channels.dismissGlance),

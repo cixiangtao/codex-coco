@@ -49,3 +49,7 @@ pixel-cat 与 pixel-ghost 各四帧 PNG 从 codex-skin 同一来源提交的菜�
 ## 外观图库素材
 
 `apps/desktop/resources/backgrounds/` 的九个栅格文件来自 codex-skin 上述提交的 public/backgrounds，内容寻址后为八张不同图片。该仓库根许可证为 MIT，Copyright (c) 2026 anys；全文保留于 resources/licenses/codex-skin.txt，并随本地应用分发。Codex Coco 重写图库、预设、拖动定位和启动适配，没有迁回原设置服务器与守护进程。
+
+## 应用更新
+
+electron-updater 6.8.9（MIT，Copyright (c) 2015 Loopline Systems）用于手动下载、SHA-512 完整性校验与 macOS 原生签名安装；完整许可随 resources/licenses/electron-updater.txt 分发。依赖按 pnpm-lock.yaml 锁定，更新引擎按需加载，默认没有发布源，不做网络检查，不自动下载或安装。没有复制两个旧项目的自替换脚本。

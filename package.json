@@ -25,7 +25,7 @@
     "verify:workers": "pnpm run build && node scripts/verify-workers.mjs",
     "verify:usage": "pnpm run build && node scripts/verify-usage.mjs",
     "verify:desktop": "pnpm run build && node scripts/verify-desktop.mjs",
-    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged && node scripts/verify-menu-bar.mjs --packaged && node scripts/verify-workers.mjs --packaged && node scripts/verify-usage.mjs --packaged && node scripts/verify-appearance.mjs --packaged && node scripts/verify-usage-policy.mjs --packaged && node scripts/verify-local-usage.mjs --packaged && node scripts/verify-usage-reset.mjs --packaged && node scripts/verify-usage-tools.mjs --packaged && node scripts/verify-desktop-preferences.mjs --packaged",
+    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged && node scripts/verify-menu-bar.mjs --packaged && node scripts/verify-workers.mjs --packaged && node scripts/verify-usage.mjs --packaged && node scripts/verify-appearance.mjs --packaged && node scripts/verify-usage-policy.mjs --packaged && node scripts/verify-local-usage.mjs --packaged && node scripts/verify-usage-reset.mjs --packaged && node scripts/verify-usage-tools.mjs --packaged && node scripts/verify-desktop-preferences.mjs --packaged && node scripts/verify-updates.mjs --packaged",
     "verify:menu-bar": "pnpm run build && node scripts/verify-menu-bar.mjs",
     "design:review": "pnpm --filter @codex-coco/desktop run design:review",
     "design:build": "pnpm --filter @codex-coco/desktop run design:build",
@@ -35,7 +35,8 @@
     "verify:usage-reset": "pnpm run build && node scripts/verify-usage-reset.mjs",
     "verify:usage-tools": "pnpm run build && node scripts/verify-usage-tools.mjs",
     "verify:desktop-preferences": "pnpm run build && node scripts/verify-desktop-preferences.mjs",
-    "verify:widget": "node scripts/verify-widget.mjs"
+    "verify:widget": "node scripts/verify-widget.mjs",
+    "verify:updates": "pnpm run build && node scripts/verify-updates.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
