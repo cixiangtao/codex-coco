@@ -94,8 +94,13 @@ export async function verifyDesktopSession(session) {
   );
   assert.equal(await page.getByRole("button", { name: /展开侧栏|收起侧栏/ }).count(), 0);
   assert.equal((await page.locator(".desktop-sidebar").boundingBox()).width, 56);
+  await application.evaluate(({ app, BrowserWindow }) => {
+    app.focus({ steal: true });
+    const main = BrowserWindow.getAllWindows().find((window) => window.isVisible());
+    main?.focus();
+  });
   await page.bringToFront();
-  await page.mouse.move(400, 25);
+  await page.mouse.move(400, 200);
   for (const label of ["用量", "外观", "模块管理", "设置"]) {
     const item = nav.getByRole("button", { name: label, exact: true });
     assert.equal(await item.getAttribute("title"), null, "Avoid duplicate native tooltips");
@@ -104,7 +109,7 @@ export async function verifyDesktopSession(session) {
     await page.keyboard.press("Escape");
     await page.getByRole("tooltip").waitFor({ state: "hidden" });
   }
-  await page.mouse.move(400, 25);
+  await page.mouse.move(400, 200);
   await nav.getByRole("button", { name: "用量", exact: true }).focus();
   await page.keyboard.press("Tab");
   await page.getByRole("tooltip", { name: "外观", exact: true }).waitFor();
@@ -150,7 +155,7 @@ export async function verifyDesktopSession(session) {
   await waitTheme(page, "dark");
   await nav.getByRole("button", { name: "设置", exact: true }).hover();
   await page.getByRole("tooltip", { name: "设置", exact: true }).waitFor();
-  await page.mouse.move(400, 25);
+  await page.mouse.move(400, 200);
   await nav.getByRole("button", { name: "模块管理", exact: true }).focus();
   await page.keyboard.press("Tab");
   await page.getByRole("tooltip", { name: "设置", exact: true }).waitFor();
