@@ -24,6 +24,12 @@ pnpm run verify:modules
 
 `verify:modules` exercises two synthetic built-in modules through real Electron: whitelisted operations, progress, cancellation, independent versioned configuration, cross-window conflicts, window reopening, restart persistence and backed-up recovery. It uses temporary data. Fixtures require an explicit opt-in in unpackaged environments and are always disabled in packaged builds. Business registrations remain empty. See [module development](docs/module-development.md).
 
+## Diagnostics and profiling
+
+Local structured diagnostics retain only allowlisted metadata and correlation IDs, without payloads, configuration values or raw exceptions. Disk retention is bounded to three 256 KiB files; the queue is bounded to 256 records and 128 KiB. Logging failures do not block the application. Run `pnpm run verify:diagnostics` for desktop verification.
+
+`pnpm run profile:desktop` measures production files; `pnpm run profile:packaged` builds and measures the local macOS application. Reports include startup milestones and all Electron process CPU/working-set samples, using temporary data and no resident sampling timer. These are machine-specific reference measurements, not performance budgets. See [methodology](docs/diagnostics-and-performance.md) and [baseline](docs/performance-baseline.md).
+
 ## Structure and themes
 
 `apps/desktop` owns Electron integration, module lifecycles, settings and the renderer. The private `packages/ui` package owns customized shadcn components, Tailwind semantic tokens and a controlled ThemeProvider. It has no Electron, Node, IPC or storage dependency.

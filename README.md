@@ -30,6 +30,7 @@ pnpm run start
 pnpm run check
 pnpm run verify:desktop
 pnpm run verify:modules
+pnpm run verify:diagnostics
 pnpm run pack
 pnpm run verify:packaged
 ```
@@ -72,6 +73,12 @@ Oxfmt 管格式，Oxlint 检查代码问题。基于 Oxc AST 的依赖检查阻�
 未保存修改只在当前窗口预览。保存后原子写入并通知其他窗口，过期 revision 会被拒绝；取消恢复最新保存状态。损坏或未来版本的配置保留原件，显式恢复时先备份。Dialog 继承文档根主题，支持键盘关闭和焦点返回。
 
 UI 包不依赖 Electron、Node、IPC 或存储。应用负责偏好持久化、恢复和窗口同步。Codex Coco 自身主题与未来外部 Codex 布景业务分别管理。
+
+## 诊断与性能
+
+本地结构化日志记录固定事件、耗时、错误码和关联 ID，不保存配置内容、原始异常或账号信息。默认最多三个 256 KiB 文件，内存队列最多 256 条/128 KiB，写入失败不阻塞应用；verify:diagnostics 验证真实桌面行为。
+
+`pnpm run profile:desktop` 测生产文件，`pnpm run profile:packaged` 测重新生成的 macOS 应用。两者使用独立临时数据，记录窗口启动及 Browser/Tab/GPU/Utility 等进程的 CPU、工作集；应用不常驻采样。结果用于本机比较，不代表跨设备性能达标。详见 [诊断与测量口径](docs/diagnostics-and-performance.md) 和 [性能基线](docs/performance-baseline.md)。
 
 ## 数据与交付
 

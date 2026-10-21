@@ -52,7 +52,7 @@ ModuleHost 在现有 ModuleManager 上装配内置模块、独立配置与操作
 
 后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册。模块自己的 contract.ts 接受纯合同检查，renderer/ 接受浏览器检查；各自不能导入模块后台，主进程类型入口排除模块 renderer。状态事件以模块 revision 单调排序并带 generation，客户端拒绝旧推送；每模块只保留当前/最近一次任务，不积累历史。
 
-两个合成实例只在未打包环境且 CODEX_COCO_FIXTURES=1 时注册。默认启动与打包应用均关闭示例，业务注册表仍为空。真实 Electron 的模块回归由 verify:modules 覆盖。工作线程任务服务、有界诊断与性能基线仍待后续落实，当前操作运行于主进程异步路径，不能用于阻塞扫描或重计算。
+两个合成实例只在未打包环境且 CODEX_COCO_FIXTURES=1 时注册。默认启动与打包应用均关闭示例，业务注册表仍为空。真实 Electron 的模块回归由 verify:modules 覆盖。有界诊断与显式性能采样已接入，工作线程任务服务仍待后续落实，当前操作运行于主进程异步路径，不能用于阻塞扫描或重计算。
 
 ## 自动边界检查
 
@@ -61,3 +61,11 @@ Oxlint 检查 TS、React 和可访问性基础规则；封装 Label/Field 的两
 Oxc parser 读取 AST，检查静态、类型、动态导入和 require，并解析相对路径及包导出。检查阻止 renderer/UI 导入 Node 或 Electron、应用/模块纯合同导入 UI 运行时代码、UI 导入应用、application 导入 Electron/React、模块跨目录调用其他模块。动态非字面量加载被拒绝。当前应用没有自定义路径别名导入；未来新增别名时须同步解析规则并增加反例测试。
 
 [基建计划](foundation-plan.md) · [验证记录](verification.md)
+
+## 诊断与采样
+
+DiagnosticLog 在主进程拥有磁盘队列，ModuleHost 仅通过 DiagnosticSink 记录固定事件。通道、模块/操作、状态和错误码采用允许列表；IPC 错误返回关联 ID，任务使用同一个 ID 连接请求与执行结果，不记录请求体、配置、公开结果或原始异常。
+
+每个文件不超过 256 KiB，保留三个文件；内存队列最多 256 条/128 KiB。轮转和写入均为异步，IO 失败暂停本会话日志，不阻塞模块。退出完成模块和配置清理后，日志最多再等待一秒。正常取消与失败分别记录，进度更新不逐次落盘。
+
+窗口 ready 日志每个窗口只记录一次，计时覆盖窗口创建到 renderer 握手，不等同首帧。性能脚本经 Playwright 主进程上下文调用 getAppMetrics，不给 renderer 新增系统权限，也不引入常驻采样定时器。完整口径见 [诊断与性能](diagnostics-and-performance.md)。

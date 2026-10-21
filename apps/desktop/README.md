@@ -9,3 +9,5 @@ Electron + React + TypeScript 桌面宿主。当前包含基建验证页、白�
 不读取真实账号，不请求额度，不连接外部 Codex。详见 [架构约定](../../docs/architecture.md) 与 [开发验证](../../docs/verification.md)。
 
 `pnpm run verify:modules` 使用临时目录和显式开启的合成模块验证完整链路。普通启动和打包应用均不注册示例。后台、纯合同与页面的接入方式见 [模块开发](../../docs/module-development.md)。
+
+本地诊断使用固定字段和文件/队列上限，错误经关联 ID 对应日志；不记录配置值或原始异常。显式性能采样命令为 profile:desktop / profile:packaged，详见 [诊断与性能](../../docs/diagnostics-and-performance.md)。
