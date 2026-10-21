@@ -31,7 +31,7 @@ export function usageAccountScope(raw: unknown) {
   return typeof raw === "object" && raw !== null ? (scopes.get(raw) ?? null) : null;
 }
 
-async function codexCommand(environment: NodeJS.ProcessEnv, signal: AbortSignal) {
+export async function codexCommand(environment: NodeJS.ProcessEnv, signal: AbortSignal) {
   const folders = [
     ...(environment.PATH ?? "").split(delimiter).filter(Boolean),
     join(homedir(), ".local/bin"),
@@ -186,15 +186,19 @@ export function createAppServerRequest(
               finish("INVALID_RESPONSE");
               continue;
             }
-            if (!account.data.account) {
+            if (!account.data.account && request.method !== "model/list") {
               finish("NOT_SIGNED_IN");
               continue;
             }
-            if (account.data.account.type !== "chatgpt") {
+            if (
+              account.data.account &&
+              account.data.account.type !== "chatgpt" &&
+              request.method !== "model/list"
+            ) {
               finish("UNSUPPORTED_ACCOUNT");
               continue;
             }
-            if (account.data.account.email)
+            if (account.data.account?.email)
               accountScope = createHash("sha256")
                 .update(account.data.account.email.trim().toLowerCase())
                 .digest("hex");

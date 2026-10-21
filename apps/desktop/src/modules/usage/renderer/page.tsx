@@ -1,3 +1,4 @@
+import { UsageToolsPanel } from "./tools-panel";
 import { UsageResetCards } from "./reset-cards";
 import { UsageTrend } from "./trend";
 import { UsagePreferences } from "./preferences";
@@ -167,7 +168,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
                 void cancel();
               }}
             >
-              取消读取
+              {operation?.name === "refresh" ? "取消读取" : "取消任务"}
             </Button>
           )}
           <output aria-live="polite">
@@ -289,6 +290,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
       )}
       <UsageResetCards snapshot={snapshot} />
       <UsageTrend snapshot={snapshot} />
+      <UsageToolsPanel snapshot={snapshot} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { BuiltinModule } from "../application/module-host";
 import { createFoundationFixture } from "./foundation-fixture/runtime";
 import type { WorkerFactory } from "../application/worker-task";
 import { createAppearanceModule, type AppearanceDependencies } from "./appearance/runtime";
+import type { UsageToolsService } from "./usage/tools";
 import type { ResetService } from "./usage/reset";
 import type { LocalUsageService } from "./usage/local-service";
 import type { UsageNotifier } from "./usage/notifications";
@@ -18,10 +19,11 @@ export function registeredModules(
   notifyUsage?: UsageNotifier,
   localUsage?: LocalUsageService,
   resetService?: ResetService,
+  usageTools?: UsageToolsService,
 ): readonly BuiltinModule[] {
   const definitions = [
     ...(notifyUsage
-      ? [createUsageModule(undefined, notifyUsage, localUsage, resetService)]
+      ? [createUsageModule(undefined, notifyUsage, localUsage, resetService, usageTools)]
       : moduleDefinitions),
     ...(appearance ? [createAppearanceModule(appearance)] : []),
   ];

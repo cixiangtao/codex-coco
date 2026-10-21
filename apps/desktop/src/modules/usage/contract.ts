@@ -119,20 +119,88 @@ export const localScanResultSchema = z.strictObject({
   fallback: usageSnapshotSchema.nullable(),
 });
 export const trendInputSchema = z.strictObject({ force: z.boolean() });
+const modelIdSchema = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,99}$/);
+const effortSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,29}$/);
+export const intelligenceInputSchema = z.strictObject({
+  model: modelIdSchema.nullable(),
+  effort: effortSchema.nullable(),
+  runs: z.number().int().min(1).max(5),
+});
+export const modelOptionSchema = z.strictObject({
+  id: modelIdSchema,
+  label: z.string().min(1).max(120),
+  efforts: z.array(effortSchema).max(12),
+  defaultEffort: effortSchema.nullable(),
+  isDefault: z.boolean(),
+});
+const nullableCount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable();
+const sampleSchema = z.strictObject({
+  index: z.number().int().min(1).max(5),
+  answer: z.number().int().nullable(),
+  explanation: z.string().max(8192),
+  correct: z.boolean().nullable(),
+  elapsedMs: z.number().nonnegative(),
+  inputTokens: nullableCount,
+  outputTokens: nullableCount,
+  reasoningTokens: nullableCount,
+});
+export const intelligenceHistorySchema = z.strictObject({
+  id: z.uuid(),
+  capturedAt: z.number().int().nonnegative(),
+  model: z.string().max(100),
+  effort: z.string().max(30).nullable(),
+  requested: z.number().int().min(1).max(5),
+  completed: z.number().int().min(0).max(5),
+  correct: z.number().int().min(0).max(5),
+  averageTokensPerSecond: z.number().nonnegative().nullable(),
+});
+export const usageToolsSchema = z.strictObject({
+  installation: z.enum(["unknown", "standalone", "package-manager", "homebrew"]),
+  models: z.array(modelOptionSchema).max(200),
+  samples: z.array(sampleSchema).max(5),
+  history: z.array(intelligenceHistorySchema).max(100),
+  error: z
+    .enum([
+      "MODELS_UNAVAILABLE",
+      "SAMPLE_FAILED",
+      "HISTORY_INVALID",
+      "CLI_UNAVAILABLE",
+      "UPDATE_FAILED",
+    ])
+    .nullable(),
+  cliVersion: z
+    .string()
+    .regex(/^\d+\.\d+\.\d+$/)
+    .nullable(),
+  latestCliVersion: z
+    .string()
+    .regex(/^\d+\.\d+\.\d+$/)
+    .nullable(),
+});
+export type UsageTools = z.infer<typeof usageToolsSchema>;
 export const usageResultSchema = z.discriminatedUnion("status", [
   z.strictObject({
+    status: z.literal("tools"),
+    tools: usageToolsSchema.nullable().default(null),
+    trend: trendSnapshotSchema.nullable(),
     reset: resetFeedbackSchema.nullable().default(null),
+  }),
+  z.strictObject({
+    reset: resetFeedbackSchema.nullable().default(null),
+    tools: usageToolsSchema.nullable().default(null),
     status: z.literal("source"),
     changed: z.boolean(),
     trend: trendSnapshotSchema.nullable(),
   }),
   z.strictObject({
+    tools: usageToolsSchema.nullable().default(null),
     status: z.literal("ready"),
     data: usageSnapshotSchema,
     trend: trendSnapshotSchema.nullable().default(null),
     reset: resetFeedbackSchema.nullable().default(null),
   }),
   z.strictObject({
+    tools: usageToolsSchema.nullable().default(null),
     status: z.literal("error"),
     reason: usageFailureSchema,
     checkedAt: z.number().int().nonnegative(),
@@ -142,6 +210,7 @@ export const usageResultSchema = z.discriminatedUnion("status", [
   }),
   z.strictObject({
     reset: resetFeedbackSchema.nullable().default(null),
+    tools: usageToolsSchema.nullable().default(null),
     status: z.literal("local"),
     data: usageSnapshotSchema.nullable(),
     reason: usageFailureSchema.nullable(),

@@ -17,6 +17,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SettingsError, SettingsStore } from "../../application/settings-store";
 import { ModuleError, ModuleHost } from "../../application/module-host";
+import { createUsageToolsService } from "../../modules/usage/tools";
 import { createResetService } from "../../modules/usage/reset";
 import { createLocalUsageService } from "../../modules/usage/local-service";
 import { registeredModules } from "../../modules/registry";
@@ -99,6 +100,7 @@ const definitions = registeredModules(
     },
   }),
   createResetService(join(app.getPath("userData"), "usage-reset-attempts.json")),
+  createUsageToolsService({ directory: join(app.getPath("userData"), "usage-tools") }),
 );
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
   modules: definitions.map((definition) => ({

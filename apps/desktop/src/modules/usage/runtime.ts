@@ -1,3 +1,4 @@
+import type { UsageToolsService } from "./tools";
 import type { ResetService } from "./reset";
 import type { LocalUsageService } from "./local-service";
 import { UsageNotifications, type UsageNotifier } from "./notifications";
@@ -18,6 +19,7 @@ import {
   type TrendSnapshot,
   resetInputSchema,
   type ResetFeedback,
+  intelligenceInputSchema,
   type UsageSnapshot,
 } from "./contract";
 
@@ -27,7 +29,11 @@ export function createUsageModule(
   notify?: UsageNotifier,
   local?: LocalUsageService,
   resetService?: ResetService,
+  tools?: UsageToolsService,
 ): BuiltinModule {
+  const output = usageResultSchema.transform((value) =>
+    usageResultSchema.parse({ ...value, tools: tools?.snapshot() ?? null }),
+  );
   return {
     id: "usage",
     title: "用量",
@@ -44,13 +50,31 @@ export function createUsageModule(
       },
     },
     operations: {
-      refresh: { input: usageInputSchema, output: usageResultSchema, timeoutMs: 60_000 },
-      "consume-reset": { input: resetInputSchema, output: usageResultSchema, timeoutMs: 40_000 },
-      "reset-status": { input: usageInputSchema, output: usageResultSchema, timeoutMs: 5000 },
-      "scan-trend": { input: trendInputSchema, output: usageResultSchema, timeoutMs: 60_000 },
+      ...Object.fromEntries(
+        [
+          "list-models",
+          "load-intelligence-history",
+          "clear-intelligence-history",
+          "check-cli",
+          "update-cli",
+          "run-intelligence",
+        ].map((name) => [
+          name,
+          {
+            input: name === "run-intelligence" ? intelligenceInputSchema : usageInputSchema,
+            output,
+            timeoutMs:
+              name === "run-intelligence" ? 610_000 : name === "update-cli" ? 230_000 : 60_000,
+          },
+        ]),
+      ),
+      refresh: { input: usageInputSchema, output, timeoutMs: 60_000 },
+      "consume-reset": { input: resetInputSchema, output, timeoutMs: 40_000 },
+      "reset-status": { input: usageInputSchema, output, timeoutMs: 5000 },
+      "scan-trend": { input: trendInputSchema, output, timeoutMs: 60_000 },
       "choose-local-home": {
         input: usageInputSchema,
-        output: usageResultSchema,
+        output,
         timeoutMs: 60_000,
       },
     },
@@ -90,6 +114,20 @@ export function createUsageModule(
           clearTimeout(timer);
           const settings = usageConfigSchema.parse(context.config);
           try {
+            if (
+              [
+                "list-models",
+                "load-intelligence-history",
+                "clear-intelligence-history",
+                "check-cli",
+                "update-cli",
+                "run-intelligence",
+              ].includes(name)
+            ) {
+              if (!tools) throw new Error("TOOLS_UNAVAILABLE");
+              await tools.execute(name, input, context.signal, context.report);
+              return latest ?? { status: "tools", tools: tools.snapshot(), trend, reset };
+            }
             if (name === "reset-status") {
               reset = (await resetService?.latest()) ?? null;
               return latest
@@ -125,7 +163,7 @@ export function createUsageModule(
                   };
                 const refreshed = await read(context.signal);
                 previous = normalizeUsage(refreshed, Date.now());
-                latest = { status: "ready", data: previous, trend, reset };
+                latest = { status: "ready", data: previous, trend, reset, tools: null };
                 return latest;
               } catch {
                 context.signal.throwIfAborted();
@@ -183,7 +221,7 @@ export function createUsageModule(
               ...settings,
               notificationsEnabled: settings.notificationsEnabled && config.notificationsEnabled,
             });
-            latest = { status: "ready", data, trend, reset };
+            latest = { status: "ready", data, trend, reset, tools: null };
             return latest;
           } catch (error) {
             context.signal.throwIfAborted();
@@ -203,14 +241,29 @@ export function createUsageModule(
                 });
                 trend = scan.trend;
                 if (scan.fallback) {
-                  latest = { status: "local", data: scan.fallback, reason, trend, reset };
+                  latest = {
+                    status: "local",
+                    data: scan.fallback,
+                    reason,
+                    trend,
+                    reset,
+                    tools: null,
+                  };
                   return latest;
                 }
               } catch {
                 context.signal.throwIfAborted();
               }
             }
-            latest = { status: "error", reason, checkedAt: Date.now(), previous, trend, reset };
+            latest = {
+              status: "error",
+              reason,
+              checkedAt: Date.now(),
+              previous,
+              trend,
+              reset,
+              tools: null,
+            };
             return latest;
           } finally {
             schedule();
@@ -237,8 +290,27 @@ export function createUsageModule(
         return { description: "读取已取消，可在主窗口重新读取。" };
       const parsed = usageResultSchema.safeParse(operation.result);
       if (!parsed.success) return null;
+      if (
+        parsed.data.tools?.error &&
+        [
+          "list-models",
+          "run-intelligence",
+          "load-intelligence-history",
+          "clear-intelligence-history",
+          "check-cli",
+          "update-cli",
+        ].includes(operation.name)
+      )
+        return { phase: "error", description: "用量辅助工具操作未完成，请在主窗口检查。" };
       if (parsed.data.status === "error")
         return { phase: "error", description: usageFailures[parsed.data.reason].title };
+      if (parsed.data.status === "tools")
+        return {
+          phase: parsed.data.tools?.error ? "error" : "running",
+          description: parsed.data.tools?.error
+            ? "用量辅助工具操作未完成，请在主窗口检查。"
+            : "辅助工具已就绪，额度仍需单独读取。",
+        };
       if (parsed.data.status === "source")
         return {
           description: parsed.data.changed
