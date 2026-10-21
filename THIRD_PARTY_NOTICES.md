@@ -55,3 +55,7 @@ pixel-cat 与 pixel-ghost 各四帧 PNG 从 codex-skin 同一来源提交的菜�
 ## 应用更新
 
 electron-updater 6.8.9（MIT，Copyright (c) 2015 Loopline Systems）用于手动下载、SHA-512 完整性校验与 macOS 原生签名安装；完整许可随 resources/licenses/electron-updater.txt 分发。依赖按 pnpm-lock.yaml 锁定，更新引擎按需加载，默认没有发布源，不做网络检查，不自动下载或安装。没有复制两个旧项目的自替换脚本。
+
+## 图片尺寸读取
+
+image-size 2.0.4（MIT，Copyright © 2013-Present Aditya Yadav）仅在桌面后台读取本地图片头部的宽高和 EXIF 方向，为原生异步缩略图保留宽高比；不执行网络请求，不解码完整图片，不把路径公开给界面。完整许可保留于 resources/licenses/image-size.txt，并随应用分发。

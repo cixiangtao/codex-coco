@@ -21,6 +21,7 @@
     "cn": "0.5.0",
     "electron-updater": "6.8.9",
     "gifuct-js": "2.1.2",
+    "image-size": "2.0.4",
     "lucide-react": "1.59.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
