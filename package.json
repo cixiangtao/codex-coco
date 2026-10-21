@@ -23,7 +23,9 @@
     "verify:diagnostics": "pnpm run build && node scripts/verify-diagnostics.mjs",
     "verify:modules": "pnpm run build && node scripts/verify-modules.mjs",
     "verify:desktop": "pnpm run build && node scripts/verify-desktop.mjs",
-    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged"
+    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged",
+    "design:review": "pnpm --filter @codex-coco/desktop run design:review",
+    "design:build": "pnpm --filter @codex-coco/desktop run design:build"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
