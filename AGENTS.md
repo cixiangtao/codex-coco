@@ -34,6 +34,7 @@
 ## 当前验证
 
 - pnpm run check：Oxfmt、Oxlint、AST 依赖边界、分进程/包/测试类型检查、合同测试和生产构建。
+- pnpm run verify:modules：生产入口的真实模块链路回归，仅注册合成模块并使用临时数据，结束后清理。
 - pnpm run verify:desktop：生产入口的真实 Electron 回归，使用临时数据，结束后清理。
 - pnpm run pack：本机未签名的 macOS 应用目录；必须写 run，避免调用 pnpm 内置 pack。
 - pnpm run verify:packaged：生成并验证 macOS arm64 本地应用本身。
@@ -42,4 +43,6 @@
 
 改变生命周期、数据解析或 IPC 时，增加针对合同的测试；界面实现后通过真实 Electron 验证。修改后执行对应检查；干净安装和构建在工具链变更时验证，不因纯文档修改重复整套桌面回归。
 
-UI 验证页、base-nova 和工程预设不是已认可的视觉方案。独立局部主题作用域、业务操作分发、模块专属配置迁移、worker 服务和有界诊断日志仍是后续基建目标；不要把本轮基线描述为 F01–F15 全部完成。
+UI 验证页、base-nova 和工程预设不是已认可的视觉方案。独立局部主题作用域、worker 服务、有界诊断日志和性能基线仍是后续基建目标；不要把本轮基线描述为 F01–F15 全部完成。
+
+模块接入使用 application/module-host.ts 的 BuiltinModule 合同。后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册；模块自己的纯 contract.ts 与 renderer/ 分别接受合同和浏览器边界检查。配置仅包含可公开的偏好，不保存凭据或私有数据；配置变化供下一次操作使用。CODEX_COCO_FIXTURES=1 仅允许未打包验证环境加载合成模块，打包应用始终禁用示例。真实业务注册表仍为空。

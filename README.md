@@ -29,12 +29,14 @@ pnpm run start
 ```sh
 pnpm run check
 pnpm run verify:desktop
+pnpm run verify:modules
 pnpm run pack
 pnpm run verify:packaged
 ```
 
 - `check`：Oxfmt、Oxlint、依赖边界、分进程类型、合同测试与生产构建。
 - `verify:desktop`：构建后启动真实 Electron，用临时配置验证主题、IPC、窗口同步、取消和重启恢复，结束后清理进程与数据。
+- `verify:modules`：构建后用两个合成模块验证任务、取消、独立配置、跨窗口、重启与损坏恢复，全程使用临时目录并自动清理。
 - `pack`：生成本机未签名的 macOS 应用目录；不是 npm 打包，不执行发布。
 - `verify:packaged`：重新生成本地应用目录，并对其中的应用执行同一套桌面回归。此脚本目前针对 macOS arm64。
 
@@ -48,15 +50,20 @@ apps/desktop/src/
   application/   模块生命周期与版本化配置
   contracts/     纯数据类型、运行时校验与白名单桌面桥合同
   renderer/      React 验证页、设置客户端和预览草稿
-  modules/       后续业务模块注册入口，目前为空
+  modules/       业务注册表为空；含显式开启的合成验收模块
 packages/ui/src/
   components/    shadcn 自有组件源码
   theme/         纯主题合同、解析器与受控 Provider
   styles/        共享语义变量和 Tailwind 映射
-  lib/           界面工具
 ```
 
 Oxfmt 管格式，Oxlint 检查代码问题。基于 Oxc AST 的依赖检查阻止跨进程、跨模块和 UI 包到宿主的非法导入；TypeScript 对 Node、preload、合同、renderer、UI 包和测试分别检查。
+
+## 模块接入基础
+
+后台与页面分别静态注册，固定操作名与输入、公开结果均由模块声明校验。每个模块有独立的版本化配置和写入队列；保存冲突、迁移备份与损坏恢复不影响其他模块。每个模块同时运行一个操作，取消须等待任务实际结束；超时未释放资源时保留错误，不伪装成停用成功。
+
+普通启动不注册示例。`verify:modules` 显式开启未打包环境的 `CODEX_COCO_FIXTURES=1`，运行合成示例；打包应用忽略该开关。配置只保存可公开偏好，配置变更供下一次操作使用。接入方式见 [模块开发](docs/module-development.md)。
 
 ## 当前主题能力
 

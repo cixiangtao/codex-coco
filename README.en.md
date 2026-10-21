@@ -15,11 +15,14 @@ pnpm install --frozen-lockfile
 pnpm run dev
 pnpm run check
 pnpm run verify:desktop
+pnpm run verify:modules
 ```
 
 `check` runs Oxfmt, Oxlint, AST dependency-boundary checks, separate TypeScript configurations, contract tests and the production build. `verify:desktop` launches real Electron with temporary application data and checks production loading, theme preview/save/cancel, IPC validation, window synchronization and restart persistence.
 
 `pnpm run build` builds production files; `pnpm run start` opens them. `pnpm run pack` creates an unsigned local macOS application directory. `pnpm run verify:packaged` packages and tests the application itself, currently on macOS arm64. Use the explicit `run` syntax so `pack` does not invoke pnpm's npm-package archive command.
+
+`verify:modules` exercises two synthetic built-in modules through real Electron: whitelisted operations, progress, cancellation, independent versioned configuration, cross-window conflicts, window reopening, restart persistence and backed-up recovery. It uses temporary data. Fixtures require an explicit opt-in in unpackaged environments and are always disabled in packaged builds. Business registrations remain empty. See [module development](docs/module-development.md).
 
 ## Structure and themes
 
