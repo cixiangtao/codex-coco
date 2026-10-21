@@ -51,4 +51,4 @@ UI 验证页、base-nova 和工程预设不是已认可的视觉方案。独立�
 
 诊断只经 DiagnosticSink 写入固定字段；禁止传入原始异常、请求、配置、结果、路径或账号内容。新增事件与错误码需同步允许列表。默认最多三个 256 KiB 文件，内存队列同时受条数和字节限制；日志失败不阻塞业务。性能采样只由显式脚本触发，不增加常驻轮询；口径与基线见 docs/diagnostics-and-performance.md 和 docs/performance-baseline.md。
 
-窗口交互提案独立放在 renderer/design-review，通过 pnpm run design:review 查看，不接入正常 Electron 入口或真实业务。提案不代表用户认可的正式视觉；主窗口承载完整模块能力，菜单栏悬浮窗跨模块速览。异常时优先展示恢复路径，旧数据默认收起。详见 docs/design-review.md。
+窗口交互提案独立放在 renderer/design-review，通过 pnpm run design:review 查看，不接入正常 Electron 入口或真实业务。用户认可侧栏布局方向并要求参考 Codex 客户端精简导航，目前默认 A 精简侧栏并保留 B/C 对照；这仍不是最终视觉定稿。主窗口承载完整模块能力，菜单栏悬浮窗跨模块速览。异常时优先展示恢复路径，旧数据默认收起。详见 docs/design-review.md。
