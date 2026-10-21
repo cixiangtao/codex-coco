@@ -13,7 +13,7 @@
   },
   "aliases": {
     "components": "@codex-coco/ui/components",
-    "utils": "@codex-coco/ui/lib/utils",
+    "utils": "cn",
     "ui": "@codex-coco/ui/components",
     "lib": "@codex-coco/ui/lib",
     "hooks": "@codex-coco/ui/hooks"

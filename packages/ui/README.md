@@ -26,7 +26,8 @@ export function Example() {
 - `theme/contract`：纯类型、默认值、模式/预设列表与 HEX 归一化。
 - `theme/resolve`：纯 token 解析与对比度计算。
 - `styles.css`：Tailwind、语义映射与基础样式；从应用唯一 CSS 入口导入，再显式注册应用自己的源码扫描。
-- `lib/utils`：直接重导出 `cn` npm 包，组件继续使用统一入口；不在项目内重写合并逻辑。
+
+组件直接通过 `import { cn } from "cn"` 使用类名工具，不在 UI 包内封装或重导出。两个 shadcn 配置的 `aliases.utils` 均指向 `cn`。
 
 React 和 React DOM 由 peerDependencies 与应用统一。组件包不依赖 Electron、Node、IPC、业务或配置服务。Provider 不自行持久化，应用负责草稿、保存、取消、版本冲突和多窗口同步。
 

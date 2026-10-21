@@ -19,7 +19,7 @@
 - 格式化使用 Oxc 的 Oxfmt，代码检查使用 Oxlint，进程/包依赖边界由 Oxc parser AST 脚本检查；类型检查仍由 TypeScript 独立负责。
 - 桌面应用位于 `apps/desktop`；私有 UI 包 `@codex-coco/ui` 位于 `packages/ui`，应用通过 `workspace:*` 依赖。
 - UI 使用 Tailwind CSS + shadcn/ui 构建自有组件。基础控件、语义 token、业务复合组件与窗口布局分层；不安装或延续 Ant Design。
-- cn 类名工具统一使用 cn npm 包；packages/ui/src/lib/utils.ts 直接重导出，保留组件统一入口，不自行实现 clsx + tailwind-merge 包装。
+- cn 类名工具统一通过 `import { cn } from "cn"` 直接使用 npm 包，不建立本地封装或重导出入口；shadcn 的 aliases.utils 指向 cn。
 - UI 包不依赖 Electron、Node.js、IPC、应用配置服务或业务模块。业务复合组件留在应用，复用通过公开导出进行。
 - UI 包提供主题类型、解析和受控 Provider；支持浅色/深色/跟随系统、预设及自定义主色。应用负责偏好持久化、迁移、启动恢复与多窗口同步。弹层继承同一主题。
 - Codex Coco 自身 UI 主题与外部 Codex 布景业务分离；主题细节见 `docs/ui-package-and-theme.md`。

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@codex-coco/ui/lib/utils";
+import { cn } from "cn";
 
 import { Label } from "@codex-coco/ui/components/label";
 import { Separator } from "@codex-coco/ui/components/separator";

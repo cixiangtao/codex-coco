@@ -67,6 +67,8 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 
 ## cn 工具替换验证
 
-2026-10-21 按用户要求，UI 包锁定 cn@0.5.0，lib/utils.ts 直接重导出其 cn 函数；组件导入入口保持不变，移除 UI 包对 clsx、tailwind-merge 的直接依赖。此变更采用上游文档提供的手动迁移方式。
+2026-10-21 按用户要求，UI 包锁定 cn@0.5.0，移除 UI 包对 clsx、tailwind-merge 的直接依赖。首次替换时按上游手动迁移方式保留了重导出入口，随后按用户要求将全部 9 个组件改为直接从 cn 导入，删除 lib/utils.ts 及对应包导出，并将两个 shadcn 配置的 aliases.utils 指向 cn。
 
 从现有组件源码提取类名，加入条件、嵌套数组与常见覆盖组合，共 385 组，与替换前的合并结果一致。随后完整 check（含 22 项测试和生产构建）及真实 Electron 桌面回归通过，覆盖主题、弹层、窗口同步、重启与配置恢复。本次没有重新打包 macOS 应用目录；此前的打包验证记录属于基建阶段产物。
+
+直接导入调整后，Oxfmt、Oxlint、AST 依赖边界、类型检查与生产构建通过。shadcn add button 的 dry-run 确认生成源码直接从 cn 导入，且不生成工具文件；本次未重复运行桌面回归或重新打包。

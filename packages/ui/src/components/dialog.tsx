@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { cn } from "@codex-coco/ui/lib/utils";
+import { cn } from "cn";
 
 import { Button } from "@codex-coco/ui/components/button";
 import { XIcon } from "lucide-react";

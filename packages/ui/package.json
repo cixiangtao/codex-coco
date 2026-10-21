@@ -7,7 +7,6 @@
   "type": "module",
   "exports": {
     "./components/*": "./src/components/*.tsx",
-    "./lib/*": "./src/lib/*.ts",
     "./theme": "./src/theme/provider.tsx",
     "./theme/contract": "./src/theme/contract.ts",
     "./theme/resolve": "./src/theme/resolve.ts",
