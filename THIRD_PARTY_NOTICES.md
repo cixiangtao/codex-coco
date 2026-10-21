@@ -4,7 +4,7 @@
 
 packages/ui/src/components 中的基础组件由 shadcn CLI 4.22.1 从 [shadcn/ui](https://github.com/shadcn-ui/ui) 的 base-nova registry 生成。底层交互使用 Base UI，按上游 MIT 许可使用。shadcn 的完整授权条款保留于 [packages/ui/LICENSE.shadcn](packages/ui/LICENSE.shadcn)。
 
-定制包含语义颜色与状态、移除独立 dark 颜色覆盖、中文关闭文案，以及封装组件的局部 lint 说明。所有改动后的组件源码由本项目维护；base-nova 是当前工程实现起点，不代表最终视觉方案。
+本轮新增 Empty 组件，并将其标题与说明分别调整为 h3/p 语义标签。定制包含语义颜色与状态、移除独立 dark 颜色覆盖、中文关闭文案，以及封装组件的局部 lint 说明。所有改动后的组件源码由本项目维护；base-nova 是当前工程实现起点，不代表最终视觉方案。
 
 类名合并使用 [shadcn-ui/cn](https://github.com/shadcn-ui/cn) 的 cn npm 包，当前锁定 0.5.0，按随包 MIT 许可使用。UI 包不再直接依赖 clsx 和 tailwind-merge；其他依赖仍可能间接使用 clsx。
 
