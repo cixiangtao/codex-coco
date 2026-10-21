@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "jsx-a11y", "import"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "eqeqeq": ["error", "always"],
+    "no-debugger": "error"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/out/**",
+    "**/release/**",
+    "**/coverage/**",
+    "work/**"
+  ],
+  "overrides": [
+    {
+      "files": ["apps/desktop/src/renderer/**", "packages/ui/src/**"],
+      "env": {
+        "browser": true
+      },
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": ["node:*", "electron", "electron/*"]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "apps/desktop/src/desktop/**",
+        "apps/desktop/src/application/**",
+        "scripts/**",
+        "tests/**"
+      ],
+      "env": {
+        "node": true
+      }
+    }
+  ]
+}

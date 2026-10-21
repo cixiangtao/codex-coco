@@ -1,0 +1,38 @@
+{
+  "name": "codex-coco",
+  "version": "0.1.0-dev.1",
+  "private": true,
+  "description": "一个按自己习惯打磨的 Codex 桌面伴侣。",
+  "license": "MIT",
+  "author": "cixiangtao",
+  "type": "module",
+  "scripts": {
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
+    "dev": "pnpm --filter @codex-coco/desktop dev",
+    "build": "pnpm --filter @codex-coco/desktop build",
+    "start": "pnpm --filter @codex-coco/desktop start",
+    "pack": "pnpm --filter @codex-coco/desktop run pack",
+    "lint": "oxlint --deny-warnings . && node scripts/check-boundaries.mjs",
+    "lint:fix": "oxlint --fix .",
+    "typecheck": "pnpm -r --if-present run typecheck && tsc -p tsconfig.tools.json",
+    "test": "vitest run",
+    "verify:desktop": "pnpm run build && node scripts/verify-desktop.mjs",
+    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "oxc-parser": "0.155.0",
+    "oxfmt": "0.74.0",
+    "oxlint": "1.89.0",
+    "playwright": "1.64.1",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "packageManager": "pnpm@12.14.0",
+  "productName": "Codex Coco"
+}

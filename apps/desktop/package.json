@@ -1,0 +1,34 @@
+{
+  "name": "@codex-coco/desktop",
+  "version": "0.1.0-dev.1",
+  "private": true,
+  "description": "Codex Coco 桌面宿主与应用基础。",
+  "license": "MIT",
+  "author": "cixiangtao",
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.preload.json && tsc -p tsconfig.contracts.json && tsc -p tsconfig.renderer.json",
+    "pack": "pnpm run build && electron-builder --dir --publish never"
+  },
+  "dependencies": {
+    "@codex-coco/ui": "workspace:*",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "electron": "44.9.2",
+    "electron-builder": "26.15.3",
+    "electron-vite": "6.0.0",
+    "vite": "8.3.4"
+  },
+  "productName": "Codex Coco"
+}
