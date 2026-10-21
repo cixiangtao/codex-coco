@@ -1,6 +1,26 @@
 import { z } from "zod";
 
-export const usageConfigSchema = z.strictObject({});
+export const usageConfigSchema = z
+  .strictObject({
+    refreshIntervalSeconds: z.union([z.literal(0), z.number().int().min(30).max(3600)]),
+    notificationsEnabled: z.boolean(),
+    warningThreshold: z.number().int().min(1).max(80),
+    criticalThreshold: z.number().int().min(0).max(50),
+    showPrimaryInMenuBar: z.boolean(),
+    showSecondaryInMenuBar: z.boolean(),
+    showMenuBarLabels: z.boolean(),
+  })
+  .refine((value) => value.criticalThreshold < value.warningThreshold);
+export type UsageConfig = z.infer<typeof usageConfigSchema>;
+export const usageDefaults: UsageConfig = {
+  refreshIntervalSeconds: 0,
+  notificationsEnabled: false,
+  warningThreshold: 20,
+  criticalThreshold: 5,
+  showPrimaryInMenuBar: true,
+  showSecondaryInMenuBar: true,
+  showMenuBarLabels: true,
+};
 export const usageInputSchema = z.strictObject({});
 const windowSchema = z.strictObject({
   kind: z.enum(["primary", "secondary"]),

@@ -106,7 +106,10 @@ describe("appearance lifecycle", () => {
     await host.load();
     const controller = new AbortController();
     const request = vi.fn(() => true);
-    const runtime = await definition.start(controller.signal, { requestOperation: request });
+    const runtime = await definition.start(controller.signal, {
+      configuration: () => appearanceDefaults,
+      requestOperation: request,
+    });
     const config = structuredClone(appearanceDefaults);
     const execute = (name: string) =>
       runtime.execute(name, {}, { signal: controller.signal, config, report: () => undefined });

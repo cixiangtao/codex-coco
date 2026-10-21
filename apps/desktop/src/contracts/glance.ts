@@ -17,6 +17,7 @@ export interface GlanceItem {
   page: MainPage;
   metrics?: GlanceMetric[];
   capturedAt?: number;
+  statusText?: string;
 }
 /** Explicitly public presentation fields, never an arbitrary module result. */
 export interface GlanceMetric {
@@ -39,6 +40,7 @@ export const glanceDetailSchema = z.strictObject({
     )
     .max(40)
     .optional(),
+  statusText: z.string().max(120).optional(),
   capturedAt: z.number().int().nonnegative().optional(),
 });
 export type GlanceDetail = z.infer<typeof glanceDetailSchema>;

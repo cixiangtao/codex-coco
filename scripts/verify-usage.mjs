@@ -87,7 +87,8 @@ try {
   await page.getByText("剩余 75%", { exact: true }).waitFor();
   await page.getByText("剩余 40%", { exact: true }).waitFor();
   assert.equal((await snapshot(page)).phase, "running");
-  assert.deepEqual((await snapshot(page)).config.value, {});
+  assert.equal((await snapshot(page)).config.value.refreshIntervalSeconds, 0);
+  assert.equal((await snapshot(page)).config.value.notificationsEnabled, false);
   await assertChildrenExited();
   await capture(page, "ready.png");
   const calls = (await traces()).filter((item) => item.method === "spawn").length;

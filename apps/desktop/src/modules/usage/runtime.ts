@@ -1,10 +1,12 @@
+import { UsageNotifications, type UsageNotifier } from "./notifications";
 import type { BuiltinModule } from "../../application/module-host";
-import { createUsageReader, type UsageReader } from "./app-server";
+import { createUsageReader, usageAccountScope, type UsageReader } from "./app-server";
 import { normalizeUsage, UsageReadError } from "./normalize";
 import {
   remainingPercent,
   usageBucketTitle,
   usageConfigSchema,
+  usageDefaults,
   usageFailures,
   usageInputSchema,
   usageResultSchema,
@@ -12,40 +14,92 @@ import {
   type UsageSnapshot,
 } from "./contract";
 
-/** Opt-in, manual reads only. Cached history is public quota data held in memory for this runtime. */
-export function createUsageModule(read: UsageReader = createUsageReader()): BuiltinModule {
+/** Reads remain opt-in; an explicitly saved policy schedules bounded tasks without renderer timers. */
+export function createUsageModule(
+  read: UsageReader = createUsageReader(),
+  notify?: UsageNotifier,
+): BuiltinModule {
   return {
     id: "usage",
     title: "用量",
-    config: { version: 1, defaults: {}, schema: usageConfigSchema, migrations: {} },
+    config: {
+      version: 2,
+      defaults: usageDefaults,
+      schema: usageConfigSchema,
+      migrations: { 1: () => ({ ...usageDefaults }) },
+    },
     operations: {
       refresh: { input: usageInputSchema, output: usageResultSchema, timeoutMs: 12_000 },
     },
-    start: async (signal) => {
+    start: async (signal, host) => {
       signal.throwIfAborted();
       let previous: UsageSnapshot | null = null;
       let stopped = false;
+      let config = usageConfigSchema.parse(host.configuration());
+      let failures = 0;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let notifications = new UsageNotifications(notify);
+      let accountScope: string | null = null;
+      const schedule = () => {
+        clearTimeout(timer);
+        if (!stopped && !signal.aborted && config.refreshIntervalSeconds > 0) {
+          const seconds = Math.min(
+            3600,
+            config.refreshIntervalSeconds * 2 ** Math.min(failures, 5),
+          );
+          timer = setTimeout(() => {
+            if (!host.requestOperation("refresh", {})) schedule();
+          }, seconds * 1000);
+        }
+      };
+      signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+      schedule();
       return {
+        configurationChanged: (value) => {
+          config = usageConfigSchema.parse(value);
+          schedule();
+        },
         execute: async (_name, _input, context) => {
           if (stopped) throw new Error("USAGE_STOPPED");
+          clearTimeout(timer);
+          const settings = usageConfigSchema.parse(context.config);
           try {
             const raw = await read(context.signal);
             context.signal.throwIfAborted();
+            const nextScope = usageAccountScope(raw);
+            if (nextScope !== null && nextScope !== accountScope) {
+              previous = null;
+              notifications = new UsageNotifications(notify);
+              accountScope = nextScope;
+            }
             const data = normalizeUsage(raw, Date.now());
             previous = data;
+            failures = 0;
+            notifications.success(data, {
+              ...settings,
+              notificationsEnabled: settings.notificationsEnabled && config.notificationsEnabled,
+            });
             return { status: "ready", data };
           } catch (error) {
             context.signal.throwIfAborted();
+            failures++;
+            notifications.failure({
+              ...settings,
+              notificationsEnabled: settings.notificationsEnabled && config.notificationsEnabled,
+            });
             return {
               status: "error",
               reason: error instanceof UsageReadError ? error.code : "READ_FAILED",
               checkedAt: Date.now(),
               previous,
             };
+          } finally {
+            schedule();
           }
         },
         stop: async () => {
           stopped = true;
+          clearTimeout(timer);
           previous = null;
         },
       };
@@ -66,7 +120,27 @@ export function createUsageModule(read: UsageReader = createUsageReader()): Buil
         return { phase: "error", description: usageFailures[parsed.data.reason].title };
       const data = parsed.data.data;
       return {
-        description: "来自 Codex CLI，额度为上次手动读取的记录。",
+        description: "来自 Codex CLI，额度为最近一次读取的记录。",
+        statusText: (() => {
+          const settings = usageConfigSchema.safeParse(snapshot.config.value);
+          if (!settings.success) return "";
+          return data.buckets
+            .filter((bucket) => bucket.id === "codex")
+            .flatMap((bucket) =>
+              bucket.windows
+                .filter((window) =>
+                  window.kind === "primary"
+                    ? settings.data.showPrimaryInMenuBar
+                    : settings.data.showSecondaryInMenuBar,
+                )
+                .map(
+                  (window) =>
+                    `${settings.data.showMenuBarLabels ? usageWindowTitle(window) + " " : ""}${Number(remainingPercent(window.usedPercent).toFixed(0))}%`,
+                ),
+            )
+            .join(" · ")
+            .slice(0, 120);
+        })(),
         capturedAt: data.capturedAt,
         metrics: data.buckets.flatMap((bucket, index) =>
           bucket.windows.map((window) => ({

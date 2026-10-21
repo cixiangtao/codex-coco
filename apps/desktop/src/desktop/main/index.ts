@@ -8,6 +8,7 @@ import {
   protocol,
   dialog,
   nativeImage,
+  Notification,
 } from "electron";
 import { randomUUID } from "node:crypto";
 import { Worker } from "node:worker_threads";
@@ -75,6 +76,14 @@ const definitions = registeredModules(
       const preview = image.resize({ width: 480, quality: "good" }).toDataURL();
       return preview.length < 400_000 ? preview : null;
     },
+  },
+  (notification) => {
+    if (!Notification.isSupported()) return false;
+    const native = new Notification({ title: notification.title, body: notification.body });
+    native.on("click", () => openMain("usage"));
+    native.on("failed", () => undefined);
+    native.show();
+    return true;
   },
 );
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
@@ -191,6 +200,7 @@ function updateGlance() {
   const items = buildGlanceItems(modules.snapshots(), modules.glanceDetails());
   if (JSON.stringify(items) === JSON.stringify(glance.items)) return;
   glance = { revision: glance.revision + 1, items };
+  menuBar?.updateSummary(glance);
   for (const win of windows.values()) {
     if (!win.isDestroyed() && contexts.get(win.webContents.id)?.kind === "glance")
       win.webContents.send(channels.glanceChanged, glance);
@@ -368,6 +378,7 @@ async function start() {
     unavailable: () =>
       diagnostics.record({ event: "app.failure", outcome: "error", errorCode: "TRAY_UNAVAILABLE" }),
   });
+  menuBar.updateSummary(glance);
   diagnostics.record({ event: "app.ready", outcome: "ok", durationMs: performance.now() - began });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([

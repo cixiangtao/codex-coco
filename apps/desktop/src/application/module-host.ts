@@ -31,10 +31,12 @@ export interface OperationContext {
   report(progress: number): void;
 }
 export interface ModuleStartContext {
+  configuration(): JsonValue;
   /** Requests a normal bounded task; busy, stopped and stale generations return false. */
   requestOperation(name: string, input: JsonValue): boolean;
 }
 export interface ModuleRuntime {
+  configurationChanged?(config: JsonValue): void;
   execute(name: string, input: JsonValue, context: OperationContext): Promise<JsonValue>;
   stop(): Promise<void>;
 }
@@ -116,6 +118,7 @@ export class ModuleHost {
         start: async (signal) => {
           const entry = this.get(definition.id);
           const runtime = await definition.start(signal, {
+            configuration: () => entry.config.snapshot().value,
             requestOperation: (name, input) => {
               if (signal.aborted || this.closed) return false;
               try {
@@ -274,6 +277,11 @@ export class ModuleHost {
     const request = this.parse(saveModuleConfigSchema, input);
     const entry = this.get(request.moduleId);
     await entry.config.update({ value: request.value }, request.expectedRevision);
+    try {
+      entry.runtime?.configurationChanged?.(entry.config.snapshot().value);
+    } catch {
+      /* Persistence has already succeeded; an optional runtime observer cannot invalidate it. */
+    }
     this.publish(entry);
     return this.snapshot(entry);
   }

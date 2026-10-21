@@ -1,4 +1,5 @@
 import { Menu, screen, Tray, type BrowserWindow } from "electron";
+import type { GlanceSnapshot } from "../../contracts/glance";
 import type { MainPage } from "../../contracts/windows";
 import { glanceBounds } from "./glance-bounds";
 import { createTrayIcon } from "./tray-icon";
@@ -53,6 +54,12 @@ export class MenuBarController {
     }
     screen.on("display-metrics-changed", this.reposition);
     screen.on("display-removed", this.reposition);
+  }
+  updateSummary(snapshot: GlanceSnapshot) {
+    if (!this.tray || process.platform !== "darwin") return;
+    const usage = snapshot.items.find((item) => item.id === "usage");
+    const suffix = usage?.phase === "running" ? usage.statusText : "";
+    this.tray.setTitle(`Codex Coco${suffix ? ` · ${suffix}` : ""}`);
   }
   toggle() {
     if (this.disposed) return;

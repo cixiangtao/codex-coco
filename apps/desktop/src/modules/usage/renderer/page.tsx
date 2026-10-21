@@ -1,3 +1,4 @@
+import { UsagePreferences } from "./preferences";
 import { useEffect, useState } from "react";
 import { Activity, RefreshCw } from "lucide-react";
 import { Button } from "@codex-coco/ui/components/button";
@@ -17,6 +18,7 @@ import {
   usageBucketTitle,
   usageFailures,
   usageResultSchema,
+  usageConfigSchema,
   usageWindowTitle,
   type UsageSnapshot,
 } from "../contract";
@@ -78,6 +80,8 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(Date.now);
+  const config = usageConfigSchema.safeParse(snapshot.config.value);
+  const automatic = config.success ? config.data.refreshIntervalSeconds : 0;
   const operation = snapshot.operation;
   const running = operation?.phase === "running" || operation?.phase === "cancelling";
   const parsed = usageResultSchema.safeParse(operation?.result);
@@ -169,10 +173,13 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
               ? operation?.phase === "cancelling"
                 ? "正在取消读取…"
                 : "正在读取额度…"
-              : "手动刷新，不在后台轮询。"}
+              : automatic > 0
+                ? `已开启自动刷新，间隔 ${automatic} 秒；失败时会延长。`
+                : "手动刷新，不在后台轮询。"}
           </output>
         </div>
       )}
+      <UsagePreferences snapshot={snapshot} />
       {message && (
         <Alert variant="destructive">
           <AlertTitle>操作未完成</AlertTitle>
@@ -193,7 +200,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
             <EmptyTitle>按需读取用量</EmptyTitle>
             <EmptyDescription>
               启用后通过本机 Codex CLI 读取订阅额度。Codex Coco
-              不接收或保存登录令牌；本轮不会自动刷新，也不会创建对话。
+              不接收或保存登录令牌；默认仅手动读取，可在下方设置中开启自动刷新，不会创建对话。
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

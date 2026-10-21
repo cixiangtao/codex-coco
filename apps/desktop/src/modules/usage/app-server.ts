@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
@@ -21,7 +22,14 @@ const rpcSchema = z.object({
   result: z.unknown().optional(),
   error: z.object({ code: z.number() }).optional(),
 });
-const accountSchema = z.object({ account: z.object({ type: z.string() }).nullable() });
+const accountSchema = z.object({
+  account: z.object({ type: z.string(), email: z.string().max(320).nullish() }).nullable(),
+});
+const scopes = new WeakMap<object, string>();
+/** Ephemeral account correlation stays in the backend, outside the public quota response. */
+export function usageAccountScope(raw: unknown) {
+  return typeof raw === "object" && raw !== null ? (scopes.get(raw) ?? null) : null;
+}
 
 async function codexCommand(environment: NodeJS.ProcessEnv, signal: AbortSignal) {
   const folders = [
@@ -64,6 +72,7 @@ export function createUsageReader(options: ReaderOptions = {}): UsageReader {
       let finished = false;
       let closed = false;
       let value: unknown;
+      let accountScope: string | null = null;
       let failure: UsageFailureCode | null = null;
       let force: ReturnType<typeof setTimeout> | undefined;
       const kill = (signalName: NodeJS.Signals) => {
@@ -169,9 +178,17 @@ export function createUsageReader(options: ReaderOptions = {}): UsageReader {
               finish("UNSUPPORTED_ACCOUNT");
               continue;
             }
+            if (account.data.account.email)
+              accountScope = createHash("sha256")
+                .update(account.data.account.email.trim().toLowerCase())
+                .digest("hex");
             expected = 2;
             send({ method: "account/rateLimits/read", id: 2 });
-          } else finish(null, message.result);
+          } else {
+            if (accountScope && typeof message.result === "object" && message.result !== null)
+              scopes.set(message.result, accountScope);
+            finish(null, message.result);
+          }
         }
       });
       signal.addEventListener("abort", abort, { once: true });
