@@ -124,6 +124,23 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
             </ToggleGroup>
           </Field>
         ))}
+        <Field>
+          <FieldLabel>服务失败时使用本地额度记录</FieldLabel>
+          <ToggleGroup
+            aria-label="本地额度回退"
+            value={[value.localFallbackEnabled ? "on" : "off"]}
+            onValueChange={(values) => {
+              if (values.length) update({ localFallbackEnabled: values[0] === "on" });
+            }}
+            variant="outline"
+          >
+            <ToggleGroupItem value="off">关闭</ToggleGroupItem>
+            <ToggleGroupItem value="on">开启</ToggleGroupItem>
+          </ToggleGroup>
+          <FieldDescription>
+            默认关闭。开启后服务读取失败时扫描本机记录，历史额度仍默认收起，不进入菜单栏当前额度。
+          </FieldDescription>
+        </Field>
         {!valid && <p role="alert">请检查刷新间隔和阈值，严重阈值需要低于提醒阈值。</p>}
         {conflict && <p role="alert">偏好已在其他窗口更新，请取消当前修改后重新编辑。</p>}
         <div className="flex flex-wrap gap-3">

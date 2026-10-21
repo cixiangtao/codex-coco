@@ -17,6 +17,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SettingsError, SettingsStore } from "../../application/settings-store";
 import { ModuleError, ModuleHost } from "../../application/module-host";
+import { createLocalUsageService } from "../../modules/usage/local-service";
 import { registeredModules } from "../../modules/registry";
 import { channels, type Result } from "../../contracts/bridge";
 import { resolveTheme } from "@codex-coco/ui/theme/resolve";
@@ -85,6 +86,17 @@ const definitions = registeredModules(
     native.show();
     return true;
   },
+  createLocalUsageService({
+    createWorker: () => new Worker(join(here, "usage-worker.js"), { stdout: true, stderr: true }),
+    directory: join(app.getPath("userData"), "usage-local"),
+    chooseDirectory: async () => {
+      const result = await dialog.showOpenDialog({
+        title: "选择本地 Codex 记录目录",
+        properties: ["openDirectory"],
+      });
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+  }),
 );
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
   modules: definitions.map((definition) => ({

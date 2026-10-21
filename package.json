@@ -25,12 +25,13 @@
     "verify:workers": "pnpm run build && node scripts/verify-workers.mjs",
     "verify:usage": "pnpm run build && node scripts/verify-usage.mjs",
     "verify:desktop": "pnpm run build && node scripts/verify-desktop.mjs",
-    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged && node scripts/verify-menu-bar.mjs --packaged && node scripts/verify-workers.mjs --packaged && node scripts/verify-usage.mjs --packaged && node scripts/verify-appearance.mjs --packaged && node scripts/verify-usage-policy.mjs --packaged",
+    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged && node scripts/verify-menu-bar.mjs --packaged && node scripts/verify-workers.mjs --packaged && node scripts/verify-usage.mjs --packaged && node scripts/verify-appearance.mjs --packaged && node scripts/verify-usage-policy.mjs --packaged && node scripts/verify-local-usage.mjs --packaged",
     "verify:menu-bar": "pnpm run build && node scripts/verify-menu-bar.mjs",
     "design:review": "pnpm --filter @codex-coco/desktop run design:review",
     "design:build": "pnpm --filter @codex-coco/desktop run design:build",
     "verify:appearance": "pnpm run build && node scripts/verify-appearance.mjs",
-    "verify:usage-policy": "pnpm run build && node scripts/verify-usage-policy.mjs"
+    "verify:usage-policy": "pnpm run build && node scripts/verify-usage-policy.mjs",
+    "verify:local-usage": "pnpm run build && node scripts/verify-local-usage.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

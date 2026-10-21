@@ -14,6 +14,7 @@ export default defineConfig({
         input: {
           index: resolve(root, "src/desktop/main/index.ts"),
           "foundation-worker": resolve(root, "src/modules/foundation-fixture/worker.ts"),
+          "usage-worker": resolve(root, "src/modules/usage/worker.ts"),
         },
         external: ["electron", /^node:/],
       },

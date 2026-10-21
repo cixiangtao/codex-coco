@@ -6,6 +6,8 @@ export const usageConfigSchema = z
     notificationsEnabled: z.boolean(),
     warningThreshold: z.number().int().min(1).max(80),
     criticalThreshold: z.number().int().min(0).max(50),
+    localFallbackEnabled: z.boolean(),
+    trendDays: z.union([z.literal(7), z.literal(14), z.literal(30)]),
     showPrimaryInMenuBar: z.boolean(),
     showSecondaryInMenuBar: z.boolean(),
     showMenuBarLabels: z.boolean(),
@@ -17,6 +19,8 @@ export const usageDefaults: UsageConfig = {
   notificationsEnabled: false,
   warningThreshold: 20,
   criticalThreshold: 5,
+  localFallbackEnabled: false,
+  trendDays: 30,
   showPrimaryInMenuBar: true,
   showSecondaryInMenuBar: true,
   showMenuBarLabels: true,
@@ -30,7 +34,7 @@ const windowSchema = z.strictObject({
 });
 export const usageSnapshotSchema = z.strictObject({
   capturedAt: z.number().int().nonnegative(),
-  source: z.literal("codex-app-server"),
+  source: z.enum(["codex-app-server", "local-session"]),
   buckets: z
     .array(
       z.strictObject({
@@ -52,13 +56,53 @@ export const usageFailureSchema = z.enum([
   "INVALID_RESPONSE",
   "NO_LIMITS",
 ]);
+export const trendSnapshotSchema = z.strictObject({
+  capturedAt: z.number().int().nonnegative(),
+  days: z.union([z.literal(7), z.literal(14), z.literal(30)]),
+  source: z.enum(["session-events", "thread-totals", "none"]),
+  scope: z.enum(["current-account-and-unassigned", "all-local-unassigned"]),
+  points: z
+    .array(
+      z.strictObject({
+        day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        tokens: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+      }),
+    )
+    .max(30),
+  unassignedTokens: z.number().int().nonnegative(),
+  limited: z.boolean(),
+  scannedFiles: z.number().int().nonnegative(),
+  reusedFiles: z.number().int().nonnegative(),
+});
+export type TrendSnapshot = z.infer<typeof trendSnapshotSchema>;
+export const localScanResultSchema = z.strictObject({
+  trend: trendSnapshotSchema,
+  fallback: usageSnapshotSchema.nullable(),
+});
+export const trendInputSchema = z.strictObject({ force: z.boolean() });
 export const usageResultSchema = z.discriminatedUnion("status", [
-  z.strictObject({ status: z.literal("ready"), data: usageSnapshotSchema }),
+  z.strictObject({
+    status: z.literal("source"),
+    changed: z.boolean(),
+    trend: trendSnapshotSchema.nullable(),
+  }),
+  z.strictObject({
+    status: z.literal("ready"),
+    data: usageSnapshotSchema,
+    trend: trendSnapshotSchema.nullable().default(null),
+  }),
   z.strictObject({
     status: z.literal("error"),
     reason: usageFailureSchema,
     checkedAt: z.number().int().nonnegative(),
     previous: usageSnapshotSchema.nullable(),
+    trend: trendSnapshotSchema.nullable().default(null),
+  }),
+  z.strictObject({
+    status: z.literal("local"),
+    data: usageSnapshotSchema.nullable(),
+    reason: usageFailureSchema.nullable(),
+    trend: trendSnapshotSchema,
   }),
 ]);
 export type UsageSnapshot = z.infer<typeof usageSnapshotSchema>;

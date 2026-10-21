@@ -1,3 +1,4 @@
+import type { LocalUsageService } from "./local-service";
 import { UsageNotifications, type UsageNotifier } from "./notifications";
 import type { BuiltinModule } from "../../application/module-host";
 import { createUsageReader, usageAccountScope, type UsageReader } from "./app-server";
@@ -11,6 +12,9 @@ import {
   usageInputSchema,
   usageResultSchema,
   usageWindowTitle,
+  trendInputSchema,
+  type UsageResult,
+  type TrendSnapshot,
   type UsageSnapshot,
 } from "./contract";
 
@@ -18,18 +22,31 @@ import {
 export function createUsageModule(
   read: UsageReader = createUsageReader(),
   notify?: UsageNotifier,
+  local?: LocalUsageService,
 ): BuiltinModule {
   return {
     id: "usage",
     title: "用量",
     config: {
-      version: 2,
+      version: 3,
       defaults: usageDefaults,
       schema: usageConfigSchema,
-      migrations: { 1: () => ({ ...usageDefaults }) },
+      migrations: {
+        1: () => ({ ...usageDefaults }),
+        2: (value) => ({
+          ...usageDefaults,
+          ...(typeof value === "object" && value !== null && !Array.isArray(value) ? value : {}),
+        }),
+      },
     },
     operations: {
-      refresh: { input: usageInputSchema, output: usageResultSchema, timeoutMs: 12_000 },
+      refresh: { input: usageInputSchema, output: usageResultSchema, timeoutMs: 60_000 },
+      "scan-trend": { input: trendInputSchema, output: usageResultSchema, timeoutMs: 60_000 },
+      "choose-local-home": {
+        input: usageInputSchema,
+        output: usageResultSchema,
+        timeoutMs: 60_000,
+      },
     },
     start: async (signal, host) => {
       signal.throwIfAborted();
@@ -40,6 +57,8 @@ export function createUsageModule(
       let timer: ReturnType<typeof setTimeout> | undefined;
       let notifications = new UsageNotifications(notify);
       let accountScope: string | null = null;
+      let trend: TrendSnapshot | null = null;
+      let latest: UsageResult | null = null;
       const schedule = () => {
         clearTimeout(timer);
         if (!stopped && !signal.aborted && config.refreshIntervalSeconds > 0) {
@@ -59,16 +78,39 @@ export function createUsageModule(
           config = usageConfigSchema.parse(value);
           schedule();
         },
-        execute: async (_name, _input, context) => {
+        execute: async (name, input, context) => {
           if (stopped) throw new Error("USAGE_STOPPED");
           clearTimeout(timer);
           const settings = usageConfigSchema.parse(context.config);
           try {
+            if (name === "choose-local-home") {
+              if (!local) throw new Error("LOCAL_UNAVAILABLE");
+              const changed = await local.chooseHome();
+              context.signal.throwIfAborted();
+              if (changed) trend = null;
+              if (latest?.status === "ready" || latest?.status === "error")
+                return { ...latest, trend };
+              return { status: "source", changed, trend };
+            }
+            if (name === "scan-trend") {
+              if (!local) throw new Error("LOCAL_UNAVAILABLE");
+              const scan = await local.scan(context.signal, context.report, {
+                days: settings.trendDays,
+                scope: accountScope,
+                force: trendInputSchema.parse(input).force,
+              });
+              trend = scan.trend;
+              if (latest?.status === "ready" || latest?.status === "error")
+                return { ...latest, trend };
+              return { status: "local", data: scan.fallback, reason: null, trend };
+            }
             const raw = await read(context.signal);
             context.signal.throwIfAborted();
             const nextScope = usageAccountScope(raw);
             if (nextScope !== null && nextScope !== accountScope) {
               previous = null;
+              trend = null;
+              latest = null;
               notifications = new UsageNotifications(notify);
               accountScope = nextScope;
             }
@@ -79,20 +121,35 @@ export function createUsageModule(
               ...settings,
               notificationsEnabled: settings.notificationsEnabled && config.notificationsEnabled,
             });
-            return { status: "ready", data };
+            latest = { status: "ready", data, trend };
+            return latest;
           } catch (error) {
             context.signal.throwIfAborted();
+            if (name !== "refresh") throw error;
             failures++;
             notifications.failure({
               ...settings,
               notificationsEnabled: settings.notificationsEnabled && config.notificationsEnabled,
             });
-            return {
-              status: "error",
-              reason: error instanceof UsageReadError ? error.code : "READ_FAILED",
-              checkedAt: Date.now(),
-              previous,
-            };
+            const reason = error instanceof UsageReadError ? error.code : "READ_FAILED";
+            if (settings.localFallbackEnabled && local) {
+              try {
+                const scan = await local.scan(context.signal, context.report, {
+                  days: settings.trendDays,
+                  scope: accountScope,
+                  force: false,
+                });
+                trend = scan.trend;
+                if (scan.fallback) {
+                  latest = { status: "local", data: scan.fallback, reason, trend };
+                  return latest;
+                }
+              } catch {
+                context.signal.throwIfAborted();
+              }
+            }
+            latest = { status: "error", reason, checkedAt: Date.now(), previous, trend };
+            return latest;
           } finally {
             schedule();
           }
@@ -101,6 +158,8 @@ export function createUsageModule(
           stopped = true;
           clearTimeout(timer);
           previous = null;
+          trend = null;
+          latest = null;
         },
       };
     },
@@ -118,6 +177,19 @@ export function createUsageModule(
       if (!parsed.success) return null;
       if (parsed.data.status === "error")
         return { phase: "error", description: usageFailures[parsed.data.reason].title };
+      if (parsed.data.status === "source")
+        return {
+          description: parsed.data.changed
+            ? "本地记录目录已设置，可在主窗口扫描趋势。"
+            : "目录选择已取消，可在主窗口继续操作。",
+        };
+      if (parsed.data.status === "local")
+        return {
+          phase: parsed.data.reason ? "error" : "running",
+          description: parsed.data.reason
+            ? "服务额度读取失败，主窗口可查看本机历史记录。"
+            : "已读取本机趋势；本机记录不代表当前服务额度。",
+        };
       const data = parsed.data.data;
       return {
         description: "来自 Codex CLI，额度为最近一次读取的记录。",

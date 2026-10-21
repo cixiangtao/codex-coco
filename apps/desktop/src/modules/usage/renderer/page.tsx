@@ -1,3 +1,4 @@
+import { UsageTrend } from "./trend";
 import { UsagePreferences } from "./preferences";
 import { useEffect, useState } from "react";
 import { Activity, RefreshCw } from "lucide-react";
@@ -37,7 +38,7 @@ function QuotaData({ data }: { data: UsageSnapshot }) {
       <p className="usage-source">
         读取于{" "}
         <time dateTime={new Date(data.capturedAt).toISOString()}>{dateTime(data.capturedAt)}</time>{" "}
-        · Codex CLI
+        · {data.source === "local-session" ? "本机会话历史记录" : "Codex CLI"}
       </p>
       {data.buckets.map((bucket, index) => (
         <section
@@ -235,6 +236,23 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
             </details>
           )}
         </>
+      ) : result?.status === "local" ? (
+        <>
+          <Alert variant={result.reason ? "destructive" : "default"}>
+            <AlertTitle>
+              {result.reason ? usageFailures[result.reason].title : "本地统计已更新"}
+            </AlertTitle>
+            <AlertDescription>
+              本机历史记录不代表当前服务额度；请恢复连接后刷新确认。
+            </AlertDescription>
+          </Alert>
+          {result.data && (
+            <details className="usage-previous">
+              <summary>查看本机历史额度（非当前服务状态）</summary>
+              <QuotaData data={result.data} />
+            </details>
+          )}
+        </>
       ) : current ? (
         <>
           {(now - current.capturedAt > 10 * 60_000 ||
@@ -268,6 +286,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
           </EmptyHeader>
         </Empty>
       )}
+      <UsageTrend snapshot={snapshot} />
     </div>
   );
 }
