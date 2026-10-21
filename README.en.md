@@ -4,7 +4,7 @@ A Codex desktop companion, shaped around personal workflows.
 
 [中文](README.md)
 
-**Status: local development build with a real main-window shell and theme settings.** The accepted slim sidebar is now part of the normal Electron entry, with four-page navigation and collapse support. Theme preview, cancel, save and cross-window synchronization use the existing host service. The native menu bar now provides a read-only, cross-module status popover and main-window navigation. Usage and external appearance business modules are not implemented; no synthetic business data is shown. The previous prototype remains removed and archived.
+**Status: local development build with a real main-window shell and theme settings.** The fixed icon sidebar supports four-page navigation and themed menu tooltips. Theme preview, cancel, save and cross-window synchronization use the existing host service. The native menu bar provides a read-only, cross-module status popover and main-window navigation. Per-task worker execution has passed synthetic-module verification. Usage and external appearance business modules are not implemented; no synthetic business data is shown. The previous prototype remains removed and archived.
 
 ## Development
 
@@ -16,14 +16,17 @@ pnpm run dev
 pnpm run check
 pnpm run verify:desktop
 pnpm run verify:modules
+pnpm run verify:workers
 pnpm run verify:menu-bar
 ```
 
 `check` runs Oxfmt, Oxlint, AST dependency-boundary checks, separate TypeScript configurations, contract tests and the production build. `verify:desktop` launches real Electron with temporary application data and checks production loading, theme preview/save/cancel, IPC validation, window synchronization and restart persistence.
 
-`pnpm run build` builds production files; `pnpm run start` opens them. `pnpm run pack` creates an unsigned local macOS application directory. `pnpm run verify:packaged` packages and tests both the main window and popover, currently on macOS arm64. Use the explicit `run` syntax so `pack` does not invoke pnpm's npm-package archive command.
+`pnpm run build` builds production files; `pnpm run start` opens them. `pnpm run pack` creates an unsigned local macOS application directory. `pnpm run verify:packaged` packages and tests the main window, popover and worker resource, currently on macOS arm64. Use the explicit `run` syntax so `pack` does not invoke pnpm's npm-package archive command.
 
 `verify:modules` exercises two synthetic built-in modules through real Electron: whitelisted operations, progress, cancellation, independent versioned configuration, cross-window conflicts, window reopening, restart persistence and backed-up recovery. It uses temporary data. Fixtures require an explicit opt-in in unpackaged environments and are always disabled in packaged builds. Business registrations remain empty. See [module development](docs/module-development.md).
+
+Each worker task owns a separate thread and waits for its actual exit before settlement. Cancellation, timeout, module disable and shutdown terminate the worker without main-thread fallback. JSON messages have strict schemas and a size limit; module-specific output validation still applies. `verify:workers` checks the emitted entry in real Electron, including packaged resources. See [worker tasks](docs/worker-tasks.md).
 
 ## Menu-bar popover
 

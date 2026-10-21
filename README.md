@@ -6,7 +6,7 @@
 
 Codex Coco 计划将用量监控与外观定制放进一个 Electron 应用，并为后续模块保留独立生命周期和配置边界。个人使用习惯、学习与持续打磨是项目的出发点。
 
-**当前状态：正式主窗口与主题设置已接入的本地开发版。** 主窗口采用已认可的精简侧栏，支持四页导航和侧栏折叠；设置具备真实预览、保存、取消及跨窗口同步。菜单栏已提供只读跨模块状态与主窗口跳转；用量、外观业务尚未接入，不显示模拟业务数据。旧原型已归档并移除，没有恢复其实现。
+**当前状态：正式主窗口与主题设置已接入的本地开发版。** 主窗口采用固定图标侧栏，支持四页导航和菜单提示；设置具备真实预览、保存、取消及跨窗口同步。菜单栏已提供只读跨模块状态与主窗口跳转；工作线程执行器已接入并通过合成任务验收。用量、外观业务尚未接入，不显示模拟业务数据。旧原型已归档并移除，没有恢复其实现。
 
 ## 开发
 
@@ -30,6 +30,7 @@ pnpm run start
 pnpm run check
 pnpm run verify:desktop
 pnpm run verify:modules
+pnpm run verify:workers
 pnpm run verify:menu-bar
 pnpm run verify:diagnostics
 pnpm run pack
@@ -40,8 +41,9 @@ pnpm run verify:packaged
 - `verify:desktop`：构建后启动真实 Electron，用临时配置验证主题、IPC、窗口同步、取消和重启恢复，结束后清理进程与数据。
 - `verify:menu-bar`：验证菜单栏开合回调、窗口权限、状态/主题同步、主窗口重开与读取失败恢复，全程使用临时数据。
 - `verify:modules`：构建后用两个合成模块验证任务、取消、独立配置、跨窗口、重启与损坏恢复，全程使用临时目录并自动清理。
+- `verify:workers`：验证真实 Electron 中独立线程构建入口的加载、进度、结果和实际退出，使用临时数据。
 - `pack`：生成本机未签名的 macOS 应用目录；不是 npm 打包，不执行发布。
-- `verify:packaged`：重新生成本地应用目录，并对其中的应用执行主窗口与速览回归。此脚本目前针对 macOS arm64。
+- `verify:packaged`：重新生成本地应用目录，并对其中的应用执行主窗口、速览和线程资源回归。此脚本目前针对 macOS arm64。
 
 单独执行：`pnpm run format`、`pnpm run format:check`、`pnpm run lint`、`pnpm run typecheck`、`pnpm run test`。始终写明 `pnpm run pack`，避免调用 pnpm 内置的 npm 包打包命令。
 
@@ -67,6 +69,8 @@ Oxfmt 管格式，Oxlint 检查代码问题。基于 Oxc AST 的依赖检查阻�
 后台与页面分别静态注册，固定操作名与输入、公开结果均由模块声明校验。每个模块有独立的版本化配置和写入队列；保存冲突、迁移备份与损坏恢复不影响其他模块。每个模块同时运行一个操作，取消须等待任务实际结束；超时未释放资源时保留错误，不伪装成停用成功。
 
 普通启动不注册示例。`verify:modules` 显式开启未打包环境的 `CODEX_COCO_FIXTURES=1`，运行合成示例；打包应用忽略该开关。配置只保存可公开偏好，配置变更供下一次操作使用。接入方式见 [模块开发](docs/module-development.md)。
+
+重计算通过按任务创建的工作线程执行，取消、超时、停用及退出等待真实线程释放，不回退到主线程。合成模块已使用该路径；固定消息经过 JSON、大小与结构校验，业务结果仍由模块合同再次校验。详见 [工作线程](docs/worker-tasks.md)。
 
 ## 菜单栏速览
 

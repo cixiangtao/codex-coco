@@ -48,7 +48,7 @@ UI 包只维护组件、语义变量与受控 Provider。纯主题子路径可�
 
 ## 主窗口状态
 
-renderer/shell 负责应用导航与折叠，renderer/pages 放置页面，client/theme-editor.ts 维护窗口级主题草稿。页面保持挂载并 hidden 切换，未保存主题与模块草稿跨导航保留；路由不修改 URL，不扩大桌面桥信任范围。未注册业务模块只显示真实建设状态。详见 [正式主窗口](main-window.md)。
+renderer/shell 负责固定图标侧栏导航与菜单提示，renderer/pages 放置页面，client/theme-editor.ts 维护窗口级主题草稿。页面保持挂载并 hidden 切换，未保存主题与模块草稿跨导航保留；路由不修改 URL，不扩大桌面桥信任范围。未注册业务模块只显示真实建设状态。详见 [正式主窗口](main-window.md)。
 
 ## 模块生命周期
 
@@ -62,7 +62,9 @@ ModuleHost 在现有 ModuleManager 上装配内置模块、独立配置与操作
 
 后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册。模块自己的 contract.ts 接受纯合同检查，renderer/ 接受浏览器检查；各自不能导入模块后台，主进程类型入口排除模块 renderer。状态事件以模块 revision 单调排序并带 generation，客户端拒绝旧推送；每模块只保留当前/最近一次任务，不积累历史。
 
-两个合成实例只在未打包环境且 CODEX_COCO_FIXTURES=1 时注册。默认启动与打包应用均关闭示例，业务注册表仍为空。真实 Electron 的模块回归由 verify:modules 覆盖。有界诊断与显式性能采样已接入，工作线程任务服务仍待后续落实，当前操作运行于主进程异步路径，不能用于阻塞扫描或重计算。
+两个合成实例只在未打包环境且 CODEX_COCO_FIXTURES=1 时注册。默认启动与打包应用均关闭示例，业务注册表仍为空。真实 Electron 的模块回归由 verify:modules 覆盖。有界诊断与显式性能采样已接入。
+
+application/worker-task.ts 按任务创建独立线程，主进程组合根注入静态入口。取消、超时、停用与退出沿同一信号清理，任务结算等待线程实际退出；终止失败时保留等待，由宿主截止与隔离。严格的进度/结果/错误消息经过 JSON、大小和 schema 校验，模块公开输出仍独立校验。不在主线程回退执行，不常驻空闲线程；原始异常不进入窗口或日志。构建独立 worker 入口，生产文件与打包资源均有真实 Electron 验收，详见 [工作线程](worker-tasks.md)。
 
 ## 自动边界检查
 

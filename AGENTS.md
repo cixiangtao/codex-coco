@@ -38,6 +38,7 @@
 - pnpm run profile:desktop / profile:packaged：显式采样生产文件/打包应用的启动和全进程资源，使用临时数据，不作为性能达标声明。
 - pnpm run verify:menu-bar：验证真实菜单栏回调、只读窗口权限、速览状态/主题同步、开合和主窗口重开。
 - pnpm run verify:modules：生产入口的真实模块链路回归，仅注册合成模块并使用临时数据，结束后清理。
+- pnpm run verify:workers：验证真实 Electron 中独立 worker 构建入口、进度、结果与实际退出；打包回归包含同一资源验证。
 - pnpm run verify:desktop：生产入口的真实 Electron 回归，使用临时数据，结束后清理。
 - pnpm run pack：本机未签名的 macOS 应用目录；必须写 run，避免调用 pnpm 内置 pack。
 - pnpm run verify:packaged：生成并验证 macOS arm64 本地应用本身。
@@ -46,7 +47,7 @@
 
 改变生命周期、数据解析或 IPC 时，增加针对合同的测试；界面实现后通过真实 Electron 验证。修改后执行对应检查；干净安装和构建在工具链变更时验证，不因纯文档修改重复整套桌面回归。
 
-正式主窗口采用已认可的精简侧栏，布局基线见 DESIGN.md；base-nova 和工程配色预设不代表最终品牌视觉。独立局部主题作用域和 worker 服务仍是后续基建目标；本地有界诊断与可复现性能采样已接入；不要把本轮基线描述为 F01–F15 全部完成。
+正式主窗口采用已认可的固定图标侧栏与菜单提示，布局基线见 DESIGN.md；base-nova 和工程配色预设不代表最终品牌视觉。按任务工作线程、本地有界诊断与可复现性能采样已接入；独立局部主题作用域仍是后续基建目标；不要把本轮基线描述为 F01–F15 全部完成。
 
 模块接入使用 application/module-host.ts 的 BuiltinModule 合同。后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册；模块自己的纯 contract.ts 与 renderer/ 分别接受合同和浏览器边界检查。配置仅包含可公开的偏好，不保存凭据或私有数据；配置变化供下一次操作使用。CODEX_COCO_FIXTURES=1 仅允许未打包验证环境加载合成模块，打包应用始终禁用示例。真实业务注册表仍为空。
 
@@ -55,3 +56,5 @@
 窗口交互提案独立放在 renderer/design-review，通过 pnpm run design:review 查看，不接入正常 Electron 入口或真实业务。用户认可侧栏布局方向并要求参考 Codex 客户端精简导航，目前默认 A 精简侧栏并保留 B/C 对照；正式 Electron 已独立实现 A 的布局，视觉细节仍可打磨。主窗口承载完整模块能力，菜单栏悬浮窗跨模块速览。异常时优先展示恢复路径，旧数据默认收起。详见 docs/design-review.md。
 
 菜单栏速览通过主进程注册的窗口身份限制为只读，仅接收 application/glance.ts 的公开状态投影，不接收完整模块事件、配置或结果。跳转只接受固定 MainPage；新摘要数据或业务刷新接入时同步合同、权限与隐私测试。原生生命周期与边界见 docs/menu-bar.md。
+
+重计算通过 application/worker-task.ts 执行。Worker 工厂由组合根静态注入，不接受 renderer 或配置传入的代码路径；禁止失败后回退主线程。取消、停用与退出须等待实际线程退出，终止失败不得伪装清理成功。worker 返回严格 JSON 消息，公开输出仍须模块自己的 schema 校验。构建入口与打包资源一同验证，详见 docs/worker-tasks.md。

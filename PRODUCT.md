@@ -12,7 +12,7 @@ web
 
 Electron、React、TypeScript；Tailwind CSS + shadcn/ui 构建自有组件；pnpm workspace 管理依赖；Oxc 的 Oxfmt 格式化，Oxlint 代码检查，Oxc parser 检查依赖边界。
 
-桌面应用位于 `apps/desktop`，私有 UI 包位于 `packages/ui`。当前已接入可运行 Electron、白名单桌面桥、模块/配置基础、共享组件与受控主题；正式主窗口已采用用户认可的精简侧栏；菜单栏已提供跨模块状态速览；用量/外观业务尚未接入。
+桌面应用位于 `apps/desktop`，私有 UI 包位于 `packages/ui`。当前已接入可运行 Electron、白名单桌面桥、模块/配置基础、工作线程执行器、共享组件与受控主题；正式主窗口已采用用户认可的固定图标侧栏；菜单栏已提供跨模块状态速览；用量/外观业务尚未接入。
 
 ## Users
 
@@ -38,7 +38,7 @@ Electron、React、TypeScript；Tailwind CSS + shadcn/ui 构建自有组件；pn
 
 应用、文档、通知和发布说明使用完整名称 **Codex Coco**；仓库名为 `codex-coco`。没有已确定的 Logo、吉祥物或视觉品牌。用户未认可原型的整体审美；原型布局、绿色配色、双 C 标记和 Ant Design 不构成设计约束。
 
-用户认可侧栏布局方向，提出参考 Codex 客户端并精简侧栏；常用模块与管理设置分组，减少常驻辅助信息，预留折叠能力。精简侧栏已接入正式主窗口，布局与交互基线见 DESIGN.md；独立评审页保留对照方案，配色预设仍可继续打磨。
+用户认可参考 Codex 客户端的精简侧栏方向，后续确定只保留图标模式，并增加主题菜单提示；常用模块与管理设置分组，减少常驻辅助信息。顶部与侧栏共用背景，内容区使用圆角独立表面。布局与交互基线见 DESIGN.md；独立评审页保留对照方案，配色预设仍可继续打磨。
 
 ## Evidence on Hand
 
