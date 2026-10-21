@@ -100,3 +100,19 @@ export const appearanceResultSchema = z.strictObject({
 export type AppearanceResult = z.infer<typeof appearanceResultSchema>;
 export const emptyAppearanceInput = z.strictObject({});
 export const assetInputSchema = z.strictObject({ id: assetIdSchema });
+
+/** Illustrations keep their nearest edge as the reference, including oversized images. */
+export function illustrationPosition(x: number, y: number) {
+  const axis = (value: number, start: string, end: string) =>
+    value === 50 ? "center" : value < 50 ? `${start} ${value}%` : `${end} ${100 - value}%`;
+  return `${axis(x, "left", "right")} ${axis(y, "top", "bottom")}`;
+}
+
+/** Shared logical preview canvas; image sizes and blur remain in target CSS pixels. */
+export const previewGeometry = {
+  width: 1000,
+  height: 620,
+  titlebar: 40,
+  rail: 48,
+  sidebar: 260,
+};

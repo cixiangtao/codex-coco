@@ -1,12 +1,30 @@
 import { z } from "zod";
-import { injectionExpression, removalExpression, verificationExpression } from "./css";
+import {
+  injectionExpression,
+  removalExpression,
+  verificationExpression,
+  targetLocationExpression,
+} from "./css";
 
 const targetSchema = z.object({
   type: z.string(),
   url: z.string().max(4096),
   webSocketDebuggerUrl: z.string().max(4096).optional(),
 });
-const probe = `location.href.startsWith('app://-/index.html') && !location.href.includes('avatar-overlay') && document.documentElement.dataset.codexWindowType === 'electron' && Boolean(document.querySelector('[data-app-shell-main-surface], .app-shell-main-content-viewport'))`;
+const probe = `(${targetLocationExpression}) && document.documentElement.dataset.codexWindowType === 'electron'`;
+export function isAppearanceTarget(value: string) {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "app:" &&
+      url.hostname === "-" &&
+      url.pathname === "/index.html" &&
+      !value.includes("avatar-overlay")
+    );
+  } catch {
+    return false;
+  }
+}
 /** Renderer operations are fixed at the host; no arbitrary expression or address comes from IPC. */
 export class AppearanceDiscoveryError extends Error {}
 export interface AppearanceConnection {
@@ -55,12 +73,7 @@ async function targets(port: number, signal: AbortSignal) {
     .array(targetSchema)
     .max(100)
     .parse(JSON.parse(Buffer.concat(chunks).toString()));
-  const accepted = list.filter(
-    (t) =>
-      t.type === "page" &&
-      t.url.startsWith("app://-/index.html") &&
-      !t.url.includes("avatar-overlay"),
-  );
+  const accepted = list.filter((t) => t.type === "page" && isAppearanceTarget(t.url));
   if (!accepted.length || accepted.length > 10) throw new Error("INVALID_TARGET");
   return accepted.map((t) => validateDebuggerUrl(t.webSocketDebuggerUrl ?? "", port));
 }
@@ -161,7 +174,12 @@ export function createAppearanceConnection(): AppearanceConnection {
   return {
     apply: (port, css, signal) => visit(port, injectionExpression(css), signal),
     remove: (port, signal) => visit(port, removalExpression, signal),
-    inspect: (port, signal) => visit(port, "true", signal),
+    inspect: (port, signal) =>
+      visit(
+        port,
+        "Boolean(document.querySelector('[data-app-shell-main-surface], [data-app-shell-main-content-layout], .app-shell-main-content-viewport'))",
+        signal,
+      ),
     verify: (port, signal, css) => visit(port, verificationExpression(css), signal),
   };
 }

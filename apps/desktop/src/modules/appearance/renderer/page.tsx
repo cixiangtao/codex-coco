@@ -6,7 +6,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@codex-coco/ui/components/dialog";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
 import { Field, FieldGroup, FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
@@ -36,15 +36,54 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
   const draft = dirty ? draftState : config.success ? config.data : appearanceDefaults;
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const [previews, setPreviews] = useState<Partial<Record<Layer, string>>>({});
+  const [previews, setPreviews] = useState<Record<string, string>>({});
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [presetTitle, setPresetTitle] = useState("");
   const [libraryLayer, setLibraryLayer] = useState<Layer>("main");
   const task = snapshot.operation;
   const busy = pending || task?.phase === "running" || task?.phase === "cancelling";
   const enabled = snapshot.phase === "running";
-  const parsed = appearanceResultSchema.safeParse(task?.result);
+  const parsed = appearanceResultSchema.safeParse(snapshot.state ?? task?.result);
   const result = parsed.success ? parsed.data : null;
+  const previewRequests = useRef(new Set<string>());
+  const previewInFlight = useRef(false);
+  const selectedImages = useMemo(
+    () => [draft.wallpaper.image, draft.main.image, draft.sidebar.image],
+    [draft.wallpaper.image, draft.main.image, draft.sidebar.image],
+  );
+  useEffect(() => {
+    if (!enabled || busy || previewInFlight.current) return;
+    const id = selectedImages.find((id) => id && !previews[id] && !previewRequests.current.has(id));
+    if (!id) return;
+    previewRequests.current.add(id);
+    previewInFlight.current = true;
+    void (async () => {
+      try {
+        const response = await window.codexCoco.runModuleOperation({
+          moduleId: "appearance",
+          operation: "preview-image",
+          input: { id },
+        });
+        if (!response.ok || !response.value.operation) {
+          previewRequests.current.delete(id);
+          return;
+        }
+        acceptModuleSnapshot(response.value);
+        const operation = await waitForModuleOperation(
+          "appearance",
+          response.value.operation.id,
+          30_000,
+        );
+        const parsed = appearanceResultSchema.safeParse(operation.result);
+        if (parsed.success && parsed.data.preview)
+          setPreviews((previous) => ({ ...previous, [id]: parsed.data.preview! }));
+      } catch {
+        setMessage("部分图片预览未能载入，可以通过重新选择图片重试。");
+      } finally {
+        previewInFlight.current = false;
+      }
+    })();
+  }, [enabled, busy, selectedImages, previews]);
   const conflict = dirty && baseRevision !== snapshot.config.revision;
   function update(next: AppearanceConfig) {
     if (!dirty) setBaseRevision(snapshot.config.revision);
@@ -79,7 +118,8 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
             [layer]: { ...draft[layer], image: result.data.imported, enabled: true },
           });
           const preview = result.data.preview;
-          if (preview) setPreviews((previous) => ({ ...previous, [layer]: preview }));
+          if (preview)
+            setPreviews((previous) => ({ ...previous, [result.data.imported!]: preview }));
         }
       }
     } catch {
@@ -171,7 +211,6 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
               variant="outline"
               onClick={() => {
                 setDirty(false);
-                setPreviews({});
               }}
             >
               载入已保存配置
@@ -278,7 +317,6 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
                     ...draft,
                     [libraryLayer]: { ...draft[libraryLayer], enabled: true, image: item.id },
                   });
-                  setPreviews((previous) => ({ ...previous, [libraryLayer]: item.preview }));
                 }}
               >
                 <img src={item.preview} alt={item.title} className="h-24 w-full object-contain" />
@@ -304,7 +342,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
         images={Object.fromEntries(
           (["wallpaper", "main", "sidebar"] as const).map((layer) => [
             layer,
-            previews[layer] ??
+            (draft[layer].image ? previews[draft[layer].image] : undefined) ??
               result?.gallery.find((item) => item.id === draft[layer].image)?.preview,
           ]),
         )}
@@ -345,7 +383,6 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
               disabled={busy}
               onClick={() => {
                 update({ ...draft, ...preset.look, port: draft.port });
-                setPreviews({});
               }}
             >
               载入预设
@@ -440,16 +477,15 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
                   disabled={busy}
                   onClick={() => {
                     update({ ...draft, [layer]: { ...draft[layer], image: null } });
-                    setPreviews((previous) => ({ ...previous, [layer]: undefined }));
                   }}
                 >
                   清除图片
                 </Button>
               )}
             </div>
-            {previews[layer] && (
+            {draft[layer].image && previews[draft[layer].image] && (
               <img
-                src={previews[layer]}
+                src={previews[draft[layer].image!]}
                 alt={`${labels[layer]}图片预览`}
                 className="max-h-40 max-w-full rounded-lg object-contain"
               />

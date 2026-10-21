@@ -1,5 +1,5 @@
 import type { AppearanceLauncher } from "./launcher";
-import type { GalleryItem } from "./contract";
+import type { GalleryItem, AppearanceFailure } from "./contract";
 import type { BuiltinModule } from "../../application/module-host";
 import { AppearanceAssets } from "./assets";
 import {
@@ -44,6 +44,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
       schema: appearanceConfigSchema,
       migrations: { 1: (value) => appearanceConfigSchema.parse(value) },
     },
+    state: appearanceResultSchema.nullable(),
     operations: Object.fromEntries(
       [
         "inspect",
@@ -73,6 +74,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
       signal.throwIfAborted();
       let stopped = false;
       let active = false;
+      let syncing = false;
       let port: number | null = null;
       let count = 0;
       let cssCache = { key: "", css: "" };
@@ -84,22 +86,36 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
         ? appearanceConfigSchema.parse(host.configuration())
         : null;
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const result = (extra: Partial<AppearanceResult> = {}): AppearanceResult => ({
-        status: "ready",
-        active,
-        targets: count,
-        checkedAt: Date.now(),
-        reason: null,
-        imported: null,
-        preview: null,
-        appSelected: selected,
-        connectedPort: port,
-        gallery,
-        ...extra,
-      });
+      let published: AppearanceResult | null = null;
+      let connectionFailure: AppearanceFailure | null = null;
+      let currentOperation = "";
+      const result = (extra: Partial<AppearanceResult> = {}): AppearanceResult => {
+        const next: AppearanceResult = {
+          status: "ready",
+          active,
+          targets: count,
+          checkedAt: Date.now(),
+          reason: null,
+          imported: null,
+          preview: null,
+          appSelected: selected,
+          connectedPort: port,
+          gallery,
+          ...extra,
+        };
+        if (["apply", "sync", "verify", "remove"].includes(currentOperation))
+          connectionFailure = next.reason;
+        published = {
+          ...next,
+          imported: null,
+          preview: null,
+          ...(connectionFailure ? { status: "error", reason: connectionFailure } : {}),
+        };
+        return next;
+      };
       const schedule = () => {
         clearTimeout(timer);
-        if (!stopped && (active || restoring) && !signal.aborted)
+        if (!stopped && (active || restoring || syncing) && !signal.aborted)
           timer = setTimeout(
             () => {
               if (!host.requestOperation("sync", {})) schedule();
@@ -109,6 +125,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
       };
       const remove = async (cleanup: AbortSignal) => {
         active = false;
+        syncing = false;
         clearTimeout(timer);
         if (port !== null) {
           await connection.remove(port, cleanup);
@@ -127,11 +144,13 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
       );
       schedule();
       return {
+        state: () => published,
         configurationChanged: (value) => {
           if (!appearanceConfigSchema.parse(value).restoreOnEnable) restoring = false;
           schedule();
         },
         execute: async (name, input, context) => {
+          currentOperation = name;
           const config =
             name === "sync" && appliedConfig
               ? appliedConfig
@@ -220,6 +239,12 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
                 context.signal,
                 cssCache.css || undefined,
               );
+              active = port !== null && appliedConfig !== null;
+              return result();
+            }
+            if (!config.wallpaper.enabled && !config.main.enabled && !config.sidebar.enabled) {
+              restoring = false;
+              await remove(context.signal);
               return result();
             }
             const key = JSON.stringify([config.wallpaper, config.main, config.sidebar]);
@@ -238,12 +263,15 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             context.signal.throwIfAborted();
             port = targetPort; // Retain ownership even if only some windows accept the style.
             appliedConfig = config;
+            syncing = true;
             count = await connection.apply(port, css, context.signal);
+            count = await connection.verify(port, context.signal, css);
             active = true;
             failures = 0;
             return result();
           } catch (error) {
             failures++;
+            if (["apply", "sync", "verify"].includes(name)) active = false;
             if (error instanceof AppearanceDiscoveryError && previousPort === null) port = null;
             if (context.signal.aborted && port !== null) await remove(AbortSignal.timeout(2000));
             context.signal.throwIfAborted();
@@ -273,7 +301,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
       };
     },
     glance: (snapshot) => {
-      const parsed = appearanceResultSchema.safeParse(snapshot.operation?.result);
+      const parsed = appearanceResultSchema.safeParse(snapshot.state ?? snapshot.operation?.result);
       if (!parsed.success) return { description: "已启用，等待在主窗口连接并应用布景。" };
       const state = parsed.data;
       if (state.status === "error")

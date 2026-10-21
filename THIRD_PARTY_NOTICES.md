@@ -26,7 +26,7 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 
 `apps/desktop/src/modules/appearance/css.ts` 参考 codex-skin 的三层布景与 Codex DOM 选择器，来源为本地只读仓库 `codex-skin`，提交 `9b88ab8a72417b9a69ac4dea1abda4f4a990c354`。原项目使用 MIT 许可，Copyright (c) 2026 anys。适用 MIT 许可全文见 resources/licenses/codex-skin.txt；根 LICENSE 也保留该声明。
 
-新实现使用 Codex Coco 自己的配置、内容寻址图片库、模块任务和 CDP 连接。未复制旧守护进程、HTTP 设置服务器或配置目录，不操作旧服务；新增菜单栏素材记录如下。样式节点和观察器使用独立标识，撤销仅删除 Codex Coco 自己的布景。
+新实现使用 Codex Coco 自己的配置、内容寻址图片库、模块任务和 CDP 连接。未复制旧守护进程、HTTP 设置服务器或配置目录，不操作旧服务；新增菜单栏素材记录如下。样式节点和观察器使用独立标识，撤销仅删除 Codex Coco 自己的布景。`appearance/contract.ts` 的插画靠边锚点语义同样参考上述 MIT 来源的 `background-position.ts`；独立背景节点、缩略图与预览坐标处理由 Codex Coco 重写。新版数据属性与颜色变量另经本机已安装 webview 资源只读核对，没有复制客户端打包业务代码。
 
 ## 本地用量计数语义参考
 

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { createServer } from "node:net";
+import { rgbaPng } from "../apps/desktop/src/application/png.ts";
 import { createDesktopSession } from "./verify-desktop.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const { _electron } = createRequire(import.meta.url)("playwright");
@@ -23,28 +24,41 @@ const port = server.address().port;
 await new Promise((resolve) => server.close(resolve));
 const fixture = join(directory, "target.cjs");
 const image = join(directory, "picture.png");
-await writeFile(
-  image,
-  Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jGv8AAAAASUVORK5CYII=",
-    "base64",
-  ),
-);
+const pixels = new Uint8Array(100 * 50 * 4);
+for (let y = 0; y < 50; y++)
+  for (let x = 0; x < 100; x++)
+    pixels.set(x < 50 ? [230, 40, 60, 255] : [240, 190, 30, 255], (y * 100 + x) * 4);
+pixels[3] = 0;
+await writeFile(image, rgbaPng(100, 50, pixels));
+// Authored fixture models current stable data attributes and an older fallback layout.
+const fixtureHtml = `<!doctype html><html data-codex-window-type="electron" style="--color-surface:#fff;--app-color-background-shell:#ddd"><head><title>Controlled Codex surface</title><style>
+html,body{margin:0;height:100%;font:14px sans-serif}#shell{position:fixed;inset:0;background:var(--app-color-background-shell)}
+header{height:40px}#workspace{position:absolute;inset:40px 0 0;display:flex;background:white}
+#rail{width:48px;flex:none}#sidebar{position:relative;width:260px;flex:none;background:#eee}
+main{position:relative;flex:1;min-width:0;height:100%;background:var(--color-surface)}
+#viewport{position:absolute;inset:0;background:var(--color-surface);overflow:auto}.long{height:1400px;padding:12px}
+main::before{content:'client decoration';position:absolute;right:10px;top:12px;color:#777;pointer-events:none}
+</style></head><body><div id="shell" data-app-shell-frame data-app-shell-page-surface="true"><header>Controlled titlebar</header><div id="workspace" data-app-shell-workspace-row><nav id="rail">Rail</nav><aside id="sidebar" data-slate-sidebar-content class="sidebar-navigation">Sidebar</aside><main data-app-shell-main-surface="default"><div id="viewport" data-app-shell-main-content-layout="default"><div class="long"><button onclick="this.textContent='Clicked'">Test action</button></div></div></main></div></div></body></html>`;
 await writeFile(
   fixture,
   `const {app, BrowserWindow, protocol} = require('electron');
 app.setName('Codex Coco Appearance Test Target'); app.setPath('userData', ${JSON.stringify(join(directory, "target-data"))});
 app.commandLine.appendSwitch('remote-debugging-port', ${JSON.stringify(String(port))});
 protocol.registerSchemesAsPrivileged([{scheme:'app',privileges:{standard:true,secure:true,supportFetchAPI:true}}]);
-app.whenReady().then(async () => { protocol.handle('app', () => new Response('<!doctype html><html data-codex-window-type="electron" style="--codex-base-surface:#fff"><head><title>Controlled Codex surface</title></head><body style="margin:0"><aside class="app-shell-left-panel" style="width:180px;height:600px;float:left">Sidebar</aside><main data-app-shell-main-surface style="margin-left:180px;height:600px">Controlled main surface</main></body></html>', {headers:{'content-type':'text/html'}})); const w = new BrowserWindow({width:900,height:700,webPreferences:{nodeIntegration:false,contextIsolation:true}}); await w.loadURL('app://-/index.html'); });`,
+app.whenReady().then(async () => { protocol.handle('app', () => new Response(${JSON.stringify(fixtureHtml)}, {headers:{'content-type':'text/html'}})); const w = new BrowserWindow({width:1000,height:720,webPreferences:{nodeIntegration:false,contextIsolation:true}}); await w.loadURL('app://-/index.html'); });`,
 );
 let target, session;
 async function operation(page, name, input = {}) {
-  const response = await page.evaluate(
-    ({ name, input }) =>
-      window.codexCoco.runModuleOperation({ moduleId: "appearance", operation: name, input }),
-    { name, input },
-  );
+  let response;
+  const start = Date.now();
+  do {
+    response = await page.evaluate(
+      ({ name, input }) =>
+        window.codexCoco.runModuleOperation({ moduleId: "appearance", operation: name, input }),
+      { name, input },
+    );
+    if (!response.ok) await delay(100);
+  } while (!response.ok && Date.now() - start < 5000);
   assert.equal(response.ok, true);
   const id = response.value.operation.id;
   let result;
@@ -60,6 +74,140 @@ async function operation(page, name, input = {}) {
   assert.equal(result.phase, "succeeded");
   return result.result;
 }
+async function configure(page, update) {
+  const response = await page.evaluate(async (update) => {
+    const snapshot = (await window.codexCoco.modules()).value.find((m) => m.id === "appearance");
+    const value = snapshot.config.value;
+    for (const [key, patch] of Object.entries(update)) value[key] = { ...value[key], ...patch };
+    return window.codexCoco.saveModuleConfig({
+      moduleId: "appearance",
+      expectedRevision: snapshot.config.revision,
+      value,
+    });
+  }, update);
+  assert.equal(response.ok, true);
+  const result = await operation(page, "apply");
+  assert.equal(result.status, "ready", JSON.stringify(result));
+  return result;
+}
+function expectPixel(actual, expected) {
+  assert(
+    actual.every((channel, index) => Math.abs(channel - expected[index]) <= 2),
+    `Pixel ${actual} does not match ${expected}`,
+  );
+}
+async function pixel(target, targetPage, x, y) {
+  const screenshot = await targetPage.screenshot({ scale: "css", animations: "disabled" });
+  return target.evaluate(
+    ({ nativeImage }, { png, x, y }) => {
+      const image = nativeImage.createFromBuffer(Buffer.from(png, "base64"));
+      const size = image.getSize();
+      const bitmap = image.toBitmap();
+      const offset = (Math.floor(y) * size.width + Math.floor(x)) * 4;
+      return [bitmap[offset + 2], bitmap[offset + 1], bitmap[offset], bitmap[offset + 3]];
+    },
+    { png: screenshot.toString("base64"), x, y },
+  );
+}
+async function verifyLayout(page, targetPage, target, image, output) {
+  await configure(page, {
+    wallpaper: { enabled: false },
+    main: { enabled: true, image, size: 200, x: 0, y: 0, opacity: 1, blur: 0 },
+    sidebar: { enabled: true, image, size: 140, x: 100, y: 100, opacity: 1, blur: 0 },
+  });
+  let main = await targetPage.locator("main").boundingBox(),
+    sidebar = await targetPage.locator("#sidebar").boundingBox();
+  expectPixel(await pixel(target, targetPage, main.x + 30, main.y + 60), [230, 40, 60, 255]);
+  expectPixel(await pixel(target, targetPage, main.x + 170, main.y + 60), [240, 190, 30, 255]);
+  expectPixel(
+    await pixel(
+      target,
+      targetPage,
+      sidebar.x + sidebar.width - 25,
+      sidebar.y + sidebar.height - 25,
+    ),
+    [240, 190, 30, 255],
+  );
+  await targetPage.locator("#viewport").evaluate((e) => {
+    e.scrollTop = 700;
+  });
+  expectPixel(await pixel(target, targetPage, main.x + 30, main.y + 60), [230, 40, 60, 255]);
+  await configure(page, { main: { size: 1200, x: 100, y: 100 } });
+  expectPixel(
+    await pixel(target, targetPage, main.x + main.width - 20, main.y + main.height - 20),
+    [240, 190, 30, 255],
+  );
+  await target.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].setSize(1100, 800);
+  });
+  assert.equal((await operation(page, "verify")).status, "ready");
+  await target.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1.25);
+  });
+  assert.equal((await operation(page, "verify")).status, "ready");
+  await target.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1);
+  });
+  await configure(page, {
+    main: { enabled: false },
+    sidebar: { enabled: false },
+    wallpaper: { enabled: true, image, fit: "contain", x: 50, y: 50, transparency: 1 },
+  });
+  expectPixel(await pixel(target, targetPage, 400, 300), [230, 40, 60, 255]);
+  await configure(page, { wallpaper: { fit: "contain", y: 100 } });
+  expectPixel(await pixel(target, targetPage, 400, 80), [255, 255, 255, 255]);
+  await configure(page, { wallpaper: { fit: "cover" } });
+  expectPixel(await pixel(target, targetPage, 400, 80), [230, 40, 60, 255]);
+  await configure(page, { wallpaper: { transparency: 0 } });
+  expectPixel(await pixel(target, targetPage, 400, 300), [255, 255, 255, 255]);
+  await configure(page, {
+    main: { enabled: true, size: 200, x: 0, y: 0 },
+    sidebar: { enabled: true },
+    wallpaper: { transparency: 0.5 },
+  });
+  // Same attributes can be replaced by client navigation without duplicate layers.
+  await targetPage.locator("#viewport").evaluate((e) => {
+    e.replaceWith(e.cloneNode(true));
+  });
+  await targetPage.locator('[data-codex-coco-surface="main"]').waitFor({ state: "attached" });
+  assert.equal((await operation(page, "verify")).status, "ready");
+  assert.equal(await targetPage.locator('[data-codex-coco-surface="main"]').count(), 1);
+  await targetPage.screenshot({ path: join(output, "modern-layout.png"), scale: "css" });
+  // Missing requested surfaces must fail validation, while revoke remains available.
+  await targetPage.locator("#sidebar").evaluate((e) => {
+    e.removeAttribute("data-slate-sidebar-content");
+  });
+  assert.equal((await operation(page, "apply")).status, "error");
+  assert.equal((await operation(page, "remove")).status, "ready");
+  // The old sidebar class remains a fallback; absolute positioning must survive injection.
+  await targetPage.locator("#sidebar").evaluate((e) => {
+    e.removeAttribute("data-slate-sidebar-content");
+    e.className = "app-shell-left-panel";
+  });
+  assert.equal((await operation(page, "apply")).status, "ready");
+  assert.equal(
+    await targetPage.locator("main").evaluate((e) => getComputedStyle(e).position),
+    "relative",
+  );
+  assert.equal((await operation(page, "verify")).status, "ready");
+  await targetPage.locator("main").evaluate((e) => {
+    e.style.position = "absolute";
+    e.style.inset = "0 0 0 308px";
+  });
+  await operation(page, "apply");
+  assert.equal(
+    await targetPage.locator("main").evaluate((e) => getComputedStyle(e).position),
+    "absolute",
+  );
+  assert.equal((await operation(page, "verify")).status, "ready");
+  await operation(page, "remove");
+  assert.equal(
+    await targetPage.locator("main").evaluate((e) => getComputedStyle(e).position),
+    "absolute",
+  );
+  await operation(page, "apply");
+}
+
 try {
   const environment = { ...process.env };
   delete environment.ELECTRON_RUN_AS_NODE;
@@ -85,7 +233,7 @@ try {
   }, image);
   const library = await operation(page, "list-gallery");
   assert.equal(library.gallery.length, 8);
-  assert(library.gallery.every((item) => item.preview.startsWith("data:image/jpeg;base64,")));
+  assert(library.gallery.every((item) => item.preview.startsWith("data:image/png;base64,")));
   assert(!JSON.stringify(library).includes(directory));
   await page
     .getByRole("button")
@@ -95,8 +243,14 @@ try {
   await drag.focus();
   await drag.press("ArrowLeft");
   assert.equal(await page.locator("#main-x").inputValue(), "81");
+  for (const axis of ["x", "y"]) {
+    const range = page.locator(`#main-${axis}`);
+    await range.focus();
+    await range.press("Home");
+    for (let i = 0; i < 20; i++) await range.press("ArrowRight");
+  }
   await drag.scrollIntoViewIfNeeded();
-  const dragBounds = await drag.boundingBox();
+  const dragBounds = await page.locator('[data-preview-surface="main"]').boundingBox();
   assert(dragBounds);
   await page.mouse.move(
     dragBounds.x + dragBounds.width * 0.3,
@@ -108,8 +262,19 @@ try {
     dragBounds.y + dragBounds.height * 0.6,
   );
   await page.mouse.up();
-  assert.equal(await page.locator("#main-x").inputValue(), "70");
-  assert.equal(await page.locator("#main-y").inputValue(), "60");
+  assert.equal(await page.locator("#main-x").inputValue(), "60");
+  assert.equal(await page.locator("#main-y").inputValue(), "50");
+  await page.mouse.click(
+    dragBounds.x + dragBounds.width * 0.2,
+    dragBounds.y + dragBounds.height * 0.2,
+  );
+  assert.equal(await page.locator("#main-x").inputValue(), "60");
+  const sideBounds = await page.locator('[data-preview-surface="sidebar"]').boundingBox();
+  await page.mouse.move(sideBounds.x + 10, sideBounds.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(sideBounds.x + 30, sideBounds.y + 30);
+  await page.mouse.up();
+  assert.equal(await page.locator("#main-x").inputValue(), "60");
   await page.getByRole("textbox", { name: "预设名称", exact: true }).fill("受控布景预设");
   await page.getByRole("button", { name: "保存为预设", exact: true }).click();
   await page.getByRole("button", { name: "仅保存配置", exact: true }).click();
@@ -126,6 +291,18 @@ try {
   );
   const imported = await operation(page, "import-image");
   assert(imported.imported);
+  const previewDimensions = await target.evaluate(
+    ({ nativeImage }, preview) => nativeImage.createFromDataURL(preview).getSize(),
+    imported.preview,
+  );
+  assert.equal(previewDimensions.width / previewDimensions.height, 2);
+  assert.equal(
+    await target.evaluate(
+      ({ nativeImage }, preview) => nativeImage.createFromDataURL(preview).toBitmap()[3],
+      imported.preview,
+    ),
+    0,
+  );
   assert(!JSON.stringify(imported).includes(directory));
   const updated = await page.evaluate(
     async ({ port, image }) => {
@@ -148,9 +325,22 @@ try {
   assert.equal((await operation(page, "verify")).targets, 1);
   assert.equal(await targetPage.locator("#codex-coco-appearance").count(), 1);
   const pointer = await targetPage
-    .locator("main")
-    .evaluate((e) => getComputedStyle(e, "::before").pointerEvents);
+    .locator('[data-codex-coco-surface="main"]')
+    .evaluate((e) => getComputedStyle(e).pointerEvents);
   assert.equal(pointer, "none");
+  await targetPage
+    .locator('[data-codex-coco-surface="main"]')
+    .evaluate((e) => e.style.setProperty("background-size", "1px", "important"));
+  assert.equal((await operation(page, "verify")).status, "error");
+  assert.equal((await operation(page, "apply")).status, "ready");
+  assert.equal(await targetPage.locator("[data-codex-coco-surface]").count(), 3);
+  assert.equal(
+    await targetPage.locator("main").evaluate((e) => getComputedStyle(e, "::before").content),
+    '"client decoration"',
+  );
+  await targetPage.getByRole("button", { name: "Test action", exact: true }).click();
+  await targetPage.getByRole("button", { name: "Clicked", exact: true }).waitFor();
+  await verifyLayout(page, targetPage, target, imported.imported, output);
   await targetPage.reload();
   await targetPage.locator("#codex-coco-appearance").waitFor({ state: "attached", timeout: 8000 });
   const nextEvent = target.waitForEvent("window");
@@ -160,6 +350,7 @@ try {
   });
   const second = await nextEvent;
   await second.locator("#codex-coco-appearance").waitFor({ state: "attached", timeout: 8000 });
+  await page.getByRole("region", { name: "布景交互预览", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({
     path: join(output, "settings.png"),
     scale: "css",
@@ -174,6 +365,36 @@ try {
   assert.equal(remove.active, false);
   for (const w of [targetPage, second])
     assert.equal(await w.locator("#codex-coco-appearance").count(), 0);
+  // Turning every layer off is an explicit removal, including DOM markers.
+  await page.evaluate(async () => {
+    const snapshot = (await window.codexCoco.modules()).value.find((m) => m.id === "appearance");
+    const value = snapshot.config.value;
+    for (const layer of ["wallpaper", "main", "sidebar"]) value[layer].enabled = false;
+    return window.codexCoco.saveModuleConfig({
+      moduleId: "appearance",
+      expectedRevision: snapshot.config.revision,
+      value,
+    });
+  });
+  assert.equal((await operation(page, "apply")).active, false);
+  assert.equal(
+    await targetPage
+      .locator(
+        "[data-codex-coco-surface],[data-codex-coco-host],[data-codex-coco-clear],[data-codex-coco-paper]",
+      )
+      .count(),
+    0,
+  );
+  await page.evaluate(async () => {
+    const snapshot = (await window.codexCoco.modules()).value.find((m) => m.id === "appearance");
+    const value = snapshot.config.value;
+    for (const layer of ["wallpaper", "main", "sidebar"]) value[layer].enabled = true;
+    return window.codexCoco.saveModuleConfig({
+      moduleId: "appearance",
+      expectedRevision: snapshot.config.revision,
+      value,
+    });
+  });
   await operation(page, "apply");
   const disabled = await page.evaluate(() =>
     window.codexCoco.enableModule({ moduleId: "appearance", enabled: false }),
@@ -204,6 +425,13 @@ try {
       : undefined,
   );
   await targetPage.locator("#codex-coco-appearance").waitFor({ state: "attached", timeout: 10000 });
+  await session.page
+    .getByRole("navigation", { name: "应用导航" })
+    .getByRole("button", { name: "外观", exact: true })
+    .click();
+  await session.page
+    .getByAltText("主面板插画图片预览", { exact: true })
+    .waitFor({ state: "attached" });
   assert.deepEqual(session.errors, []);
   console.log(
     JSON.stringify(
@@ -212,6 +440,11 @@ try {
         packaged,
         controlledTargetOnly: true,
         layers: 3,
+        modernAndLegacyLayout: true,
+        pixelPlacement: true,
+        scrollResizeAndZoom: true,
+        clientPseudoElementPreserved: true,
+        allLayersOffCleanup: true,
         gallery: true,
         keyboardPositioning: true,
         pointerPositioning: true,

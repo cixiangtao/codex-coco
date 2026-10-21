@@ -1,3 +1,4 @@
+import { appearanceThumbnail } from "./appearance-thumbnail";
 import { ApplicationUpdates } from "../../application/updates";
 import { createNativeUpdateEngine } from "./updates";
 import {
@@ -9,7 +10,6 @@ import {
   net,
   protocol,
   dialog,
-  nativeImage,
   Notification,
 } from "electron";
 import { randomUUID } from "node:crypto";
@@ -113,11 +113,7 @@ const definitions = registeredModules(
       resources: app.isPackaged
         ? join(process.resourcesPath, "codex-coco/backgrounds")
         : join(app.getAppPath(), "resources/backgrounds"),
-      thumbnail: async (path) => {
-        const image = await nativeImage.createThumbnailFromPath(path, { width: 144, height: 100 });
-        if (image.isEmpty()) return null;
-        return `data:image/jpeg;base64,${image.toJPEG(55).toString("base64")}`;
-      },
+      thumbnail: (path) => appearanceThumbnail(path, { width: 144, height: 100 }, 24_000),
     }),
     pickImage: async () => {
       const result = await dialog.showOpenDialog({
@@ -127,15 +123,12 @@ const definitions = registeredModules(
       });
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
-    thumbnail: async (id) => {
-      const image = await nativeImage.createThumbnailFromPath(
+    thumbnail: (id) =>
+      appearanceThumbnail(
         join(app.getPath("userData"), "appearance-assets", id),
         { width: 480, height: 320 },
-      );
-      if (image.isEmpty()) return null;
-      const preview = `data:image/jpeg;base64,${image.toJPEG(75).toString("base64")}`;
-      return preview.length < 400_000 ? preview : null;
-    },
+        400_000,
+      ),
   },
   (notification) => {
     if (!Notification.isSupported()) return false;

@@ -1,10 +1,11 @@
-/* oxlint-disable jsx-a11y/prefer-tag-over-role -- Two-axis pointer positioning uses a composite slider; separate native ranges are also provided. */
-import { useState, type CSSProperties } from "react";
+/* oxlint-disable jsx-a11y/prefer-tag-over-role -- Two-axis positioning has separate native ranges below. */
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
 import type { AppearanceConfig } from "../contract";
+import { illustrationPosition, previewGeometry as geometry } from "../contract";
 type Layer = "wallpaper" | "main" | "sidebar";
 const labels = { wallpaper: "全局壁纸", main: "主面板插画", sidebar: "侧栏插画" };
-/** Local composition only; dragging never writes to the target application. */
+/** One logical canvas scales image width, blur and surfaces together. No target writes. */
 export function AppearancePreview({
   value,
   images,
@@ -15,15 +16,45 @@ export function AppearancePreview({
   onChange(value: AppearanceConfig): void;
 }) {
   const [selected, setSelected] = useState<Layer>("main");
+  const [scale, setScale] = useState(0.5);
+  const root = useRef<HTMLDivElement>(null);
+  const surfaces = useRef<Partial<Record<Layer, HTMLDivElement | null>>>({});
+  const drag = useRef<{
+    pointer: number;
+    layer: Layer;
+    x: number;
+    y: number;
+    initialX: number;
+    initialY: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!root.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setScale(entry.contentRect.width / geometry.width);
+    });
+    observer.observe(root.current);
+    return () => observer.disconnect();
+  }, []);
   const layerStyle = (layer: Layer): CSSProperties => ({
     backgroundImage: value[layer].enabled && images[layer] ? `url("${images[layer]}")` : "none",
-    backgroundSize: layer === "wallpaper" ? value.wallpaper.fit : `${value[layer].size / 2}px auto`,
-    backgroundPosition: `${value[layer].x}% ${value[layer].y}%`,
+    backgroundSize: layer === "wallpaper" ? value.wallpaper.fit : `${value[layer].size}px auto`,
+    backgroundPosition:
+      layer === "wallpaper"
+        ? `${value[layer].x}% ${value[layer].y}%`
+        : illustrationPosition(value[layer].x, value[layer].y),
     backgroundRepeat: "no-repeat",
     ...(layer === "wallpaper"
       ? {}
-      : { opacity: value[layer].opacity, filter: `blur(${value[layer].blur / 2}px)` }),
+      : { opacity: value[layer].opacity, filter: `blur(${value[layer].blur}px)` }),
   });
+  const paper = `color-mix(in srgb, var(--background) ${value.wallpaper.enabled && images.wallpaper ? (1 - value.wallpaper.transparency) * 100 : 100}%, transparent)`;
+  const finish = (event: React.PointerEvent<HTMLDivElement>) => {
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+  };
   return (
     <section className="flex flex-col gap-3" aria-label="布景交互预览">
       <h3>本地布景预览</h3>
@@ -32,7 +63,10 @@ export function AppearancePreview({
         variant="outline"
         value={[selected]}
         onValueChange={(items) => {
-          if (items[0] && Object.hasOwn(labels, items[0])) setSelected(items[0] as Layer);
+          if (items[0] && Object.hasOwn(labels, items[0])) {
+            drag.current = null;
+            setSelected(items[0] as Layer);
+          }
         }}
       >
         {(["wallpaper", "main", "sidebar"] as const).map((layer) => (
@@ -42,6 +76,7 @@ export function AppearancePreview({
         ))}
       </ToggleGroup>
       <div
+        ref={root}
         role="slider"
         tabIndex={0}
         aria-label={`${labels[selected]}拖动定位`}
@@ -49,25 +84,48 @@ export function AppearancePreview({
         aria-valuemax={100}
         aria-valuenow={value[selected].x}
         aria-valuetext={`水平 ${value[selected].x}%，垂直 ${value[selected].y}%`}
-        className="relative h-64 touch-none overflow-hidden rounded-xl border outline-offset-4"
-        style={layerStyle("wallpaper")}
+        className="relative touch-none overflow-hidden rounded-xl border outline-offset-4"
+        style={{ aspectRatio: `${geometry.width}/${geometry.height}` }}
         onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          const bounds = surfaces.current[selected]?.getBoundingClientRect();
+          if (
+            !bounds ||
+            event.clientX < bounds.left ||
+            event.clientX > bounds.right ||
+            event.clientY < bounds.top ||
+            event.clientY > bounds.bottom
+          )
+            return;
+          drag.current = {
+            pointer: event.pointerId,
+            layer: selected,
+            x: event.clientX,
+            y: event.clientY,
+            initialX: value[selected].x,
+            initialY: value[selected].y,
+            width: bounds.width,
+            height: bounds.height,
+          };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
-          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const x = Math.round(
-            Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100)),
-          );
-          const y = Math.round(
-            Math.max(0, Math.min(100, ((event.clientY - bounds.top) / bounds.height) * 100)),
-          );
-          onChange({ ...value, [selected]: { ...value[selected], x, y } });
+          const start = drag.current;
+          if (!start || start.pointer !== event.pointerId) return;
+          const clamp = (number: number) => Math.round(Math.max(0, Math.min(100, number)));
+          onChange({
+            ...value,
+            [start.layer]: {
+              ...value[start.layer],
+              x: clamp(start.initialX + ((event.clientX - start.x) / start.width) * 100),
+              y: clamp(start.initialY + ((event.clientY - start.y) / start.height) * 100),
+            },
+          });
         }}
-        onPointerUp={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId))
-            event.currentTarget.releasePointerCapture(event.pointerId);
+        onPointerUp={finish}
+        onPointerCancel={finish}
+        onLostPointerCapture={() => {
+          drag.current = null;
         }}
         onKeyDown={(event) => {
           const axis =
@@ -89,17 +147,33 @@ export function AppearancePreview({
         }}
       >
         <div
-          className="pointer-events-none absolute inset-0 grid grid-cols-[28%_1fr]"
-          style={{
-            backgroundColor: `rgba(250,250,250,${value.wallpaper.enabled ? 1 - value.wallpaper.transparency : 1})`,
-          }}
+          className="pointer-events-none absolute origin-top-left bg-background text-foreground"
+          style={{ width: geometry.width, height: geometry.height, transform: `scale(${scale})` }}
         >
-          <aside className="relative border-r">
+          <div
+            ref={(el) => {
+              surfaces.current.wallpaper = el;
+            }}
+            data-preview-surface="wallpaper"
+            className="absolute inset-0"
+            style={layerStyle("wallpaper")}
+          />
+          <div className="absolute left-4 top-3 text-sm">Codex</div>
+          <div
+            ref={(el) => {
+              surfaces.current.sidebar = el;
+            }}
+            data-preview-surface="sidebar"
+            className="absolute bottom-0 overflow-hidden border-r"
+            style={{
+              left: geometry.rail,
+              top: geometry.titlebar,
+              width: geometry.sidebar,
+              backgroundColor: paper,
+            }}
+          >
             <div className="absolute inset-0" style={layerStyle("sidebar")} />
-            <div className="relative p-4 text-xs text-neutral-600">
-              Codex
-              <br />
-              <br />
+            <div className="relative p-5 text-sm">
               新聊天
               <br />
               <br />
@@ -108,16 +182,27 @@ export function AppearancePreview({
               <br />
               最近
             </div>
-          </aside>
-          <main className="relative">
+          </div>
+          <div
+            ref={(el) => {
+              surfaces.current.main = el;
+            }}
+            data-preview-surface="main"
+            className="absolute bottom-0 right-0 overflow-hidden rounded-tl-xl"
+            style={{
+              left: geometry.rail + geometry.sidebar,
+              top: geometry.titlebar,
+              backgroundColor: paper,
+            }}
+          >
             <div className="absolute inset-0" style={layerStyle("main")} />
-            <div className="relative p-5 text-xs text-neutral-600">今天做点什么？</div>
-          </main>
+            <div className="relative p-7 text-sm">今天做点什么？</div>
+          </div>
         </div>
       </div>
       <p className="text-muted-foreground text-sm">
-        拖动或使用方向键调整{labels[selected]}
-        位置。预览按比例模拟布局，实际效果以目标窗口验证为准；保存并应用后才修改 Codex。
+        在{labels[selected]}区域内拖动或使用方向键定位。预览模拟 1000 × 620
+        窗口，图片宽度和模糊同比缩放；实际效果随目标窗口大小变化。保存并应用后才修改 Codex。
       </p>
     </section>
   );
