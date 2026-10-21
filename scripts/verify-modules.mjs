@@ -10,6 +10,15 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const id = "foundation-fixture";
 const peerId = "foundation-peer";
 
+async function createModuleSession(directory, environment) {
+  const session = await createDesktopSession(directory, environment);
+  await session.page
+    .getByRole("navigation")
+    .getByRole("button", { name: "模块管理", exact: true })
+    .click();
+  return session;
+}
+
 async function snapshots(page) {
   const result = await page.evaluate(() => window.codexCoco.modules());
   assert.equal(result.ok, true);
@@ -40,6 +49,7 @@ async function newWindow(application) {
   });
   const page = await event;
   await page.getByRole("heading", { name: "Codex Coco", exact: true }).waitFor();
+  await page.getByRole("navigation").getByRole("button", { name: "模块管理", exact: true }).click();
   return page;
 }
 
@@ -47,10 +57,10 @@ const directory = await mkdtemp(join(tmpdir(), "codex-coco-module-desktop-"));
 let session;
 const environment = { ...process.env, CODEX_COCO_FIXTURES: "1" };
 try {
-  session = await createDesktopSession(directory, { ...process.env, CODEX_COCO_FIXTURES: "0" });
+  session = await createModuleSession(directory, { ...process.env, CODEX_COCO_FIXTURES: "0" });
   assert.deepEqual(await snapshots(session.page), []);
   await session.application.close();
-  session = await createDesktopSession(directory, environment);
+  session = await createModuleSession(directory, environment);
   const { application, page, errors } = session;
   const panel = page.getByRole("region", { name: "模块验收示例", exact: true });
   const peer = page.getByRole("region", { name: "独立模块示例", exact: true });
@@ -172,6 +182,10 @@ try {
   await application.evaluate(({ app }) => app.emit("activate"));
   const reopened = await reopen;
   await reopened.getByRole("heading", { name: "Codex Coco", exact: true }).waitFor();
+  await reopened
+    .getByRole("navigation")
+    .getByRole("button", { name: "模块管理", exact: true })
+    .click();
   current = (await snapshots(reopened)).find((item) => item.id === id);
   assert.equal(current.operation.name, "count");
   assert.equal(current.config.value.label, "跨窗保存");
@@ -189,7 +203,7 @@ try {
     .scrollIntoViewIfNeeded();
   await reopened.screenshot({ path: join(screenshotDirectory, "module-loop.png"), scale: "css" });
   await application.close();
-  session = await createDesktopSession(directory, environment);
+  session = await createModuleSession(directory, environment);
   current = (await snapshots(session.page)).find((item) => item.id === id);
   assert.equal(current.phase, "running");
   assert.equal(current.config.value.label, "跨窗保存");
@@ -197,7 +211,7 @@ try {
   assert.deepEqual(session.errors, []);
   await session.application.close();
   await writeFile(join(directory, "modules", `${id}.json`), "damaged module config");
-  session = await createDesktopSession(directory, environment);
+  session = await createModuleSession(directory, environment);
   const damaged = session.page.getByRole("region", { name: "模块验收示例", exact: true });
   assert.equal((await snapshots(session.page)).find((item) => item.id === peerId).phase, "running");
   assert.equal(

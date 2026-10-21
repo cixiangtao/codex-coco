@@ -60,17 +60,58 @@ export async function verifyDesktopSession(session) {
   const modules = await page.evaluate(() => window.codexCoco.modules());
   assert.equal(modules.ok, true);
   assert.deepEqual(modules.value, [], "Normal and packaged launches must not register fixtures");
-  assert.equal(await page.getByRole("button", { name: "禁用按钮" }).isDisabled(), true);
+  const nav = page.getByRole("navigation", { name: "应用导航" });
+  assert.deepEqual(await nav.getByRole("button").allTextContents(), [
+    "用量",
+    "外观",
+    "模块管理",
+    "设置",
+  ]);
+  await page.getByRole("heading", { name: "外观模块准备中", exact: true }).waitFor();
+  assert.equal(await page.getByRole("button", { name: "连接 Codex", exact: true }).count(), 0);
+  assert.equal(
+    await page.locator(".traffic-lights").count(),
+    0,
+    "Native controls must not be faked in HTML",
+  );
+  assert.equal(
+    await page
+      .locator(".desktop-titlebar")
+      .evaluate((element) => getComputedStyle(element).webkitAppRegion),
+    "drag",
+  );
+  const toggle = page.getByRole("button", { name: "收起侧栏", exact: true });
+  assert.equal(
+    await toggle.evaluate((element) => getComputedStyle(element).webkitAppRegion),
+    "no-drag",
+  );
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  assert.equal(
+    await page.getByRole("button", { name: "展开侧栏", exact: true }).getAttribute("aria-expanded"),
+    "false",
+  );
+  assert.equal((await page.locator(".desktop-sidebar").boundingBox()).width, 56);
+  await nav.getByRole("button", { name: "用量", exact: true }).click();
+  await page.getByRole("heading", { name: "用量模块准备中", exact: true }).waitFor();
+  await page.getByRole("button", { name: "查看模块管理", exact: true }).click();
+  await page.getByText("当前还没有可启用的模块。", { exact: true }).waitFor();
+  await nav.getByRole("button", { name: "设置", exact: true }).click();
+  assert.equal(
+    await page.getByRole("button", { name: "保存主题", exact: true }).isDisabled(),
+    true,
+  );
   const buttonDisplay = await page
-    .getByRole("button", { name: "默认按钮" })
+    .getByRole("button", { name: "保存主题", exact: true })
     .evaluate((element) => getComputedStyle(element).display);
   assert.ok(["flex", "inline-flex"].includes(buttonDisplay));
   assert.equal(
     await page
-      .getByRole("button", { name: "默认按钮" })
+      .getByRole("button", { name: "保存主题", exact: true })
       .evaluate((element) => getComputedStyle(element).height),
     "32px",
   );
+  await page.getByRole("button", { name: "展开侧栏", exact: true }).click();
   const initialBounds = await application.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].getBounds(),
   );
@@ -103,6 +144,10 @@ export async function verifyDesktopSession(session) {
     "#000000",
   );
   await color.fill("invalid");
+  await nav.getByRole("button", { name: "外观", exact: true }).click();
+  await page.getByRole("heading", { name: "外观模块准备中", exact: true }).waitFor();
+  await nav.getByRole("button", { name: "设置", exact: true }).click();
+  assert.equal(await color.inputValue(), "invalid", "Page navigation must retain draft input");
   assert.equal(
     await page.getByRole("button", { name: "保存主题", exact: true }).isDisabled(),
     true,
@@ -131,21 +176,28 @@ export async function verifyDesktopSession(session) {
   await color.fill("#335dd8");
   await page.getByRole("button", { name: "保存主题", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "主题已保存" }).waitFor();
-  await page.getByRole("button", { name: "查看弹层", exact: true }).click();
+  await page.getByRole("button", { name: "关于 Codex Coco", exact: true }).click();
   await page.getByRole("dialog").waitFor();
-  assert.equal(await page.getByRole("heading", { name: "同一套主题" }).isVisible(), true);
+  assert.equal(
+    await page.getByRole("heading", { name: "Codex Coco", exact: true }).isVisible(),
+    true,
+  );
   assert.equal(
     await page
       .getByRole("dialog")
       .evaluate((element) => getComputedStyle(element).getPropertyValue("--primary").trim()),
     "#335dd8",
   );
-  await page.screenshot({ path: join(output, "dark-dialog.png"), scale: "css" });
+  await page.screenshot({
+    path: join(output, "dark-dialog.png"),
+    scale: "css",
+    animations: "disabled",
+  });
   await page.keyboard.press("Escape");
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   assert.equal(
     await page
-      .getByRole("button", { name: "查看弹层" })
+      .getByRole("button", { name: "关于 Codex Coco" })
       .evaluate((element) => element === document.activeElement),
     true,
   );
@@ -161,6 +213,7 @@ export async function verifyDesktopSession(session) {
   const second = await newWindow;
   await second.getByRole("heading", { name: "Codex Coco", exact: true }).waitFor();
   assert.equal(await primary(second), "#335dd8");
+  await second.getByRole("navigation").getByRole("button", { name: "设置", exact: true }).click();
   await color.fill("#ff00ff");
   assert.equal(await primary(page), "#ff00ff");
   assert.equal(await primary(second), "#335dd8");
@@ -187,11 +240,28 @@ export async function verifyDesktopSession(session) {
   );
   assert.equal(conflict.ok, false);
   assert.equal(conflict.error.code, "CONFLICT");
-  await page.screenshot({ path: join(output, "light.png"), scale: "css" });
+  await page.screenshot({ path: join(output, "light.png"), scale: "css", animations: "disabled" });
   const nativeWindow = await application.browserWindow(page);
   await nativeWindow.evaluate((window) => window.setSize(720, 640));
   await page.waitForFunction(() => innerWidth === 720);
-  await page.screenshot({ path: join(output, "compact.png"), scale: "css" });
+  await page.screenshot({
+    path: join(output, "compact.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  await nav.getByRole("button", { name: "外观", exact: true }).click();
+  await page.screenshot({
+    path: join(output, "appearance.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  await page.getByRole("button", { name: "收起侧栏", exact: true }).click();
+  await nav.getByRole("button", { name: "模块管理", exact: true }).click();
+  await page.screenshot({
+    path: join(output, "collapsed.png"),
+    scale: "css",
+    animations: "disabled",
+  });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.evaluate(() => {
     location.href = "https://example.com/";
@@ -216,7 +286,13 @@ export async function verifyDesktopSession(session) {
   assert.equal(await primary(reopened), "#335dd8");
   return {
     initialBounds,
-    screenshots: ["light.png", "dark-dialog.png", "compact.png"].map((name) => join(output, name)),
+    screenshots: [
+      "light.png",
+      "dark-dialog.png",
+      "compact.png",
+      "appearance.png",
+      "collapsed.png",
+    ].map((name) => join(output, name)),
   };
 }
 

@@ -65,6 +65,9 @@ function createWindow() {
     height: 800,
     minWidth: 720,
     minHeight: 640,
+    ...(process.platform === "darwin"
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 16, y: 18 } }
+      : {}),
     show: false,
     backgroundColor: resolveTheme(theme, mode).background,
     webPreferences: {
