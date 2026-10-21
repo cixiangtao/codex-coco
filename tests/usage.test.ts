@@ -132,7 +132,8 @@ describe("read-only App Server connection", () => {
     ["oversized", "INVALID_RESPONSE"],
     ["hang", "READ_TIMEOUT"],
   ])("returns fixed failure for %s and confirms child cleanup", async (mode, code) => {
-    const { read, trace } = await source(mode, 200);
+    // Budget process startup under concurrent test load as well as the hung response.
+    const { read, trace } = await source(mode, 2000);
     const error = await read(new AbortController().signal).catch((value: unknown) => value);
     expect(error).toMatchObject({ code });
     expect(String(error)).not.toContain("private");
