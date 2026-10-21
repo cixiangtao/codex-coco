@@ -6,7 +6,7 @@
 
 2026-10-21：用户授权移除原型，从零建立新基建。原型源码、测试、依赖、构建配置、设计记录与生成物已从工作树清理，清理前做了仓库外可恢复归档。不要恢复原型或添加兼容层作为默认起点。
 
-已从零建立可运行的 Electron、React、TypeScript 工程，独立 UI 包与主题基础、版本化配置、模块生命周期和白名单桌面桥已接入。正式主窗口使用固定图标侧栏和真实主题设置；用量模块已接入默认停用的 CLI App Server 手动读取，主窗口与菜单栏共享公开额度。外观业务尚未接入。实际状态与未完成目标见 docs/verification.md。
+已从零建立可运行的 Electron、React、TypeScript 工程，独立 UI 包与主题基础、版本化配置、模块生命周期和白名单桌面桥已接入。正式主窗口使用固定图标侧栏和真实主题设置；用量模块已接入默认停用的 CLI App Server 手动读取，主窗口与菜单栏共享公开额度。外观已接入三层布景、自定义图片与显式可撤销的本机 CDP 应用；完整二期目标见 docs/phase-two.md。实际状态与未完成目标见 docs/verification.md。
 
 ## 长期约定
 
@@ -50,7 +50,7 @@
 
 正式主窗口采用已认可的固定图标侧栏与菜单提示，布局基线见 DESIGN.md；base-nova 和工程配色预设不代表最终品牌视觉。按任务工作线程、本地有界诊断与可复现性能采样已接入；独立局部主题作用域仍是后续基建目标；不要把本轮基线描述为 F01–F15 全部完成。
 
-模块接入使用 application/module-host.ts 的 BuiltinModule 合同。后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册；模块自己的纯 contract.ts 与 renderer/ 分别接受合同和浏览器边界检查。配置仅包含可公开的偏好，不保存凭据或私有数据；配置变化供下一次操作使用。CODEX_COCO_FIXTURES=1 仅允许未打包验证环境额外加载合成模块，打包应用始终禁用示例。业务注册表目前包含默认停用的用量模块。
+模块接入使用 application/module-host.ts 的 BuiltinModule 合同。后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册；模块自己的纯 contract.ts 与 renderer/ 分别接受合同和浏览器边界检查。配置仅包含可公开的偏好，不保存凭据或私有数据；配置变化供下一次操作使用。CODEX_COCO_FIXTURES=1 仅允许未打包验证环境额外加载合成模块，打包应用始终禁用示例。业务注册表目前包含默认停用的用量与外观模块。
 
 诊断只经 DiagnosticSink 写入固定字段；禁止传入原始异常、请求、配置、结果、路径或账号内容。新增事件与错误码需同步允许列表。默认最多三个 256 KiB 文件，内存队列同时受条数和字节限制；日志失败不阻塞业务。性能采样只由显式脚本触发，不增加常驻轮询；口径与基线见 docs/diagnostics-and-performance.md 和 docs/performance-baseline.md。
 
@@ -61,3 +61,5 @@
 重计算通过 application/worker-task.ts 执行。Worker 工厂由组合根静态注入，不接受 renderer 或配置传入的代码路径；禁止失败后回退主线程。取消、停用与退出须等待实际线程退出，终止失败不得伪装清理成功。worker 返回严格 JSON 消息，公开输出仍须模块自己的 schema 校验。构建入口与打包资源一同验证，详见 docs/worker-tasks.md。
 
 用量只在主窗口明确操作后启动短期 codex app-server，固定调用 initialize/initialized、account/read(refreshToken:false) 与 account/rateLimits/read；不读取原始令牌，不启动模型对话或登录。启用或重启不自动读取。stdout 在后台限量解析，stderr 丢弃，子进程退出后才结算。BuiltinModule.glance 的公开字段须宿主严格校验；失败时摘要不携带旧额度。详见 docs/usage.md。
+
+二期从 2026-10-21 起要求覆盖两个旧项目的全部能力，按 docs/phase-two.md 逐项推进。用户允许先实现核心功能，UI 后期调整，不再以“只迁核心”缩小二期目标。外观当前固定本机 CDP 端口，三层布景与多窗口重应用已在受控 Electron 页面及打包版验证；真实聊天客户端未操作。外观启用无副作用，应用需明确操作；停用和退出清理自己的样式，不接管旧服务。

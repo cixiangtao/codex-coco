@@ -4,7 +4,7 @@ A Codex desktop companion, shaped around personal workflows.
 
 [中文](README.md)
 
-**Status: local development build with manual usage reads.** The fixed icon sidebar supports four-page navigation, themed tooltips and real theme settings. The usage module reads ChatGPT subscription quotas through the installed Codex CLI, sharing one snapshot between main windows and the menu bar. It is disabled by default and reads only on explicit action. External appearance customization is not implemented. The previous prototype remains removed and archived.
+**Status: local development build with manual usage reads.** The fixed icon sidebar supports four-page navigation, themed tooltips and real theme settings. The usage module reads ChatGPT subscription quotas through the installed Codex CLI, sharing one snapshot between main windows and the menu bar. It is disabled by default and reads only on explicit action. The appearance module supports three independent layers, imported images and explicit reversible application through local CDP. See the [phase-two checklist](docs/phase-two.md) for the complete scope. The previous prototype remains removed and archived.
 
 ## Development
 
@@ -55,7 +55,7 @@ Themes support light/dark/system modes, engineering presets and custom HEX prima
 
 Default application settings live under `~/Library/Application Support/Codex Coco/foundation/`, isolated from the archived prototype. Override this with `CODEX_COCO_DATA_DIR` for development. Automated desktop verification uses and removes temporary directories.
 
-Usage reads occur only on explicit action through the CLI; public snapshots exclude emails and tokens. There is no appearance injection, telemetry or cloud synchronization. The old repositories and existing application data are untouched. This remains a local-only repository. The generated application uses Electron's default icon, is unsigned and unnotarized, and has no public release or update channel.
+Usage reads occur only on explicit action through the CLI; public snapshots exclude emails and tokens. Appearance changes require an explicit main-window action and are removed when the module stops. There is no telemetry or cloud synchronization. The old repositories and existing application data are untouched. This remains a local-only repository. The generated application uses Electron's default icon, is unsigned and unnotarized, and has no public release or update channel.
 
 See the [main-window notes](docs/main-window.md), [design baseline](DESIGN.md), [architecture](docs/architecture.md), [theme proposal and implementation status](docs/ui-package-and-theme.md), [verification record](docs/verification.md), and [foundation plan](docs/foundation-plan.md).
 
