@@ -33,7 +33,7 @@ export type ErrorCode =
   | "MODULE_BUSY";
 export type Result<T> =
   | { ok: true; value: T }
-  | { ok: false; error: { code: ErrorCode; message: string } };
+  | { ok: false; error: { code: ErrorCode; message: string; correlationId?: string } };
 
 /** Whitelisted bridge; never exposes raw IPC channels, events or system APIs. */
 export interface DesktopBridge {

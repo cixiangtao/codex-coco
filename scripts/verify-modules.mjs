@@ -70,6 +70,7 @@ try {
     ],
     id,
   );
+  for (const result of invalid) assert.match(result.error.correlationId, /^[0-9a-f-]{36}$/);
   assert.deepEqual(
     invalid.map((result) => result.error.code),
     ["UNKNOWN_OPERATION", "INVALID_INPUT", "INVALID_INPUT"],
@@ -211,6 +212,40 @@ try {
   assert.ok(backup);
   assert.equal(await readFile(join(directory, "modules", backup), "utf8"), "damaged module config");
   assert.deepEqual(session.errors, []);
+  await session.application.close();
+  session = undefined;
+  const logDirectory = join(directory, "diagnostics");
+  const logFiles = await readdir(logDirectory);
+  const logText = (
+    await Promise.all(logFiles.map((name) => readFile(join(logDirectory, name), "utf8")))
+  ).join("");
+  assert.ok(logFiles.length <= 3);
+  for (const secret of ["跨窗保存", "未保存草稿", "独立配置", "damaged module config"])
+    assert.equal(logText.includes(secret), false);
+  const records = logText
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  assert.ok(records.some((item) => item.event === "app.shutdown"));
+  assert.ok(records.some((item) => item.event === "task.finish" && item.outcome === "cancelled"));
+  for (const result of invalid)
+    assert.ok(
+      records.some(
+        (item) =>
+          item.event === "ipc.complete" &&
+          item.correlationId === result.error.correlationId &&
+          item.errorCode === result.error.code,
+      ),
+    );
+  const startedTask = records.find((item) => item.event === "task.start");
+  assert.ok(
+    records.some(
+      (item) =>
+        item.event === "ipc.complete" &&
+        item.correlationId === startedTask.correlationId &&
+        item.action === "codex-coco:run-module-operation",
+    ),
+  );
   console.log(
     JSON.stringify(
       {
@@ -219,6 +254,7 @@ try {
         crossWindow: true,
         restartPersistence: true,
         isolatedRecovery: true,
+        safeCorrelatedDiagnostics: true,
         screenshot: join(screenshotDirectory, "module-loop.png"),
       },
       null,

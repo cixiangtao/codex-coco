@@ -13,6 +13,7 @@ import {
   type ModuleSnapshot,
 } from "../contracts/modules";
 import type { ErrorCode } from "../contracts/bridge";
+import { silentDiagnostics, type DiagnosticSink } from "./diagnostics";
 import { ModuleManager } from "./modules";
 import { ModuleConfigStore, type ModuleConfigDefinition } from "./module-config-store";
 
@@ -54,6 +55,7 @@ interface Task {
   pending: Promise<void>;
   settled: boolean;
   reason: "CANCELLED" | "TASK_TIMEOUT";
+  startedAt: number;
   deadline?: ReturnType<typeof setTimeout>;
   cleanupDeadline?: ReturnType<typeof setTimeout>;
 }
@@ -65,6 +67,9 @@ interface Entry {
   control: Promise<unknown>;
   runtime?: ModuleRuntime;
   task?: Task;
+  observedPhase: string;
+  observedGeneration: number;
+  phaseStartedAt: number;
 }
 
 /** Joins lifecycle, configuration and bounded tasks without module-specific gateway branches. */
@@ -77,6 +82,7 @@ export class ModuleHost {
     definitions: readonly BuiltinModule[],
     directory: string,
     private readonly timeoutMs = 2500,
+    private readonly diagnostics: DiagnosticSink = silentDiagnostics,
   ) {
     for (const definition of definitions) {
       moduleIdSchema.parse(definition.id);
@@ -92,6 +98,9 @@ export class ModuleHost {
         revision: 0,
         desired: false,
         control: Promise.resolve(),
+        observedPhase: "disabled",
+        observedGeneration: 0,
+        phaseStartedAt: performance.now(),
       });
     }
     this.manager = new ModuleManager(
@@ -119,7 +128,28 @@ export class ModuleHost {
       timeoutMs,
     );
     this.manager.subscribe(() => {
-      for (const entry of this.entries.values()) this.publish(entry);
+      for (const entry of this.entries.values()) {
+        const status = this.manager.statuses().find((item) => item.id === entry.definition.id)!;
+        if (
+          status.phase !== entry.observedPhase ||
+          status.generation !== entry.observedGeneration
+        ) {
+          const now = performance.now();
+          this.diagnostics.record({
+            event: "module.phase",
+            moduleId: status.id,
+            phase: status.phase,
+            generation: status.generation,
+            durationMs: now - entry.phaseStartedAt,
+            outcome: status.error ? "error" : "ok",
+            ...(status.error ? { errorCode: status.error } : {}),
+          });
+          entry.observedPhase = status.phase;
+          entry.observedGeneration = status.generation;
+          entry.phaseStartedAt = now;
+        }
+        this.publish(entry);
+      }
     });
   }
   private get(id: string) {
@@ -164,6 +194,11 @@ export class ModuleHost {
     await Promise.all(
       [...this.entries.values()].map(async (entry) => {
         const config = await entry.config.load();
+        this.diagnostics.record({
+          event: "module.config",
+          moduleId: entry.definition.id,
+          health: config.health,
+        });
         entry.desired = config.enabled;
         this.publish(entry);
         if (config.enabled && config.health === "ok") {
@@ -231,7 +266,7 @@ export class ModuleHost {
     });
   }
   /** Starts one operation per module; other modules and configuration writes remain independent. */
-  run(input: unknown) {
+  run(input: unknown, correlationId: string = randomUUID()) {
     this.assertOpen();
     const request = this.parse(runModuleOperationSchema, input);
     const entry = this.get(request.moduleId);
@@ -248,7 +283,7 @@ export class ModuleHost {
       throw new ModuleError("MODULE_BUSY", "模块有尚未结束的任务。");
     const task: Task = {
       snapshot: {
-        id: randomUUID(),
+        id: z.uuid().parse(correlationId),
         name: request.operation,
         generation: status.generation,
         phase: "running",
@@ -260,8 +295,16 @@ export class ModuleHost {
       pending: Promise.resolve(),
       settled: false,
       reason: "CANCELLED",
+      startedAt: performance.now(),
     };
     entry.task = task;
+    this.diagnostics.record({
+      event: "task.start",
+      moduleId: request.moduleId,
+      operation: request.operation,
+      correlationId: task.snapshot.id,
+      generation: status.generation,
+    });
     task.pending = Promise.resolve()
       .then(async () => {
         task.controller.signal.throwIfAborted();
@@ -306,6 +349,15 @@ export class ModuleHost {
   private abortTask(entry: Entry, task: Task, reason: Task["reason"] = "CANCELLED") {
     if (task.settled || task.controller.signal.aborted) return;
     task.reason = reason;
+    this.diagnostics.record({
+      event: "task.cancel",
+      moduleId: entry.definition.id,
+      operation: task.snapshot.name,
+      correlationId: task.snapshot.id,
+      generation: task.snapshot.generation,
+      outcome: "requested",
+      ...(reason === "TASK_TIMEOUT" ? { errorCode: reason } : {}),
+    });
     task.controller.abort();
     task.snapshot.phase = "cancelling";
     clearTimeout(task.deadline);
@@ -313,6 +365,16 @@ export class ModuleHost {
       if (task.settled) return;
       task.snapshot.phase = "failed";
       task.snapshot.error = "TASK_UNRESPONSIVE";
+      this.diagnostics.record({
+        event: "task.unresponsive",
+        moduleId: entry.definition.id,
+        operation: task.snapshot.name,
+        correlationId: task.snapshot.id,
+        generation: task.snapshot.generation,
+        outcome: "error",
+        errorCode: "TASK_UNRESPONSIVE",
+        durationMs: performance.now() - task.startedAt,
+      });
       this.publish(entry);
       void this.manager.disable(entry.definition.id).catch(() => undefined);
     }, this.timeoutMs);
@@ -340,6 +402,16 @@ export class ModuleHost {
         : null;
     task.snapshot.result = cancelled || failed ? null : result;
     if (task.snapshot.phase === "succeeded") task.snapshot.progress = 100;
+    this.diagnostics.record({
+      event: "task.finish",
+      moduleId: entry.definition.id,
+      operation: task.snapshot.name,
+      correlationId: task.snapshot.id,
+      generation: task.snapshot.generation,
+      outcome: task.snapshot.error ? "error" : cancelled ? "cancelled" : "ok",
+      ...(task.snapshot.error ? { errorCode: task.snapshot.error } : {}),
+      durationMs: performance.now() - task.startedAt,
+    });
     this.publish(entry);
   }
   /** Rejects new work first, cancels tasks, then drains short config/control queues and cleanup. */

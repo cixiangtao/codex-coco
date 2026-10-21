@@ -1,4 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, nativeTheme, net, protocol, dialog } from "electron";
+import { randomUUID } from "node:crypto";
+import { DiagnosticLog } from "../../application/diagnostics";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SettingsError, SettingsStore } from "../../application/settings-store";
@@ -35,14 +37,25 @@ if (developmentUrl) {
 }
 const entryUrl = developmentUrl ?? productionUrl;
 const windows = new Map<number, BrowserWindow>();
+const definitions = registeredModules(!app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1");
+const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
+  modules: definitions.map((definition) => ({
+    id: definition.id,
+    operations: Object.keys(definition.operations),
+  })),
+});
 const modules = new ModuleHost(
-  registeredModules(!app.isPackaged && process.env.CODEX_COCO_FIXTURES === "1"),
+  definitions,
   join(app.getPath("userData"), "modules"),
+  2500,
+  diagnostics,
 );
+const windowStarts = new Map<number, number>();
 let store: SettingsStore;
 let quitting = false;
 
 function createWindow() {
+  const began = performance.now();
   const theme = store.getSnapshot().settings.theme;
   const mode =
     theme.mode === "system" ? (nativeTheme.shouldUseDarkColors ? "dark" : "light") : theme.mode;
@@ -64,7 +77,11 @@ function createWindow() {
   });
   const contentsId = win.webContents.id;
   windows.set(contentsId, win);
-  win.on("closed", () => windows.delete(contentsId));
+  windowStarts.set(contentsId, began);
+  win.on("closed", () => {
+    windows.delete(contentsId);
+    windowStarts.delete(contentsId);
+  });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (event, url) => {
     if (!isTrustedPage(url, entryUrl)) event.preventDefault();
@@ -74,7 +91,11 @@ function createWindow() {
   );
   win.webContents.session.setPermissionCheckHandler(() => false);
   void win.loadURL(entryUrl).catch(() => {
-    console.error("RENDERER_LOAD_FAILED");
+    diagnostics.record({
+      event: "app.failure",
+      outcome: "error",
+      errorCode: "RENDERER_LOAD_FAILED",
+    });
     win.destroy();
   });
   return win;
@@ -85,19 +106,46 @@ function registerIpc() {
     windows.has(event.sender.id) &&
     event.senderFrame === event.sender.mainFrame &&
     isTrustedPage(event.senderFrame?.url ?? "", entryUrl);
-  function handle<T>(channel: string, operation: (input: unknown) => T | Promise<T>) {
+  function handle<T>(
+    channel: string,
+    operation: (input: unknown, correlationId: string) => T | Promise<T>,
+  ) {
     ipcMain.handle(channel, async (event, input: unknown): Promise<Result<T>> => {
-      if (!trusted(event))
-        return { ok: false, error: { code: "FORBIDDEN", message: "此页面没有操作权限。" } };
-      try {
-        return { ok: true, value: await operation(input) };
-      } catch (error) {
-        if (error instanceof SettingsError || error instanceof ModuleError)
-          return { ok: false, error: { code: error.code, message: error.message } };
-        console.error("DESKTOP_OPERATION_FAILED");
+      const correlationId = randomUUID();
+      const began = performance.now();
+      const record = (errorCode?: string) =>
+        diagnostics.record({
+          event: "ipc.complete",
+          action: channel,
+          correlationId,
+          outcome: errorCode ? "error" : "ok",
+          durationMs: performance.now() - began,
+          ...(errorCode ? { errorCode } : {}),
+        });
+      if (!trusted(event)) {
+        record("FORBIDDEN");
         return {
           ok: false,
-          error: { code: "STORAGE_ERROR", message: "操作未能完成，请检查磁盘权限后重试。" },
+          error: { code: "FORBIDDEN", message: "此页面没有操作权限。", correlationId },
+        };
+      }
+      try {
+        const value = await operation(input, correlationId);
+        record();
+        return { ok: true, value };
+      } catch (error) {
+        if (error instanceof SettingsError || error instanceof ModuleError) {
+          record(error.code);
+          return { ok: false, error: { code: error.code, message: error.message, correlationId } };
+        }
+        record("STORAGE_ERROR");
+        return {
+          ok: false,
+          error: {
+            code: "STORAGE_ERROR",
+            message: "操作未能完成，请检查磁盘权限后重试。",
+            correlationId,
+          },
         };
       }
     });
@@ -109,7 +157,7 @@ function registerIpc() {
   handle(channels.enableModule, (input) => modules.setEnabled(input));
   handle(channels.saveModuleConfig, (input) => modules.saveConfig(input));
   handle(channels.resetModuleConfig, (input) => modules.resetConfig(input));
-  handle(channels.runModuleOperation, (input) => modules.run(input));
+  handle(channels.runModuleOperation, (input, correlationId) => modules.run(input, correlationId));
   handle(channels.cancelModuleOperation, (input) => modules.cancel(input));
   modules.subscribe((snapshot) => {
     for (const win of windows.values()) {
@@ -126,7 +174,16 @@ function registerIpc() {
     return store.reset();
   });
   ipcMain.on(channels.rendererReady, (event) => {
-    if (trusted(event)) windows.get(event.sender.id)?.show();
+    if (!trusted(event)) return;
+    const began = windowStarts.get(event.sender.id);
+    if (began === undefined) return;
+    windowStarts.delete(event.sender.id);
+    windows.get(event.sender.id)?.show();
+    diagnostics.record({
+      event: "window.ready",
+      outcome: "ok",
+      durationMs: performance.now() - began,
+    });
   });
   store.subscribe((snapshot) => {
     for (const win of windows.values()) {
@@ -136,6 +193,8 @@ function registerIpc() {
 }
 
 async function start() {
+  const began = performance.now();
+  diagnostics.record({ event: "app.start" });
   await app.whenReady();
   protocol.handle("app", async (request) => {
     try {
@@ -159,6 +218,7 @@ async function start() {
   await store.load();
   await modules.load();
   registerIpc();
+  diagnostics.record({ event: "app.ready", outcome: "ok", durationMs: performance.now() - began });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
@@ -200,13 +260,19 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   quitting = true;
   void Promise.all([modules.shutdown(), store.flush()])
-    .then(([statuses]) => {
-      if (statuses.some((status) => status.phase === "error"))
-        console.error("MODULE_SHUTDOWN_INCOMPLETE");
+    .then(async ([statuses]) => {
+      const incomplete = statuses.some((status) => status.phase === "error");
+      diagnostics.record({
+        event: "app.shutdown",
+        outcome: incomplete ? "error" : "ok",
+        ...(incomplete ? { errorCode: "MODULE_STOP_FAILED" } : {}),
+      });
+      await diagnostics.close();
       app.quit();
     })
-    .catch(() => {
-      console.error("SHUTDOWN_FAILED");
+    .catch(async () => {
+      diagnostics.record({ event: "app.failure", outcome: "error", errorCode: "SHUTDOWN_FAILED" });
+      await diagnostics.close();
       app.exit(1);
     });
 });
@@ -220,7 +286,9 @@ app.on("second-instance", () => {
 });
 if (!app.requestSingleInstanceLock()) app.quit();
 else
-  void start().catch(() => {
+  void start().catch(async () => {
+    diagnostics.record({ event: "app.failure", outcome: "error", errorCode: "STARTUP_FAILED" });
+    await diagnostics.close();
     dialog.showErrorBox(
       "Codex Coco 无法启动",
       "无法读取应用设置或初始化桌面环境。原文件已保留，请检查目录权限后重试。",
