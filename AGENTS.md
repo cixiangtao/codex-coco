@@ -29,6 +29,7 @@
 - 凭据只在后台读取，不通过 IPC、日志、截图或错误堆栈返回界面。
 - 外观默认关闭；不自动重启 Codex，不停止其他主题工具，不读写旧项目数据目录。
 - 重新引用旧项目代码或资产时同步来源、许可证与差异记录，不自动搬回旧引擎。原型测试结果不作为新实现验收。
+- 长期技术参考：外观（skin，对应 `modules/appearance`）优先参考 [Codex Dream Skin](https://github.com/Fei-Away/Codex-Dream-Skin)，用量（usage）优先参考 [CodexBar](https://github.com/steipete/CodexBar)。开发或修复相关能力时，先核对上游对应源码、文档与测试，再按本项目 Electron / TypeScript 边界实现；参考范围与来源追踪规则见 [技术参考约定](docs/technical-references.md)。
 - 不把包骨架描述为基建完成，不把开发预览描述成完整迁移，不把本地构建描述成签名、公证或发布。
 
 ## 当前验证
