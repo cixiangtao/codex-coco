@@ -46,6 +46,26 @@ const event = (total: number, last: number, offset = 0, email?: string) =>
       privatePrompt: "PRIVATE_PROMPT",
     },
   }) + "\n";
+const turn = (id: string) =>
+  JSON.stringify({ type: "turn_context", payload: { turn_id: id, cwd: "PRIVATE_PATH" } }) + "\n";
+const requestEvent = (owner: string, turn: string, response: string, tokens: number, offset = 0) =>
+  JSON.stringify({
+    type: "token_usage_record",
+    timestamp: stamp(offset),
+    payload: {
+      thread_id: owner,
+      turn_id: turn,
+      response_id: response,
+      usage: {
+        total_tokens: tokens,
+        input_tokens: tokens - 2,
+        cached_input_tokens: 1,
+        output_tokens: 2,
+        reasoning_output_tokens: 1,
+      },
+      privatePrompt: "PRIVATE_PROMPT",
+    },
+  }) + "\n";
 async function fixture() {
   const home = await mkdtemp(join(tmpdir(), "codex-coco-local-"));
   directories.push(home);
@@ -159,6 +179,142 @@ describe("local usage counters and incremental indexing", () => {
     const serialized = await readFile(join(f.request.cacheDirectory, cache), "utf8");
     expect(serialized).not.toMatch(/PRIVATE|privatePrompt|cwd|title|email/);
     expect(JSON.stringify(result)).not.toMatch(/PRIVATE|parent|child|\.jsonl|home|email/);
+  });
+  it("merges shorter continuation files and keeps daily totals stable as each segment grows", async () => {
+    const f = await fixture();
+    const original = join(f.home, "sessions/z-original.jsonl");
+    const continuation = join(f.home, "sessions/a-continuation.jsonl");
+    await writeFile(
+      original,
+      meta("continued") +
+        event(10_000_000, 10_000_000, -86_400_000) +
+        event(20_000_000, 10_000_000, -86_399_000) +
+        event(30_000_000, 10_000_000, -86_398_000),
+    );
+    await writeFile(continuation, meta("continued") + event(430_000_000, 400_000_000));
+    const first = await f.scan();
+    expect(total(first)).toBe(430_000_000);
+    expect(first.trend.points.at(-2)?.tokens).toBe(30_000_000);
+    expect(first.trend.points.at(-1)?.tokens).toBe(400_000_000);
+    expect(total(await f.scan())).toBe(430_000_000);
+    await appendFile(continuation, event(440_000_000, 10_000_000, 1000));
+    expect(total(await f.scan())).toBe(440_000_000);
+    await appendFile(continuation, event(450_000_000, 10_000_000, 2000));
+    await appendFile(continuation, event(460_000_000, 10_000_000, 3000));
+    expect(total(await f.scan())).toBe(460_000_000);
+    expect(total(await scanLocalUsage({ ...f.request, force: true }))).toBe(460_000_000);
+  });
+  it("deduplicates overlapping segments, rate-limit repeats and fork prefixes after merging", async () => {
+    const f = await fixture();
+    const prefix = event(100, 100) + event(160, 60, 1000);
+    await writeFile(join(f.home, "sessions/a.jsonl"), meta("parent") + prefix);
+    await writeFile(
+      join(f.home, "sessions/b.jsonl"),
+      meta("parent") + event(160, 60, 1000) + event(220, 60, 2000) + event(220, 60, 2500),
+    );
+    await copyFile(join(f.home, "sessions/b.jsonl"), join(f.home, "archived_sessions/copy.jsonl"));
+    await writeFile(
+      join(f.home, "sessions/child.jsonl"),
+      meta("child", "parent") +
+        prefix +
+        event(220, 60, 2000) +
+        event(220, 60, 2500) +
+        event(280, 60, 3000),
+    );
+    expect(total(await f.scan())).toBe(280);
+    expect(total(await f.scan())).toBe(280);
+  });
+  it("retains the baseline before the indexing window without attributing it to a recent day", async () => {
+    const f = await fixture();
+    await writeFile(
+      join(f.home, "sessions/original.jsonl"),
+      meta("continued") + event(1000, 1000, -32 * 86_400_000) + event(1100, 100, -86_400_000),
+    );
+    await writeFile(
+      join(f.home, "sessions/continuation.jsonl"),
+      meta("continued") + event(1100, 100, -86_400_000) + event(1200, 100),
+    );
+    const result = await f.scan();
+    expect(total(result)).toBe(200);
+    expect(result.trend.points.at(-2)?.tokens).toBe(100);
+    expect(result.trend.points.at(-1)?.tokens).toBe(100);
+    expect(total(await f.scan())).toBe(200);
+  });
+  it("preserves a zero initial last count and rebuilds the previous index version", async () => {
+    const f = await fixture();
+    await writeFile(
+      join(f.home, "sessions/one.jsonl"),
+      meta("one") + event(1000, 0) + event(1050, 50, 1000),
+    );
+    expect(total(await f.scan())).toBe(50);
+    const cache = join(f.request.cacheDirectory, (await readdir(f.request.cacheDirectory))[0]!);
+    const old = JSON.parse(await readFile(cache, "utf8"));
+    old.version = 2;
+    for (const file of Object.values(old.files) as { records: { delta: number }[] }[])
+      for (const token of file.records) token.delta = 9999;
+    await writeFile(cache, JSON.stringify(old));
+    const rebuilt = await f.scan();
+    expect(total(rebuilt)).toBe(50);
+    expect(rebuilt.trend.reusedFiles).toBe(0);
+    expect((await f.scan()).trend.reusedFiles).toBe(1);
+  });
+  it("prefers owned request records per turn, keeps legacy turns and deduplicates response copies", async () => {
+    const f = await fixture();
+    await writeFile(
+      join(f.home, "sessions/legacy.jsonl"),
+      meta("one") + turn("legacy") + event(100, 100),
+    );
+    const modern =
+      meta("one") +
+      turn("modern") +
+      event(160, 60, 1000) +
+      requestEvent("one", "modern", "PRIVATE_RESPONSE_A", 60, 1000) +
+      requestEvent("one", "modern", "PRIVATE_RESPONSE_B", 30, 2000) +
+      event(190, 30, 2000) +
+      requestEvent("one", "modern", "PRIVATE_RESPONSE_B", 30, 3000) +
+      requestEvent("one", "modern", "PRIVATE_RESPONSE_C", 10, 4000);
+    await writeFile(join(f.home, "sessions/modern.jsonl"), modern);
+    await writeFile(join(f.home, "archived_sessions/copy.jsonl"), modern);
+    const result = await f.scan();
+    expect(total(result)).toBe(200);
+    expect(result.trend.source).toBe("session-events");
+    expect(total(await f.scan())).toBe(200);
+    expect(JSON.stringify(result)).not.toMatch(/PRIVATE|RESPONSE|\.jsonl/);
+    const cache = (await readdir(f.request.cacheDirectory))[0]!;
+    expect(await readFile(join(f.request.cacheDirectory, cache), "utf8")).not.toMatch(
+      /PRIVATE|RESPONSE|privatePrompt|cwd/,
+    );
+  });
+  it("counts request-only turns and excludes inherited parent requests in fork copies", async () => {
+    const f = await fixture();
+    const inherited = requestEvent("parent", "parent-turn", "parent-response", 100);
+    await writeFile(join(f.home, "sessions/parent.jsonl"), meta("parent") + inherited);
+    await writeFile(
+      join(f.home, "sessions/child.jsonl"),
+      meta("child", "parent") +
+        inherited +
+        requestEvent("child", "child-turn", "child-response", 20, 1000),
+    );
+    expect(total(await f.scan())).toBe(120);
+    expect(total(await f.scan())).toBe(120);
+  });
+  it("replaces legacy mirrors after appends and attributes requests to their own local day", async () => {
+    const f = await fixture();
+    const path = join(f.home, "sessions/one.jsonl");
+    await writeFile(path, meta("one") + turn("active") + event(100, 100));
+    expect(total(await f.scan())).toBe(100);
+    await appendFile(path, requestEvent("one", "active", "response-a", 70, -86_400_000));
+    await appendFile(path, requestEvent("one", "active", "response-b", 30));
+    const result = await f.scan();
+    expect(total(result)).toBe(100);
+    expect(result.trend.points.at(-2)?.tokens).toBe(70);
+    expect(result.trend.points.at(-1)?.tokens).toBe(30);
+    await appendFile(
+      path,
+      requestEvent("one", "active", "response-c", 60, 1000) + event(160, 60, 1000),
+    );
+    expect(total(await f.scan())).toBe(160);
+    expect(total(await scanLocalUsage({ ...f.request, force: true }))).toBe(160);
   });
   it("commits only complete lines, reads appended bytes and rebuilds truncations and rewrites", async () => {
     const f = await fixture();

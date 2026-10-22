@@ -274,6 +274,7 @@ export function createUsageModule(
                 days: 30,
                 scope: accountScope,
                 force: trendInputSchema.parse(input).force,
+                refresh: true,
               });
               trend = scan.trend;
               if (

@@ -23,6 +23,8 @@ const count = (value: unknown) =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 const text = (value: unknown) => (typeof value === "string" && value.length <= 300 ? value : null);
 const tokenSchema = z.strictObject({
+  kind: z.enum(["cumulative", "request"]),
+  turn: z.string().nullable(),
   t: z.number(),
   c: z.number().nullable(),
   last: z.number(),
@@ -39,6 +41,7 @@ const entrySchema = z.strictObject({
   head: z.string(),
   session: z.string().nullable(),
   parent: z.string().nullable(),
+  turn: z.string().nullable(),
   cumulative: z.number().nullable(),
   fingerprint: z.string().nullable(),
   records: z.array(tokenSchema).max(MAX_RECORDS),
@@ -47,7 +50,7 @@ const entrySchema = z.strictObject({
 });
 type Entry = z.infer<typeof entrySchema>;
 const cacheSchema = z.strictObject({
-  version: z.literal(2),
+  version: z.literal(3),
   home: z.string(),
   files: z.record(z.string(), entrySchema),
 });
@@ -130,7 +133,12 @@ function quota(raw: Record<string, unknown>, capturedAt: number): UsageSnapshot 
   return parsed.success ? parsed.data : null;
 }
 function consumeLine(line: Buffer, entry: Entry, minimumTimestamp: number) {
-  if (!line.includes('"token_count"') && !line.includes('"session_meta"')) return;
+  if (
+    !["token_count", "token_usage_record", "session_meta", "turn_context", "task_started"].some(
+      (kind) => line.includes(`"${kind}"`),
+    )
+  )
+    return;
   let root: Record<string, unknown>;
   try {
     root = record(JSON.parse(line.toString("utf8")));
@@ -143,9 +151,49 @@ function consumeLine(line: Buffer, entry: Entry, minimumTimestamp: number) {
     entry.parent = text(payload.forked_from_id) ?? text(payload.parent_thread_id);
     return;
   }
-  if (root.type !== "event_msg" || payload.type !== "token_count") return;
+  if (
+    root.type === "turn_context" ||
+    (root.type === "event_msg" && payload.type === "task_started")
+  ) {
+    const turn = text(payload.turn_id);
+    entry.turn = turn ? hash(turn) : null;
+    return;
+  }
+  if (
+    root.type !== "token_usage_record" &&
+    (root.type !== "event_msg" || payload.type !== "token_count")
+  )
+    return;
   const timestamp = typeof root.timestamp === "string" ? Date.parse(root.timestamp) : NaN;
   if (!Number.isFinite(timestamp) || timestamp < 0) return;
+  if (root.type === "token_usage_record") {
+    const owner = text(payload.thread_id);
+    const response = text(payload.response_id);
+    const turn = text(payload.turn_id);
+    const tokens = count(record(payload.usage).total_tokens);
+    if (!owner || !response || !turn || tokens === null) {
+      entry.limited = true;
+      return;
+    }
+    entry.session ??= owner;
+    // Forks may contain the parent's response records; only the owning thread counts them.
+    if (owner !== entry.session) return;
+    appendToken(
+      entry,
+      {
+        kind: "request",
+        turn: hash(turn),
+        t: timestamp,
+        c: null,
+        last: tokens,
+        delta: tokens,
+        fp: hash(`request|${owner}|${response}`),
+        scope: accountScope(payload),
+      },
+      minimumTimestamp,
+    );
+    return;
+  }
   const info = record(payload.info);
   const rates = record(payload.rate_limits);
   const scope = accountScope(rates, payload, info);
@@ -153,7 +201,8 @@ function consumeLine(line: Buffer, entry: Entry, minimumTimestamp: number) {
   if (local && (!entry.latest || entry.latest.data.capturedAt <= timestamp))
     entry.latest = { scope, data: local };
   const c = count(record(info.total_token_usage).total_tokens);
-  const last = count(record(info.last_token_usage).total_tokens) ?? 0;
+  const reportedLast = count(record(info.last_token_usage).total_tokens);
+  const last = reportedLast ?? 0;
   if (c === null && last === 0) return;
   const fp = hash(`${timestamp}|${c}|${last}`);
   if (fp === entry.fingerprint) return;
@@ -161,18 +210,25 @@ function consumeLine(line: Buffer, entry: Entry, minimumTimestamp: number) {
     c === null
       ? last
       : entry.cumulative === null
-        ? last || c
+        ? (reportedLast ?? c)
         : c >= entry.cumulative
           ? c - entry.cumulative
           : last;
   if (c !== null) entry.cumulative = c;
   entry.fingerprint = fp;
-  if (timestamp < minimumTimestamp) return;
+  appendToken(
+    entry,
+    { kind: "cumulative", turn: entry.turn, t: timestamp, c, last, delta, fp, scope },
+    minimumTimestamp,
+  );
+}
+function appendToken(entry: Entry, token: z.infer<typeof tokenSchema>, minimumTimestamp: number) {
+  if (token.t < minimumTimestamp) return;
   if (entry.records.length >= MAX_RECORDS) {
     entry.limited = true;
     return;
   }
-  entry.records.push({ t: timestamp, c, last, delta, fp, scope });
+  entry.records.push(token);
 }
 async function scanFile(path: string, existing: Entry | undefined, minimumTimestamp: number) {
   const handle = await open(path, "r");
@@ -198,6 +254,7 @@ async function scanFile(path: string, existing: Entry | undefined, minimumTimest
         head: hash(Buffer.alloc(0)),
         session: null,
         parent: null,
+        turn: null,
         cumulative: null,
         fingerprint: null,
         records: [],
@@ -254,6 +311,48 @@ async function scanFile(path: string, existing: Entry | undefined, minimumTimest
   } finally {
     await handle.close();
   }
+}
+/** A session may span several rollout files; merge events before computing its cumulative deltas. */
+function mergeSessions(files: Record<string, Entry>) {
+  type Session = Pick<Entry, "parent" | "records" | "latest"> & { requests: Entry["records"] };
+  const groups = new Map<
+    string,
+    Pick<Session, "parent" | "latest"> & { tokens: Map<string, z.infer<typeof tokenSchema>> }
+  >();
+  for (const [key, entry] of Object.entries(files)) {
+    const id = entry.session ?? key;
+    let group = groups.get(id);
+    if (!group) {
+      group = { parent: entry.parent, tokens: new Map(), latest: null };
+      groups.set(id, group);
+    }
+    group.parent ??= entry.parent;
+    for (const token of entry.records) {
+      const previous = group.tokens.get(token.fp);
+      // An overlapping file may begin at this event without its earlier baseline.
+      if (!previous || token.delta < previous.delta) group.tokens.set(token.fp, { ...token });
+    }
+    if (
+      entry.latest &&
+      (!group.latest || entry.latest.data.capturedAt > group.latest.data.capturedAt)
+    )
+      group.latest = entry.latest;
+  }
+  const sessions = new Map<string, Session>();
+  for (const [id, group] of groups) {
+    const sorted = [...group.tokens.values()].sort((left, right) => left.t - right.t);
+    const requests = sorted.filter((token) => token.kind === "request");
+    const records = sorted.filter((token) => token.kind === "cumulative");
+    let cumulative: number | null = null;
+    for (const token of records) {
+      // Keep the first file-derived delta: its baseline may predate the retained window.
+      if (cumulative !== null && token.c !== null)
+        token.delta = token.c >= cumulative ? token.c - cumulative : token.last;
+      if (token.c !== null) cumulative = token.c;
+    }
+    sessions.set(id, { parent: group.parent, records, requests, latest: group.latest });
+  }
+  return sessions;
 }
 /** Indexes only structured counters. No message, prompt, title or raw account content is retained. */
 export async function scanLocalUsage(
@@ -337,12 +436,7 @@ export async function scanLocalUsage(
     }
     report(Math.round((scannedFiles / Math.max(1, paths.length)) * 85));
   }
-  const sessions = new Map<string, Entry>();
-  for (const [key, entry] of Object.entries(next)) {
-    const session = entry.session ?? key;
-    const previous = sessions.get(session);
-    if (!previous || previous.records.length < entry.records.length) sessions.set(session, entry);
-  }
+  const sessions = mergeSessions(next);
   const points = new Map<string, number>();
   const start = new Date(request.now);
   start.setHours(0, 0, 0, 0);
@@ -356,6 +450,9 @@ export async function scanLocalUsage(
   let sawEvents = false;
   let fallback: UsageSnapshot | null = null;
   for (const entry of sessions.values()) {
+    const coveredTurns = new Set(
+      entry.requests.filter((token) => token.t <= request.now).map((token) => token.turn),
+    );
     const parent = entry.parent ? sessions.get(entry.parent) : undefined;
     let prefix = 0;
     if (parent)
@@ -365,7 +462,12 @@ export async function scanLocalUsage(
       )
         prefix++;
     const seen = new Set<string>();
-    for (const token of entry.records.slice(prefix)) {
+    for (const token of [
+      ...entry.records
+        .slice(prefix)
+        .filter((token) => !token.turn || !coveredTurns.has(token.turn)),
+      ...entry.requests,
+    ]) {
       if (seen.has(token.fp)) continue;
       seen.add(token.fp);
       if (token.t > request.now || (request.scope && token.scope && request.scope !== token.scope))
@@ -429,7 +531,7 @@ export async function scanLocalUsage(
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") limited = true;
     }
   }
-  const bytes = JSON.stringify({ version: 2, home: hash(request.home), files: next });
+  const bytes = JSON.stringify({ version: 3, home: hash(request.home), files: next });
   if (Buffer.byteLength(bytes) <= MAX_CACHE) {
     const temporary = `${cachePath}.${randomUUID()}.tmp`;
     try {

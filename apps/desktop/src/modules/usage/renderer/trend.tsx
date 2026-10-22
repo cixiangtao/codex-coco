@@ -214,7 +214,7 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
           <Box gap="md" className="pt-3">
             <p className="usage-source">
               仅提取本机 Codex 记录中的计数，不展示或上传对话。没有账号归属的记录可能来自这台 Mac
-              上使用过的其他账号。
+              上使用过的其他账号。 这里的本机记录不等同于客户端个人资料中的服务端每日统计。
             </p>
             {trend && (
               <p className="usage-source">

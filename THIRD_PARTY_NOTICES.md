@@ -32,6 +32,8 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 
 `modules/usage/local-index.ts` 的累计差值、初次 last_token_usage、fork 继承前缀与归档去重语义参考 codex-usage 同一来源提交（`b33578383a35b0f9d5d67fc67fbf98309b7702f5`，MIT，Copyright (c) 2026 cixiangtao）。实现为新的 TypeScript worker、独立有界索引和公开结果合同，没有复制 Swift 索引文件或读取旧应用配置。MIT 许可全文见根 LICENSE。
 
+2026-10-22 另对照 [CodexBar](https://github.com/steipete/CodexBar) 提交 `932673aa68878faeee2847d5bf5767ca561fd8f0` 的 `docs/codex.md`、`CostUsageScanner.swift`、`CostUsageScanner+CodexFastJSON.swift` 及分页历史合同测试，参考其原生请求优先、镜像去重和分页续写的统计语义。来源采用 MIT，Copyright (c) 2026 Peter Steinberger。Codex Coco 独立实现 TypeScript 的文件分段合并、轮次关联、请求身份哈希、有界索引和测试；没有复制 Swift 代码、数据库或账户数据，没有添加 CodexBar 运行依赖。
+
 ## 固定样本题
 
 用量工具中的糖果题数量与 21 基准参考 codex-usage 的 CodexIntelligenceCheck.swift（同上 MIT 来源提交与作者）。新实现重写问题提示、结构化输出、进程隔离与统计，并独立用动态规划核对期望值，没有迁回 Swift 运行时或界面代码。

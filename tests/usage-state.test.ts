@@ -93,6 +93,9 @@ it("keeps quota, daily statistics and menu text across auxiliary failure, cancel
     expect(summary().metrics?.find((metric) => metric.id === "tokens:today")?.value).toBe(
       "30 tokens",
     );
+    host.run({ moduleId: "usage", operation: "scan-trend", input: { force: false } });
+    await expect.poll(() => snapshot().operation?.phase).toBe("succeeded");
+    expect(local.scan.mock.lastCall?.[2]).toMatchObject({ force: false, refresh: true });
     host.run({ moduleId: "usage", operation: "check-cli", input: {} });
     await expect.poll(() => snapshot().operation?.phase).toBe("failed");
     expect(usageState(snapshot())).toEqual(ready);

@@ -71,9 +71,15 @@ CLI stdout 只在后台解析，stderr 被排空并丢弃；原始响应、账�
 
 配置 v3 增加默认关闭的本地额度回退及 7/14/30 天统计范围。主窗口“扫描本机用量”明确读取 CODEX_HOME（默认 ~/.codex）下的 sessions 和 archived_sessions。可通过系统目录选择器另选记录根目录，私有路径保存在 usage-local/source.json，不进入模块配置、IPC 结果或诊断；取消选择不触发扫描。损坏的源设置报告失败，不静默改扫默认目录。
 
-扫描在独立 usage-worker 中执行，只提取 session_meta 身份关系与 token_count 数值，原始消息与对话不写入索引。索引保存文件身份、完整行偏移、头尾边界指纹、匿名账号关联与结构化计数。追加只读取新完整行；截断、替换和边界变化触发重建；同一 session 的归档副本、重复事件和 fork 继承前缀去重。初始累计值优先使用 last_token_usage，之后使用累计差值，计数重置回退到当前 last 值。
+扫描在独立 usage-worker 中执行，只提取 session_meta 身份关系、turn_context/task_started 的匿名轮次关联、token_count 与 token_usage_record 的计数，原始消息与对话不写入索引。索引保存文件身份、完整行偏移、头尾边界指纹、匿名账号/轮次/响应关联与结构化计数。追加只读取新完整行；截断、替换和边界变化触发重建。同一 session 可以跨多个文件续写，先按事件指纹合并所有分段、按时间排列，再计算累计差值；不能只保留记录最多的文件。归档副本、重叠片段、重复事件和 fork 继承前缀仍去重。首个保留事件沿用文件中计算的增量，避免把日期窗口以前的累计量计到当天；有效 last_token_usage 为零时保留零，计数重置回退到当前 last 值。索引 v3 自动重建旧版本。
 
-结果在内存缓存十分钟，可显式重建。索引按 home 哈希区分，原子写入独立 usage-local/index，最多 32 MiB；最多 20,000 文件、200,000 个近期计数记录、单行 1 MiB，超限、文件不可读或缓存失败标记统计不完整。只统计所选本地日期范围；已知其他账号事件排除，无法归属事件仍明确列出。无法关联当前账号时不冒充账号级用量。
+有原生请求记录的轮次优先使用 token_usage_record.usage.total_tokens，按所属 thread 和 response 的哈希去重，排除分叉里继承的父线程请求；同一轮次的 token_count 作为镜像不再叠加。没有请求记录的旧轮次继续使用累计差值。请求归到各自事件时间所在的本地日期，不用线程创建日期或跨日轮次的最终累计量代替每日消耗。
+
+自动读取允许复用十分钟内的内存结果；主窗口明确点击扫描时绕过这层缓存，仍使用文件增量索引，不必全量重建。索引按 home 哈希区分，原子写入独立 usage-local/index，最多 32 MiB；最多 20,000 文件、200,000 个近期计数记录、单行 1 MiB，超限、文件不可读或缓存失败标记统计不完整。只统计所选本地日期范围；已知其他账号事件排除，无法归属事件仍明确列出。无法关联当前账号时不冒充账号级用量。
+
+每日 token 采用本机原生请求报告的 total_tokens，旧轮次使用累计差值，不会额外叠加缓存输入或推理输出子项；字段累计方式见 [Codex TokenUsageInfo 协议实现](https://github.com/openai/codex/blob/main/codex-rs/protocol/src/protocol.rs)。它表示本机已保存的记录，不保证与客户端个人资料或账号侧统计一致；其他设备、未保存的记录、不同日期范围及统计延迟需分别核对，不以倍率补齐差额。
+
+2026-10-22 对照 [CodexBar 的 Codex 数据源说明](https://github.com/steipete/CodexBar/blob/932673aa68878faeee2847d5bf5767ca561fd8f0/docs/codex.md) 与原生请求解析实现，补齐请求记录和续写文件处理；参考范围和许可证见 THIRD_PARTY_NOTICES.md。本机客户端个人资料的数据源核对及尚未覆盖的范围见 [统计口径核对](usage-statistics.md)。
 
 没有可用 JSONL 事件时，通过 node:sqlite 只读 state_5.sqlite 的 threads.created_at 与 tokens_used。该分布按线程创建日期归集累计 tokens，不能当作实际每日消耗；不与 JSONL 同时相加。无计数时显示缺少记录，不把未知用量说成真实零。
 

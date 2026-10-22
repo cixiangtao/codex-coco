@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, appendFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,7 @@ const packaged = process.argv.includes("--packaged");
 const home = join(directory, "codex");
 const bin = join(directory, "bin");
 await mkdir(join(home, "sessions"), { recursive: true });
+await mkdir(join(home, "archived_sessions"));
 await mkdir(bin);
 await writeFile(
   join(bin, "codex"),
@@ -23,21 +24,62 @@ const event = {
   timestamp: new Date(now - 60_000).toISOString(),
   payload: {
     type: "token_count",
-    info: { total_token_usage: { total_tokens: 1234 }, last_token_usage: { total_tokens: 1234 } },
+    info: {
+      total_token_usage: { total_tokens: 430_000_000 },
+      last_token_usage: { total_tokens: 400_000_000 },
+    },
     rate_limits: {
       primary: { used_percent: 25, window_minutes: 300, resets_at: Math.floor(now / 1000) + 3600 },
     },
     privatePrompt: "PRIVATE_DIALOGUE",
   },
 };
-await writeFile(
-  join(home, "sessions/record.jsonl"),
+const metadata =
   JSON.stringify({
     type: "session_meta",
     payload: { id: "private-session-id", cwd: "PRIVATE_DIRECTORY" },
-  }) +
-    "\n" +
-    JSON.stringify(event) +
+  }) + "\n";
+const requestEvent = (id, tokens, offset = 0) =>
+  JSON.stringify({
+    type: "token_usage_record",
+    timestamp: new Date(now - 60_000 + offset).toISOString(),
+    payload: {
+      thread_id: "private-session-id",
+      turn_id: "private-turn",
+      response_id: id,
+      usage: { total_tokens: tokens },
+      privatePrompt: "PRIVATE_DIALOGUE",
+    },
+  }) + "\n";
+const continuation =
+  metadata +
+  JSON.stringify({ type: "turn_context", payload: { turn_id: "private-turn" } }) +
+  "\n" +
+  requestEvent("private-response-a", 400_000_000) +
+  JSON.stringify(event) +
+  "\n" +
+  requestEvent("private-response-b", 5_000_000, 1000);
+// The shorter continuation must not disappear behind the longer original file.
+await writeFile(join(home, "sessions/continuation.jsonl"), continuation);
+await writeFile(join(home, "archived_sessions/copy.jsonl"), continuation);
+await writeFile(
+  join(home, "sessions/original.jsonl"),
+  metadata +
+    [1, 2, 3]
+      .map((index) =>
+        JSON.stringify({
+          ...event,
+          timestamp: new Date(now - 86_400_000 - 60_000 + index * 1000).toISOString(),
+          payload: {
+            ...event.payload,
+            info: {
+              total_token_usage: { total_tokens: index * 10_000_000 },
+              last_token_usage: { total_tokens: 10_000_000 },
+            },
+          },
+        }),
+      )
+      .join("\n") +
     "\n",
 );
 let session;
@@ -95,11 +137,20 @@ try {
   assert.equal(result.reason, "READ_FAILED");
   assert.equal(
     result.trend.points.reduce((sum, point) => sum + point.tokens, 0),
-    1234,
+    435_000_000,
   );
+  assert.equal(result.trend.points.at(-1).tokens, 405_000_000);
+  assert.equal(result.trend.points.at(-2).tokens, 30_000_000);
   assert.equal(result.trend.source, "session-events");
   assert(!JSON.stringify(result).match(/PRIVATE|private-session|\.jsonl|email/));
-  await page.getByText("30 天 · 1.2K tokens", { exact: true }).waitFor();
+  await page.getByText("30 天 · 435M tokens", { exact: true }).waitFor();
+  await appendFile(
+    join(home, "sessions/continuation.jsonl"),
+    requestEvent("private-response-c", 5_000_000, 2000),
+  );
+  const updated = await task(page, "scan-trend", { force: false });
+  assert.equal(updated.trend.points.at(-1).tokens, 410_000_000);
+  await page.getByText("30 天 · 440M tokens", { exact: true }).waitFor();
   assert(
     (await page.locator(".h-32").boundingBox()).height >= 120,
     "The local activity plot must have a real rendered height",
@@ -150,6 +201,9 @@ try {
         packaged,
         actualWorker: true,
         localTrend: true,
+        continuedSessionAndArchiveDeduplication: true,
+        requestRecordsWithoutDoubleCounting: true,
+        explicitScanBypassesMemoryCache: true,
         explicitFallback: true,
         noPrivateMetadata: true,
         historicalQuotaHidden: true,
