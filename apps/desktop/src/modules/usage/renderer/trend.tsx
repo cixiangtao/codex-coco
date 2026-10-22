@@ -1,3 +1,4 @@
+import { PinBlockButton } from "../../../renderer/components/pin-block";
 import { UsageDailyChart } from "./daily-chart";
 import { formatTokens, formatExactTokens } from "../../../renderer/lib/token-format";
 import {
@@ -35,6 +36,9 @@ export function UsageTokenSummary({ trend }: { trend: TrendSnapshot }) {
             <dt>
               <span aria-hidden="true" />
               {label}
+              <PinBlockButton
+                id={index === 0 ? "usage.today" : index === 1 ? "usage.week" : "usage.month"}
+              />
             </dt>
             <dd title={`${formatExactTokens(value)} tokens`}>
               <strong>{trend.source === "none" ? "暂无数据" : formatTokens(value)}</strong>
@@ -105,6 +109,7 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
             <CardTitle>每日用量</CardTitle>
             <p className="usage-source">本机计数 · 含无归属记录</p>
           </div>
+          <PinBlockButton id="usage.trend" />
           <ToggleGroup
             aria-label="趋势日期范围"
             value={[String(days)]}

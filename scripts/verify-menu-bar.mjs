@@ -133,10 +133,16 @@ export async function verifyMenuBar(packagedExecutable) {
         });
         await window.codexCoco.enableModule({ moduleId: "foundation-fixture", enabled: true });
       });
-      await popup
-        .getByRole("region", { name: "模块验收示例", exact: true })
-        .getByText("运行中", { exact: true })
-        .waitFor();
+      await popup.waitForFunction(async () =>
+        (await window.codexCoco.glance()).value.items.some(
+          (item) => item.id === "foundation-fixture" && item.phase === "running",
+        ),
+      );
+      assert.equal(
+        await popup.getByRole("region", { name: "模块验收示例", exact: true }).count(),
+        0,
+        "Unselected modules cannot bypass the saved information-block layout",
+      );
       const exposed = await popup.evaluate(async () => ({
         summary: await window.codexCoco.glance(),
         events: window.__moduleEvents,
@@ -236,7 +242,7 @@ export async function verifyMenuBar(packagedExecutable) {
       ipcMain.handle("codex-coco:glance", () => value);
     }, last);
     await popup.getByRole("button", { name: "重新读取", exact: true }).click();
-    await popup.getByRole("heading", { name: "用量", exact: true }).waitFor();
+    await popup.getByRole("heading", { name: "订阅额度", exact: true }).waitFor();
     console.log("QA: an older read cannot overwrite a newer pushed summary");
     await application.evaluate(({ ipcMain, BrowserWindow }, value) => {
       ipcMain.removeHandler("codex-coco:glance");
@@ -245,8 +251,10 @@ export async function verifyMenuBar(packagedExecutable) {
         const popup = BrowserWindow.getAllWindows().find((window) => !window.isResizable());
         popup.webContents.send("codex-coco:glance-changed", {
           revision: value.value.revision + 1,
-          items: value.value.items.map((item, index) =>
-            index ? item : { ...item, description: "已收到更新的模块状态" },
+          items: value.value.items.map((item) =>
+            item.id === "appearance"
+              ? { ...item, phase: "running", description: "已收到更新的模块状态" }
+              : item,
           ),
         });
         await new Promise((resume) => setTimeout(resume, 80));

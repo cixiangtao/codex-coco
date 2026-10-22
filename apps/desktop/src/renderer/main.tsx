@@ -1,3 +1,4 @@
+import { initializeGlanceLayout } from "./client/glance-layout";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { applyTheme } from "@codex-coco/ui/theme";
@@ -13,12 +14,15 @@ async function start() {
   if (!context.ok) throw new Error("WINDOW_CONTEXT_UNAVAILABLE");
   document.body.dataset.window = context.value.kind;
   const unsubscribeSettings = await initializeSettings();
+  const unsubscribeLayout =
+    context.value.kind === "main" ? await initializeGlanceLayout() : () => {};
   const unsubscribeSurface =
     context.value.kind === "main" ? await initializeModules() : await initializeGlance();
   window.addEventListener(
     "beforeunload",
     () => {
       unsubscribeSettings();
+      unsubscribeLayout();
       unsubscribeSurface();
     },
     { once: true },

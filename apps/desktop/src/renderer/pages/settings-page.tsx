@@ -1,3 +1,4 @@
+import { GlanceLayoutSettings } from "../glance-layout-settings";
 import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
 import { UpdateSettings } from "../update-settings";
 import { RegisteredModulePage } from "../modules-panel";
@@ -20,7 +21,7 @@ const modeLabels = { light: "浅色", dark: "深色", system: "跟随系统" };
 const presetLabels = { neutral: "中性", blue: "蓝色", violet: "紫色" };
 
 /** Edits the shared host-backed theme with a window-local draft. */
-export function SettingsPage({ editor }: { editor: ThemeEditor }) {
+export function SettingsPage({ editor, active = true }: { editor: ThemeEditor; active?: boolean }) {
   const {
     theme,
     color,
@@ -159,6 +160,7 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
           </SettingsRow>
         </SettingsGroup>
       </section>
+      <GlanceLayoutSettings active={active} />
       <UpdateSettings />
       <RegisteredModulePage moduleId="desktop-tools" />
     </div>

@@ -1,3 +1,4 @@
+import type { GlanceLayoutSnapshot } from "../../contracts/glance-layout";
 import type { UpdateSnapshot } from "../../contracts/updates";
 import type { MainPage } from "../../contracts/windows";
 import type { GlanceSnapshot } from "../../contracts/glance";
@@ -7,6 +8,18 @@ import type { ModuleSnapshot } from "../../contracts/modules";
 import type { SettingsSnapshot } from "../../contracts/settings";
 
 const bridge: DesktopBridge = {
+  glanceLayout: () => ipcRenderer.invoke(channels.glanceLayout),
+  saveGlanceLayout: (input) => ipcRenderer.invoke(channels.saveGlanceLayout, input),
+  resetGlanceLayout: () => ipcRenderer.invoke(channels.resetGlanceLayout),
+  glancePreview: () => ipcRenderer.invoke(channels.glancePreview),
+  onGlanceLayoutChanged: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, snapshot: GlanceLayoutSnapshot) =>
+      listener(snapshot);
+    ipcRenderer.on(channels.glanceLayoutChanged, handler);
+    return () => {
+      ipcRenderer.removeListener(channels.glanceLayoutChanged, handler);
+    };
+  },
   updates: () => ipcRenderer.invoke(channels.updates),
   saveUpdatePreferences: (input) => ipcRenderer.invoke(channels.saveUpdatePreferences, input),
   updateAction: (input) => ipcRenderer.invoke(channels.updateAction, input),

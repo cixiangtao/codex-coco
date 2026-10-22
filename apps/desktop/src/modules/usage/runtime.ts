@@ -428,6 +428,14 @@ export function createUsageModule(
             },
           ]
         : [];
+      const series =
+        state.trend && state.trend.source !== "none"
+          ? {
+              points: state.trend.points.slice(-7),
+              estimated: state.trend.source === "thread-totals",
+              limited: state.trend.limited,
+            }
+          : undefined;
       if (parsed.data.status === "error")
         return { phase: "error", description: usageFailures[parsed.data.reason].title };
       if (parsed.data.status === "tools")
@@ -449,7 +457,7 @@ export function createUsageModule(
           description: parsed.data.reason
             ? "服务额度读取失败，主窗口可查看本机历史记录。"
             : "已读取本机趋势；本机记录不代表当前服务额度。",
-          ...(!parsed.data.reason ? { metrics: statistics } : {}),
+          ...(!parsed.data.reason ? { metrics: statistics, series } : {}),
         };
       const data = parsed.data.data;
       return {
@@ -478,6 +486,7 @@ export function createUsageModule(
             .join(" · ");
         })(),
         capturedAt: data.capturedAt,
+        ...(series ? { series } : {}),
         metrics: [
           ...data.buckets
             .flatMap((bucket, index) =>

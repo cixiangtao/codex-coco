@@ -1,3 +1,4 @@
+import { PinBlockButton } from "../../../renderer/components/pin-block";
 import { useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
@@ -158,7 +159,9 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
   }
   return (
     <section className="flex flex-col gap-5" aria-label="系统与菜单栏设置">
-      <h3>系统与菜单栏</h3>
+      <h3 className="info-block-title">
+        系统与菜单栏 <PinBlockButton id="desktop-tools.status" />
+      </h3>
       {!enabled && (
         <Alert>
           <AlertTitle>系统偏好模块尚未启用</AlertTitle>

@@ -1,5 +1,6 @@
 import type { MainPage } from "./windows";
 import { z } from "zod";
+import type { GlanceLayout } from "./glance-layout";
 
 export type GlancePhase =
   | "unavailable"
@@ -19,6 +20,7 @@ export interface GlanceItem {
   capturedAt?: number;
   statusText?: string;
   identity?: { label: string; plan: string };
+  series?: { points: { day: string; tokens: number }[]; estimated: boolean; limited: boolean };
 }
 /** Explicitly public presentation fields, never an arbitrary module result. */
 export interface GlanceMetric {
@@ -55,10 +57,25 @@ export const glanceDetailSchema = z.strictObject({
   statusText: z.string().max(120).optional(),
   capturedAt: z.number().int().nonnegative().optional(),
   identity: z.strictObject({ label: z.string().max(120), plan: z.string().max(80) }).optional(),
+  series: z
+    .strictObject({
+      points: z
+        .array(
+          z.strictObject({
+            day: z.iso.date(),
+            tokens: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+          }),
+        )
+        .max(7),
+      estimated: z.boolean(),
+      limited: z.boolean(),
+    })
+    .optional(),
 });
 export type GlanceDetail = z.infer<typeof glanceDetailSchema>;
 export interface GlanceSnapshot {
   /** Monotonic within this host session, independent of settings and module revisions. */
   revision: number;
   items: GlanceItem[];
+  layout?: GlanceLayout;
 }

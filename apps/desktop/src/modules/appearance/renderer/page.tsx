@@ -1,3 +1,4 @@
+import { PinBlockButton } from "../../../renderer/components/pin-block";
 import { AppearancePreview } from "./preview";
 import {
   Dialog,
@@ -179,6 +180,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
           <h2>外观</h2>
           <p>壁纸、主面板与侧栏布景</p>
         </div>
+        <PinBlockButton id="appearance.status" />
         <Badge tone={dirty ? "warning" : result?.active ? "success" : "neutral"}>
           {dirty ? "有未保存修改" : result?.active ? "同步中" : enabled ? "未应用布景" : "已停用"}
         </Badge>

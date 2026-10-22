@@ -1,3 +1,4 @@
+import { PinBlockButton } from "../../../renderer/components/pin-block";
 import { Clock3, UserRound } from "lucide-react";
 import { Badge } from "@codex-coco/ui/components/badge";
 import { Box } from "@codex-coco/ui/components/box";
@@ -79,6 +80,11 @@ export function QuotaData({
                 >
                   <CardHeader>
                     <CardTitle>{usageWindowTitle(window)}</CardTitle>
+                    {!historical && (
+                      <PinBlockButton
+                        id={window.kind === "primary" ? "usage.primary" : "usage.secondary"}
+                      />
+                    )}
                     <Badge>
                       {historical ? "历史记录" : `已用 ${Number(window.usedPercent.toFixed(1))}%`}
                     </Badge>

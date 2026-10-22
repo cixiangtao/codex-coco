@@ -190,6 +190,35 @@ try {
     .waitFor();
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => document.querySelectorAll('[role="tooltip"]').length === 0);
+  await page.getByRole("button", { name: "添加到速览：每日用量趋势", exact: true }).click();
+  await page.getByRole("button", { name: "从速览移除每日用量趋势", exact: true }).waitFor();
+  assert(
+    (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value.blocks.includes(
+      "usage.trend",
+    ),
+  );
+  await page.getByRole("button", { name: "从速览移除每日用量趋势", exact: true }).click();
+  await page.getByRole("button", { name: "添加到速览：每日用量趋势", exact: true }).waitFor();
+  for (const label of ["今日消耗", "近 7 天消耗", "近 30 天消耗"]) {
+    assert.equal(
+      await page.getByRole("button", { name: `从速览移除${label}`, exact: true }).count(),
+      1,
+    );
+  }
+  const beforeTokenPin = (await page.evaluate(() => window.codexCoco.glanceLayout())).value;
+  await page.getByRole("button", { name: "从速览移除近 7 天消耗", exact: true }).click();
+  await page.getByRole("button", { name: "添加到速览：近 7 天消耗", exact: true }).waitFor();
+  assert(
+    !(await page.evaluate(() => window.codexCoco.glanceLayout())).value.value.blocks.includes(
+      "usage.week",
+    ),
+  );
+  const restoredPin = await page.evaluate(async (value) => {
+    const current = (await window.codexCoco.glanceLayout()).value;
+    return window.codexCoco.saveGlanceLayout({ expectedRevision: current.revision, value });
+  }, beforeTokenPin.value);
+  assert.equal(restoredPin.ok, true);
+  await page.getByRole("button", { name: "从速览移除近 7 天消耗", exact: true }).waitFor();
   const beforeTabs = (await readFile(trace, "utf8")).split('"method":"spawn"').length;
   await page.getByRole("tab", { name: "辅助工具", exact: true }).click();
   await page.getByRole("button", { name: "开始样本检测", exact: true }).waitFor();
@@ -269,6 +298,17 @@ try {
     window.codexCoco.runModuleOperation({ moduleId: "usage", operation: "refresh", input: {} }),
   );
   assert.equal(denied.error.code, "FORBIDDEN");
+  await popup.keyboard.press("Escape");
+  await page.bringToFront();
+  await page.getByRole("button", { name: "添加到速览：每日用量趋势", exact: true }).click();
+  await toggle();
+  await popup.locator(".glance-trend-block").waitFor();
+  await popup.locator(".glance-trend-block").scrollIntoViewIfNeeded();
+  await capture(popup, "glance-custom-trend");
+  await popup.keyboard.press("Escape");
+  await page.bringToFront();
+  await page.getByRole("button", { name: "从速览移除每日用量趋势", exact: true }).click();
+  await toggle();
   await popup.emulateMedia({ reducedMotion: "reduce" });
   assert.equal(
     await popup
@@ -300,6 +340,11 @@ try {
   await nav.getByRole("button", { name: "设置", exact: true }).click();
   await assertFits(page);
   await capture(page, "settings-light");
+  await page
+    .getByRole("region", { name: "速览面板设置", exact: true })
+    .locator(".glance-editor")
+    .evaluate((node) => node.scrollIntoView({ block: "start" }));
+  await capture(page, "glance-editor-data-light");
   await page.getByRole("button", { name: "深色", exact: true }).click();
   await page.getByRole("button", { name: "保存主题", exact: true }).click();
   await nav.getByRole("button", { name: "用量", exact: true }).click();

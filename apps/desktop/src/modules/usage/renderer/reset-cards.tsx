@@ -1,3 +1,4 @@
+import { PinBlockButton } from "../../../renderer/components/pin-block";
 import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
 import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
 import { useState } from "react";
@@ -54,7 +55,13 @@ export function UsageResetCards({ snapshot }: { snapshot: ModuleSnapshot }) {
   }
   return (
     <section className="flex flex-col gap-3" aria-label="重置卡">
-      <SettingsGroup title="重置卡">
+      <SettingsGroup
+        title={
+          <span className="info-block-title">
+            重置卡 <PinBlockButton id="usage.reset" />
+          </span>
+        }
+      >
         <SettingsRow layout="stacked">
           <FieldLabel>服务可用重置卡</FieldLabel>
           {credits ? (

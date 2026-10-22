@@ -48,7 +48,7 @@ export function App({ initialPage }: { initialPage: PageId }) {
           <ModuleManagementPage />
         </section>
         <section className="desktop-page" aria-label="设置页面" hidden={page !== "settings"}>
-          <SettingsPage editor={editor} />
+          <SettingsPage editor={editor} active={page === "settings"} />
         </section>
         {page !== "settings" && editor.recoveryMessage && (
           <output aria-live="polite" className="desktop-recovery-message">

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-22T06:36:33.189868+00:00",
+  "generatedAt": "2026-10-22T07:20:17.023748+00:00",
   "title": "Design System: Codex Coco",
   "extensions": {
     "colorMeta": {
@@ -125,6 +125,10 @@
       "settings-legend": {
         "displayName": "组外标题",
         "purpose": "SettingsGroup 的 legend，12px / 550。"
+      },
+      "instrument-glance": {
+        "displayName": "速览圆环读数",
+        "purpose": "速览额度环的局部20px字级。"
       }
     },
     "shadows": [
@@ -142,6 +146,11 @@
         "name": "switch-thumb",
         "value": "0 1px 3px color-mix(in srgb, var(--foreground) 18%, transparent)",
         "purpose": "区分开关滑块和轨道。"
+      },
+      {
+        "name": "data-tooltip",
+        "value": "0 4px 20px color-mix(in srgb, var(--foreground) 14%, transparent)",
+        "purpose": "结构化每日计数悬浮信息卡。"
       }
     ],
     "motion": [

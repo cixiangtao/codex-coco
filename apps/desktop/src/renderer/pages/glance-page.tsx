@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Layers3, RefreshCw, Settings2, X } from "lucide-react";
 import { Box } from "@codex-coco/ui/components/box";
-import { GlanceUsage } from "../components/glance-usage";
+import { GlanceBoard } from "../components/glance-board";
 import { Skeleton } from "@codex-coco/ui/components/skeleton";
 import { Button } from "@codex-coco/ui/components/button";
 import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
@@ -9,7 +9,6 @@ import { ThemeProvider } from "@codex-coco/ui/theme";
 import { useSavedSettings } from "../client/settings";
 import { useGlance, refreshGlance } from "../client/glance";
 import type { MainPage } from "../../contracts/windows";
-import { GlanceModule } from "../components/glance-module";
 
 /** Read-only cross-module surface; it follows saved settings, never another window's preview draft. */
 export function GlancePage() {
@@ -140,55 +139,14 @@ export function GlancePage() {
               <Skeleton className="h-16" />
             </Box>
           ) : (
-            <div className="glance-modules">
-              {summary.snapshot.items
-                .filter((item) => item.phase === "error")
-                .map((item) => (
-                  <GlanceModule
-                    key={item.id}
-                    item={item}
-                    busy={busy}
-                    onOpen={() => {
-                      void open(item.page);
-                    }}
-                  />
-                ))}
-              {summary.snapshot.items
-                .filter(
-                  (item) =>
-                    item.phase !== "error" &&
-                    item.metrics?.some((metric) => metric.progress !== undefined),
-                )
-                .map((item) => (
-                  <GlanceUsage
-                    key={item.id}
-                    item={item}
-                    now={now}
-                    busy={busy}
-                    onOpen={() => {
-                      void open(item.page);
-                    }}
-                  />
-                ))}
-              <div className="glance-shortcuts">
-                {summary.snapshot.items
-                  .filter(
-                    (item) =>
-                      item.phase !== "error" &&
-                      !item.metrics?.some((metric) => metric.progress !== undefined),
-                  )
-                  .map((item) => (
-                    <GlanceModule
-                      key={item.id}
-                      item={item}
-                      busy={busy}
-                      onOpen={() => {
-                        void open(item.page);
-                      }}
-                    />
-                  ))}
-              </div>
-            </div>
+            <GlanceBoard
+              snapshot={summary.snapshot}
+              now={now}
+              busy={busy}
+              onOpen={(page) => {
+                void open(page);
+              }}
+            />
           )}
         </main>
         <footer className="glance-actions">

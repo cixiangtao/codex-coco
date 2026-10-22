@@ -1,3 +1,4 @@
+import type { GlanceLayoutSnapshot, SaveGlanceLayout } from "./glance-layout";
 import type { UpdateSnapshot, SaveUpdatePreferences, UpdateAction } from "./updates";
 import type { WindowContext, MainPage } from "./windows";
 import type { GlanceSnapshot } from "./glance";
@@ -11,6 +12,11 @@ import type {
 } from "./modules";
 
 export const channels = {
+  glanceLayout: "codex-coco:glance-layout",
+  saveGlanceLayout: "codex-coco:save-glance-layout",
+  resetGlanceLayout: "codex-coco:reset-glance-layout",
+  glanceLayoutChanged: "codex-coco:glance-layout-changed",
+  glancePreview: "codex-coco:glance-preview",
   updates: "codex-coco:updates",
   saveUpdatePreferences: "codex-coco:save-update-preferences",
   updateAction: "codex-coco:update-action",
@@ -50,6 +56,11 @@ export type Result<T> =
 
 /** Whitelisted bridge; never exposes raw IPC channels, events or system APIs. */
 export interface DesktopBridge {
+  glanceLayout(): Promise<Result<GlanceLayoutSnapshot>>;
+  saveGlanceLayout(input: SaveGlanceLayout): Promise<Result<GlanceLayoutSnapshot>>;
+  resetGlanceLayout(): Promise<Result<GlanceLayoutSnapshot>>;
+  onGlanceLayoutChanged(listener: (snapshot: GlanceLayoutSnapshot) => void): () => void;
+  glancePreview(): Promise<Result<GlanceSnapshot>>;
   updates(): Promise<Result<UpdateSnapshot>>;
   saveUpdatePreferences(input: SaveUpdatePreferences): Promise<Result<UpdateSnapshot>>;
   updateAction(input: UpdateAction): Promise<Result<UpdateSnapshot>>;

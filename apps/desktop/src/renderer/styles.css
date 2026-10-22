@@ -256,7 +256,7 @@ body {
   color: var(--muted-foreground);
   font-size: 11px;
 }
-.usage-token-summary dt > span {
+.usage-token-summary dt > span[aria-hidden="true"] {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -806,18 +806,8 @@ body {
   scrollbar-gutter: stable;
   padding: 2px 1px 4px;
 }
-.glance-modules {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .glance-monitor {
   box-shadow: none;
-}
-.glance-monitor-heading {
-  align-items: center;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
 }
 .glance-identity {
   display: flex;
@@ -825,37 +815,14 @@ body {
   gap: 8px;
   min-width: 0;
 }
-.glance-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-control);
-  background: var(--data-primary-surface);
-  color: var(--data-primary);
-}
 .glance-avatar svg {
   width: 17px;
   height: 17px;
-}
-.glance-identity > div {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 6px;
 }
 .glance-identity h2 {
   font-size: 12px;
   font-weight: 600;
   overflow-wrap: anywhere;
-}
-.glance-identity .coco-badge {
-  font-size: 10px;
-  padding: 1px 5px;
-  margin-top: 0;
 }
 .glance-identity p {
   font-size: 11px;
@@ -920,21 +887,12 @@ body {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
-.glance-activity {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
 .glance-section-label {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 6px;
   margin-bottom: 4px;
-}
-.glance-section-label h3 {
-  font-size: 11px;
-  font-weight: 600;
 }
 .glance-section-label > span {
   font-size: 10px;
@@ -961,28 +919,16 @@ body {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.glance-monitor .glance-statistics strong {
-  white-space: nowrap;
-}
 .glance-statistics dd > span {
   display: block;
   color: var(--muted-foreground);
   font-size: 10px;
-}
-.glance-extra {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
 }
 .glance-extra > div {
   display: flex;
   justify-content: space-between;
   font-size: 11px;
   gap: 8px;
-}
-.glance-extra dt {
-  color: var(--muted-foreground);
 }
 .glance-captured {
   display: flex;
@@ -992,17 +938,8 @@ body {
   font-size: 10px;
   color: var(--muted-foreground);
 }
-.glance-captured > span:first-child {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--data-success);
-}
 .glance-captured > span:last-child {
   margin-left: auto;
-}
-.glance-captured[data-stale="true"] {
-  color: var(--warning);
 }
 .glance-captured[data-stale="true"] > span:first-child {
   background: var(--warning);
@@ -1095,4 +1032,179 @@ body {
 }
 .settings-page .coco-settings-group-body {
   box-shadow: var(--shadow-card);
+}
+
+/* Public information blocks use the same compact surface in preview and menu-bar windows. */
+.pin-block-control {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: auto;
+}
+.pin-block-button {
+  color: var(--muted-foreground);
+}
+.pin-block-button[data-pinned="true"] {
+  color: var(--data-primary);
+}
+.info-block-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.usage-token-summary dt .pin-block-control {
+  margin-left: 2px;
+}
+.usage-token-summary dt .pin-block-control::before {
+  display: none;
+}
+.glance-board {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.glance-board > .coco-card {
+  --card-inset: 8px;
+  gap: 6px;
+  box-shadow: none;
+}
+.glance-board .coco-card-title {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.glance-board .coco-card-title svg {
+  width: 13px;
+  height: 13px;
+  color: var(--data-primary);
+}
+.glance-board .glance-quota .coco-progress-ring {
+  width: 80px;
+  height: 80px;
+}
+.glance-board .glance-quota .coco-progress-ring strong {
+  font-size: 20px;
+}
+.glance-board .glance-quota {
+  gap: 2px;
+}
+.glance-board .glance-quota-reset {
+  font-size: 10px;
+}
+.glance-block-account {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+  margin-top: 3px;
+}
+.glance-block-unit {
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.glance-block-freshness {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.glance-token-grid {
+  display: grid;
+  gap: 6px;
+}
+.glance-token-grid > div {
+  padding: 4px 6px;
+  min-width: 0;
+  border-radius: 8px;
+  background: var(--tone-surface);
+  color: var(--foreground);
+}
+.glance-token-grid dt {
+  font-size: 10px;
+}
+.glance-token-grid dd {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.glance-token-note {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.glance-block-unavailable p {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.glance-mini-chart {
+  display: flex;
+  align-items: flex-end;
+  height: 56px;
+  gap: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.glance-mini-chart > div {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  flex: 1;
+  min-width: 0;
+}
+.glance-mini-chart span {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: var(--data-primary);
+}
+.glance-trend-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  margin-top: 5px;
+}
+.glance-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+.glance-editor .coco-settings-row {
+  column-gap: 8px;
+}
+.glance-editor-actions {
+  display: flex;
+  gap: 2px;
+}
+.glance-editor-preview {
+  min-width: 0;
+}
+.glance-editor-preview > h4 {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.glance-editor-preview > h4 > span {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+.glance-editor-preview > div {
+  padding: 10px;
+  border-radius: var(--radius-card);
+  background: var(--muted);
+  max-height: 520px;
+  overflow: auto;
+}
+@media (max-width: 900px) {
+  .glance-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .glance-editor-preview {
+    max-width: 360px;
+    width: 100%;
+  }
 }

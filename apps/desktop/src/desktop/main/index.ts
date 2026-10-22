@@ -1,3 +1,4 @@
+import { GlanceLayoutStore } from "../../application/glance-layout-store";
 import { appearanceThumbnail } from "./appearance-thumbnail";
 import { ApplicationUpdates } from "../../application/updates";
 import { createNativeUpdateEngine } from "./updates";
@@ -66,6 +67,9 @@ const windows = new Map<number, BrowserWindow>();
 const contexts = new Map<number, WindowContext>();
 let lastMainId: number | undefined;
 let menuBar: MenuBarController | undefined;
+const glanceLayoutStore = new GlanceLayoutStore(
+  join(app.getPath("userData"), "glance-layout.json"),
+);
 let glance: GlanceSnapshot = { revision: 0, items: buildGlanceItems([]) };
 const desktopPreferences = createDesktopPreferences({
   directory: app.getPath("userData"),
@@ -261,13 +265,17 @@ function openMain(page?: MainPage) {
 
 function updateGlance() {
   const items = buildGlanceItems(modules.snapshots(), modules.glanceDetails());
-  if (JSON.stringify(items) === JSON.stringify(glance.items)) return;
-  glance = { revision: glance.revision + 1, items };
+  const layout = glanceLayoutStore.snapshot().value;
+  if (
+    JSON.stringify(items) === JSON.stringify(glance.items) &&
+    JSON.stringify(layout) === JSON.stringify(glance.layout)
+  )
+    return;
+  glance = { revision: glance.revision + 1, items, layout };
   menuBar?.updateSummary(glance);
   desktopPreferences.updateGlance(glance);
   for (const win of windows.values()) {
-    if (!win.isDestroyed() && contexts.get(win.webContents.id)?.kind === "glance")
-      win.webContents.send(channels.glanceChanged, glance);
+    if (!win.isDestroyed()) win.webContents.send(channels.glanceChanged, glance);
   }
 }
 
@@ -321,6 +329,40 @@ function registerIpc() {
       }
     });
   }
+  const publishLayout = () => {
+    const snapshot = glanceLayoutStore.snapshot();
+    try {
+      updateGlance();
+    } catch {
+      // A window/native observer cannot undo preferences already persisted on disk.
+    }
+    for (const win of windows.values())
+      if (!win.isDestroyed() && contexts.get(win.webContents.id)?.kind === "main") {
+        try {
+          win.webContents.send(channels.glanceLayoutChanged, snapshot);
+        } catch {
+          // Other windows and the requesting caller still receive the saved revision.
+        }
+      }
+    return snapshot;
+  };
+  handle(channels.glanceLayout, (input) => {
+    if (input !== undefined) throw new SettingsError("INVALID_INPUT", "速览设置请求无效。");
+    return glanceLayoutStore.snapshot();
+  });
+  handle(channels.glancePreview, (input) => {
+    if (input !== undefined) throw new SettingsError("INVALID_INPUT", "预览请求无效。");
+    return glance;
+  });
+  handle(channels.saveGlanceLayout, async (input) => {
+    await glanceLayoutStore.save(input);
+    return publishLayout();
+  });
+  handle(channels.resetGlanceLayout, async (input) => {
+    if (input !== undefined) throw new SettingsError("INVALID_INPUT", "恢复请求无效。");
+    await glanceLayoutStore.reset();
+    return publishLayout();
+  });
   handle(
     channels.windowContext,
     (input, _correlationId, window) => {
@@ -443,6 +485,7 @@ async function start() {
   });
   store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
   await store.load();
+  await glanceLayoutStore.load();
   await modules.load();
   await updates.load();
   updateGlance();
@@ -500,7 +543,12 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   quitting = true;
   menuBar?.dispose();
-  void Promise.all([modules.shutdown(), store.flush(), updates.shutdown()])
+  void Promise.all([
+    modules.shutdown(),
+    store.flush(),
+    glanceLayoutStore.flush(),
+    updates.shutdown(),
+  ])
     .then(async ([statuses]) => {
       const incomplete = statuses.some((status) => status.phase === "error");
       diagnostics.record({

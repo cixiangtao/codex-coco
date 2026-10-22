@@ -26,7 +26,7 @@
     "verify:usage": "pnpm run build && node scripts/verify-usage.mjs",
     "verify:usage-parity": "pnpm run build && node scripts/verify-usage-parity.mjs",
     "verify:desktop": "pnpm run build && node scripts/verify-desktop.mjs",
-    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged && node scripts/verify-menu-bar.mjs --packaged && node scripts/verify-workers.mjs --packaged && node scripts/verify-usage.mjs --packaged && node scripts/verify-appearance.mjs --packaged && node scripts/verify-usage-policy.mjs --packaged && node scripts/verify-local-usage.mjs --packaged && node scripts/verify-usage-reset.mjs --packaged && node scripts/verify-usage-tools.mjs --packaged && node scripts/verify-desktop-preferences.mjs --packaged && node scripts/verify-updates.mjs --packaged && node scripts/verify-usage-parity.mjs --packaged && node scripts/verify-tray-colors.mjs --packaged",
+    "verify:packaged": "pnpm run pack && node scripts/verify-desktop.mjs --packaged && node scripts/verify-menu-bar.mjs --packaged && node scripts/verify-glance-layout.mjs --packaged && node scripts/verify-workers.mjs --packaged && node scripts/verify-usage.mjs --packaged && node scripts/verify-appearance.mjs --packaged && node scripts/verify-usage-policy.mjs --packaged && node scripts/verify-local-usage.mjs --packaged && node scripts/verify-usage-reset.mjs --packaged && node scripts/verify-usage-tools.mjs --packaged && node scripts/verify-desktop-preferences.mjs --packaged && node scripts/verify-updates.mjs --packaged && node scripts/verify-usage-parity.mjs --packaged && node scripts/verify-tray-colors.mjs --packaged",
     "verify:menu-bar": "pnpm run build && node scripts/verify-menu-bar.mjs",
     "design:review": "pnpm --filter @codex-coco/desktop run design:review",
     "design:build": "pnpm --filter @codex-coco/desktop run design:build",
@@ -40,6 +40,7 @@
     "verify:updates": "pnpm run build && node scripts/verify-updates.mjs",
     "verify:appearance-launcher": "node scripts/verify-appearance-launcher.mjs",
     "verify:tray-colors": "pnpm run build && node scripts/verify-tray-colors.mjs",
+    "verify:glance-layout": "pnpm run build && node scripts/verify-glance-layout.mjs",
     "verify:ui": "pnpm run build && node scripts/verify-ui-instruments.mjs"
   },
   "devDependencies": {
