@@ -18,7 +18,6 @@ export const channels = {
   reorderGlanceLayout: "codex-coco:reorder-glance-layout",
   resetGlanceLayout: "codex-coco:reset-glance-layout",
   glanceLayoutChanged: "codex-coco:glance-layout-changed",
-  glancePreview: "codex-coco:glance-preview",
   updates: "codex-coco:updates",
   saveUpdatePreferences: "codex-coco:save-update-preferences",
   updateAction: "codex-coco:update-action",
@@ -67,7 +66,6 @@ export interface DesktopBridge {
   reorderGlanceLayout(input: ReorderGlanceLayout): Promise<Result<GlanceLayoutSnapshot>>;
   resetGlanceLayout(): Promise<Result<GlanceLayoutSnapshot>>;
   onGlanceLayoutChanged(listener: (snapshot: GlanceLayoutSnapshot) => void): () => void;
-  glancePreview(): Promise<Result<GlanceSnapshot>>;
   updates(): Promise<Result<UpdateSnapshot>>;
   saveUpdatePreferences(input: SaveUpdatePreferences): Promise<Result<UpdateSnapshot>>;
   updateAction(input: UpdateAction): Promise<Result<UpdateSnapshot>>;

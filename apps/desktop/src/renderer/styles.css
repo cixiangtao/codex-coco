@@ -1166,19 +1166,6 @@ body {
   color: var(--muted-foreground);
   margin-top: 5px;
 }
-.glance-editor {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 24px;
-  align-items: start;
-}
-.glance-editor .coco-settings-row {
-  column-gap: 8px;
-}
-.glance-editor-actions {
-  display: flex;
-  gap: 2px;
-}
 .glance-reorder {
   display: flex;
   flex-direction: column;
@@ -1265,36 +1252,6 @@ body {
   top: 2px;
   right: 0;
 }
-.glance-editor-preview {
-  min-width: 0;
-}
-.glance-editor-preview > h4 {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-.glance-editor-preview > h4 > span {
-  color: var(--muted-foreground);
-  font-weight: 400;
-}
-.glance-editor-preview > div {
-  padding: 10px;
-  border-radius: var(--radius-card);
-  background: var(--muted);
-  max-height: 520px;
-  overflow: auto;
-}
-@media (max-width: 900px) {
-  .glance-editor {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .glance-editor-preview {
-    max-width: 360px;
-    width: 100%;
-  }
-}
-
 .glance-status-failed {
   min-height: 36px;
   display: flex;

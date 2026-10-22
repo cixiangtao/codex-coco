@@ -185,7 +185,7 @@ export function GlanceReorder({
           <AlertTitle>{conflict ? "组合已在主窗口更新" : "顺序未能保存"}</AlertTitle>
           <AlertDescription>
             <p>{conflict ? "请载入最新顺序后重新拖动，当前排列不会覆盖新组合。" : error}</p>
-            <div className="glance-editor-actions">
+            <div className="flex gap-0.5">
               {!conflict && draft && (
                 <Button
                   variant="outline"

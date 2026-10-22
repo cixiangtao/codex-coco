@@ -71,55 +71,36 @@ try {
     { revision: observerSaved.value.revision, value: initial.value.value },
   );
   assert.equal(restoredObservers.ok, true);
-  const section = page.getByRole("region", { name: "速览面板设置", exact: true });
-  await section.getByRole("button", { name: "移除近 30 天消耗", exact: true }).click();
-  await section.getByRole("button", { name: "添加每日用量趋势", exact: true }).click();
-  await section.getByRole("button", { name: "上移每日用量趋势", exact: true }).click();
+  assert.equal(await page.getByRole("region", { name: "速览面板设置", exact: true }).count(), 0);
+  assert.equal(
+    await page.getByRole("button", { name: "备份并恢复速览设置", exact: true }).count(),
+    0,
+  );
+  assert.equal(await page.evaluate(() => typeof window.codexCoco.glancePreview), "undefined");
   assert.deepEqual(
     (await read(page)).value.value,
     initial.value.value,
-    "Drafts do not change the saved panel",
+    "Removing the editor preserves the saved selection",
   );
-  await section.getByRole("button", { name: "取消速览修改", exact: true }).click();
-  assert.equal(
-    await section.getByRole("button", { name: "移除近 30 天消耗", exact: true }).count(),
-    1,
-  );
-  await section.getByRole("button", { name: "移除近 30 天消耗", exact: true }).click();
-  await section.getByRole("button", { name: "添加每日用量趋势", exact: true }).click();
-  await section.getByRole("button", { name: "上移每日用量趋势", exact: true }).click();
-  await section.getByRole("button", { name: "保存速览组合", exact: true }).click();
-  await section.getByText("速览组合已保存。", { exact: true }).waitFor();
   const saved = (await read(page)).value;
-  assert(!saved.value.blocks.includes("usage.month"));
-  assert.equal(saved.value.blocks.at(-2), "usage.trend");
-  assert.equal(
-    (await page.evaluate(() => window.codexCoco.modules())).value.every(
-      (module) => module.phase === "disabled",
-    ),
-    true,
-  );
-  await section
-    .locator(".glance-editor")
-    .evaluate((node) => node.scrollIntoView({ block: "start" }));
+  const window = await application.browserWindow(page);
   await page.screenshot({
-    path: join(output, "editor-light.png"),
+    path: join(output, "settings-light.png"),
     scale: "css",
     animations: "disabled",
   });
-  const window = await application.browserWindow(page);
   await window.evaluate((window) => window.setSize(720, 640));
   assert(
     await page.locator(".desktop-content").evaluate((node) => node.scrollWidth <= node.clientWidth),
   );
   await page.screenshot({
-    path: join(output, "editor-compact.png"),
+    path: join(output, "settings-compact.png"),
     scale: "css",
     animations: "disabled",
   });
   await window.evaluate((window) => window.setSize(980, 800));
-  // A window-local draft survives a concurrent update and cannot overwrite the latest revision.
-  await section.getByRole("button", { name: "添加近 30 天消耗", exact: true }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "外观", exact: true }).click();
+  // A concurrent selection is reflected in source pins; stale saves cannot overwrite it.
   const secondEvent = application.waitForEvent("window");
   await application.evaluate(({ Menu }) =>
     Menu.getApplicationMenu()
@@ -139,12 +120,7 @@ try {
     saved,
   );
   assert.equal(concurrent.ok, true);
-  await section.getByText("速览组合已在其他窗口更新", { exact: true }).waitFor();
-  assert.equal(
-    await section.getByRole("button", { name: "保存速览组合", exact: true }).isDisabled(),
-    true,
-  );
-  await section.getByRole("button", { name: "取消速览修改", exact: true }).click();
+  await page.getByRole("button", { name: "从速览移除布景连接状态", exact: true }).waitFor();
   const stale = await page.evaluate(
     (snapshot) =>
       window.codexCoco.saveGlanceLayout({
@@ -201,7 +177,7 @@ try {
     await popup.getByRole("button", { name: "打开系统与菜单栏", exact: true }).count(),
     0,
   );
-  for (const method of ["glanceLayout", "resetGlanceLayout", "glancePreview"]) {
+  for (const method of ["glanceLayout", "resetGlanceLayout"]) {
     const denied = await popup.evaluate((method) => window.codexCoco[method](), method);
     assert.equal(denied.error.code, "FORBIDDEN");
   }
@@ -462,6 +438,11 @@ try {
   const path = join(data, "glance-layout.json");
   await writeFile(path, "damaged-glance-layout");
   ({ application, page, errors } = await launch());
+  await page.getByRole("navigation").getByRole("button", { name: "外观", exact: true }).click();
+  assert.equal(
+    await page.getByRole("button", { name: "从速览移除布景连接状态", exact: true }).isDisabled(),
+    true,
+  );
   await page.getByRole("button", { name: "备份并恢复速览设置", exact: true }).click();
   await page.getByText("速览设置已备份并恢复。", { exact: true }).waitFor();
   const backup = (await readdir(data)).find((entry) =>
@@ -475,7 +456,8 @@ try {
       {
         ok: true,
         packaged,
-        draftAndCancel: true,
+        settingsEditorRemoved: true,
+        recoveryOutsideSettings: true,
         orderedPersistence: true,
         conflictProtection: true,
         sourcePinning: true,

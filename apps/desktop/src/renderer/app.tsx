@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
 import { ThemeProvider } from "@codex-coco/ui/theme";
+import { GlanceLayoutRecovery } from "./components/glance-layout-recovery";
 import { WindowShell } from "./shell/window-shell";
 import type { PageId } from "./shell/navigation";
 import { SettingsPage } from "./pages/settings-page";
@@ -38,6 +39,7 @@ export function App({ initialPage }: { initialPage: PageId }) {
             </AlertDescription>
           </Alert>
         )}
+        <GlanceLayoutRecovery />
         <section className="desktop-page" aria-label="外观页面" hidden={page !== "appearance"}>
           <RegisteredModulePage moduleId="appearance" />
         </section>
@@ -48,7 +50,7 @@ export function App({ initialPage }: { initialPage: PageId }) {
           <ModuleManagementPage />
         </section>
         <section className="desktop-page" aria-label="设置页面" hidden={page !== "settings"}>
-          <SettingsPage editor={editor} active={page === "settings"} />
+          <SettingsPage editor={editor} />
         </section>
         {page !== "settings" && editor.recoveryMessage && (
           <output aria-live="polite" className="desktop-recovery-message">

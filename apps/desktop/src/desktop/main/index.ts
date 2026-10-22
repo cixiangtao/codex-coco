@@ -403,10 +403,6 @@ function registerIpc() {
     if (input !== undefined) throw new SettingsError("INVALID_INPUT", "速览设置请求无效。");
     return glanceLayoutStore.snapshot();
   });
-  handle(channels.glancePreview, (input) => {
-    if (input !== undefined) throw new SettingsError("INVALID_INPUT", "预览请求无效。");
-    return glance;
-  });
   handle(channels.saveGlanceLayout, async (input) => {
     await glanceLayoutStore.save(input);
     return publishLayout();

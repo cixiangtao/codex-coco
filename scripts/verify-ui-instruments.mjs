@@ -373,11 +373,7 @@ try {
   await nav.getByRole("button", { name: "设置", exact: true }).click();
   await assertFits(page);
   await capture(page, "settings-light");
-  await page
-    .getByRole("region", { name: "速览面板设置", exact: true })
-    .locator(".glance-editor")
-    .evaluate((node) => node.scrollIntoView({ block: "start" }));
-  await capture(page, "glance-editor-data-light");
+  assert.equal(await page.getByRole("region", { name: "速览面板设置", exact: true }).count(), 0);
   await page.getByRole("button", { name: "深色", exact: true }).click();
   await page.getByRole("button", { name: "保存主题", exact: true }).click();
   await nav.getByRole("button", { name: "用量", exact: true }).click();

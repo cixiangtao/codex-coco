@@ -13,7 +13,6 @@ const bridge: DesktopBridge = {
   saveGlanceLayout: (input) => ipcRenderer.invoke(channels.saveGlanceLayout, input),
   reorderGlanceLayout: (input) => ipcRenderer.invoke(channels.reorderGlanceLayout, input),
   resetGlanceLayout: () => ipcRenderer.invoke(channels.resetGlanceLayout),
-  glancePreview: () => ipcRenderer.invoke(channels.glancePreview),
   onGlanceLayoutChanged: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, snapshot: GlanceLayoutSnapshot) =>
       listener(snapshot);

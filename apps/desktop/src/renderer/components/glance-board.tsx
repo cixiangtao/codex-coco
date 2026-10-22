@@ -137,7 +137,7 @@ export function GlanceBoard({
             <CardTitle>速览由你决定</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>在主窗口添加信息块，或在设置中选择默认组合。</p>
+            <p>在各功能面板点击图钉添加信息块，再在这里直接拖动排序。</p>
           </CardContent>
         </Card>
       )}
