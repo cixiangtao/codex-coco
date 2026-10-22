@@ -90,6 +90,82 @@ async function configure(page, update) {
   assert.equal(result.status, "ready", JSON.stringify(result));
   return result;
 }
+async function verifyEditorUi(page, application, targetPage) {
+  const capture = async (name) => {
+    await page.locator(".desktop-content").evaluate((node) => {
+      node.scrollTop = 0;
+    });
+    assert(
+      await page.evaluate(() => {
+        const node = document.querySelector(".desktop-content");
+        return node.scrollWidth <= node.clientWidth;
+      }),
+      "Appearance content must not overflow horizontally",
+    );
+    await page.screenshot({
+      path: join(output, `${name}.png`),
+      scale: "css",
+      animations: "disabled",
+    });
+  };
+  const tabs = page.getByRole("tab");
+  const layer = page.getByLabel("预览定位图层", { exact: true });
+  await page.locator("#main-x").focus();
+  await page.locator("#main-x").press("ArrowRight");
+  assert.equal(await page.locator("#main-x").inputValue(), "61");
+  await layer.getByRole("button", { name: "全局壁纸", exact: true }).click();
+  assert.equal(await page.locator("#wallpaper-x").inputValue(), "50");
+  await layer.getByRole("button", { name: "侧栏插画", exact: true }).click();
+  await page.locator("#sidebar-y").focus();
+  await page.locator("#sidebar-y").press("ArrowRight");
+  assert.equal(await page.locator("#sidebar-y").inputValue(), "81");
+  await tabs.filter({ hasText: "图片与预设" }).click();
+  await page.getByRole("textbox", { name: "预设名称", exact: true }).fill("尚未保存的名称");
+  await capture("library-light");
+  await tabs.filter({ hasText: "连接设置" }).click();
+  await page.getByRole("button", { name: "明确重启所选应用", exact: true }).waitFor();
+  await capture("connection-light");
+  await tabs.filter({ hasText: "图片与预设" }).click();
+  assert.equal(
+    await page.getByRole("textbox", { name: "预设名称", exact: true }).inputValue(),
+    "尚未保存的名称",
+  );
+  await tabs.filter({ hasText: "布景编辑" }).click();
+  assert.equal(await page.locator("#sidebar-y").inputValue(), "81");
+  await layer.getByRole("button", { name: "主面板插画", exact: true }).click();
+  assert.equal(await page.locator("#main-x").inputValue(), "61");
+  assert.equal(
+    await targetPage.locator("#codex-coco-appearance").count(),
+    0,
+    "Tab and layer changes never apply to the target",
+  );
+  await capture("editor-light");
+  const window = await application.browserWindow(page);
+  await window.evaluate((window) => window.setSize(720, 640));
+  await page.waitForFunction(() => innerWidth === 720);
+  await capture("editor-compact");
+  await window.evaluate((window) => window.setSize(980, 800));
+  const nav = page.getByRole("navigation", { name: "应用导航" });
+  await nav.getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "深色", exact: true }).click();
+  await page.getByRole("button", { name: "保存主题", exact: true }).click();
+  await nav.getByRole("button", { name: "外观", exact: true }).click();
+  await capture("editor-dark");
+  await page.getByRole("button", { name: "放弃修改", exact: true }).click();
+  assert.equal(await page.locator("#main-x").inputValue(), "60");
+  await layer.getByRole("button", { name: "侧栏插画", exact: true }).click();
+  assert.equal(await page.locator("#sidebar-y").inputValue(), "80");
+  await layer.getByRole("button", { name: "主面板插画", exact: true }).click();
+  await tabs.filter({ hasText: "连接设置" }).click();
+  await page.getByRole("button", { name: "明确重启所选应用", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "取消", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await tabs.filter({ hasText: "布景编辑" }).click();
+  await nav.getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "浅色", exact: true }).click();
+  await page.getByRole("button", { name: "保存主题", exact: true }).click();
+  await nav.getByRole("button", { name: "外观", exact: true }).click();
+}
 function expectPixel(actual, expected) {
   assert(
     actual.every((channel, index) => Math.abs(channel - expected[index]) <= 2),
@@ -235,10 +311,12 @@ try {
   assert.equal(library.gallery.length, 8);
   assert(library.gallery.every((item) => item.preview.startsWith("data:image/png;base64,")));
   assert(!JSON.stringify(library).includes(directory));
+  await page.getByRole("tab", { name: "图片与预设", exact: true }).click();
   await page
     .getByRole("button")
     .filter({ has: page.getByAltText(library.gallery[0].title, { exact: true }) })
     .click();
+  await page.getByRole("tab", { name: "布景编辑", exact: true }).click();
   const drag = page.getByRole("slider", { name: "主面板插画拖动定位", exact: true });
   await drag.focus();
   await drag.press("ArrowLeft");
@@ -275,10 +353,12 @@ try {
   await page.mouse.move(sideBounds.x + 30, sideBounds.y + 30);
   await page.mouse.up();
   assert.equal(await page.locator("#main-x").inputValue(), "60");
+  await page.getByRole("tab", { name: "图片与预设", exact: true }).click();
   await page.getByRole("textbox", { name: "预设名称", exact: true }).fill("受控布景预设");
   await page.getByRole("button", { name: "保存为预设", exact: true }).click();
   await page.getByRole("button", { name: "仅保存配置", exact: true }).click();
   await page.getByText("布景配置已保存。", { exact: true }).waitFor();
+  await page.getByRole("tab", { name: "布景编辑", exact: true }).click();
   assert.equal(
     (
       await page.evaluate(
@@ -289,6 +369,7 @@ try {
     ).length,
     1,
   );
+  await verifyEditorUi(page, application, targetPage);
   const imported = await operation(page, "import-image");
   assert(imported.imported);
   const previewDimensions = await target.evaluate(

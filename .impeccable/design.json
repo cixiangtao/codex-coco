@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-22T03:54:01.673844+00:00",
+  "generatedAt": "2026-10-22T04:07:00.277417+00:00",
   "title": "Design System: Codex Coco",
   "extensions": {
     "colorMeta": {
@@ -157,6 +157,10 @@
       {
         "name": "desktop-compact",
         "value": "800px"
+      },
+      {
+        "name": "appearance-stacked",
+        "value": "900px"
       }
     ]
   },
@@ -247,14 +251,14 @@
       "name": "功能标签页",
       "kind": "nav",
       "refersTo": "tabs-list",
-      "description": "淡灰轨道、当前页签与键盘焦点；业务使用 Base UI，面板保持挂载。",
+      "description": "用量与外观共享淡灰轨道、当前页签与键盘焦点；业务使用 Base UI，面板保持挂载。",
       "html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"用量功能\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">总览</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">辅助工具</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">用量设置</button></div>",
       "css": ".ds-tabs{display:flex;align-items:center;flex-wrap:wrap;width:fit-content;max-width:100%;padding:4px;gap:2px;border-radius:12px;background:var(--muted,#f0f0f0);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif}.ds-tab{padding:6px 14px;border:0;border-radius:9px;background:transparent;color:var(--muted-foreground,#626262);font-family:inherit;font-size:12px;font-weight:550;cursor:pointer;transition:background 220ms cubic-bezier(.16,1,.3,1),color 220ms cubic-bezier(.16,1,.3,1)}.ds-tab:hover{color:var(--foreground,#202020)}.ds-tab[aria-selected=true]{color:var(--data-primary,#7464df);background:var(--card,#fff);box-shadow:0 1px 3px color-mix(in srgb,var(--foreground,#202020) 8%,transparent)}.ds-tab:focus-visible{outline:2px solid var(--ring,#343434);outline-offset:2px}"
     }
   ],
   "narrative": {
     "northStar": "柔彩仪表台",
-    "overview": "Codex Coco 用安静的中性外壳承托柔彩数据表面，以圆环、圆润卡片和紧凑分组建立清楚的操作层级。颜色帮助辨认真实状态，文字说明来源、时间与恢复路径；界面保持桌面工具应有的准确和克制。\n\n用户已选择 A 柔彩仪表台方向，并明确要求保留圆环、圆润圆角、进一步压紧布局和先封装组件。本规范将该方向记录为新的视觉基线；当前完整落点为用量页面与菜单栏速览，其他模块保留已有业务界面，不能据此宣称全部页面已迁移。具体页面策略见 [用量与速览 surface brief](docs/surfaces/usage-and-glance.md)，批准参考见 [样稿](docs/design/instruments-approved.png) 与 [批准记录](docs/design/instruments-approved.json)。样稿中的示例账号、数值、色板和冗余进度条不进入运行时。",
+    "overview": "Codex Coco 用安静的中性外壳承托柔彩数据表面，以圆环、圆润卡片和紧凑分组建立清楚的操作层级。颜色帮助辨认真实状态，文字说明来源、时间与恢复路径；界面保持桌面工具应有的准确和克制。\n\n用户已选择 A 柔彩仪表台方向，并明确要求保留圆环、圆润圆角、进一步压紧布局和先封装组件。本规范将该方向记录为新的视觉基线；当前完整落点为用量页面、菜单栏速览与外观布景工作台，设置等页面尚未全部迁移。具体页面策略见 [用量与速览 surface brief](docs/surfaces/usage-and-glance.md) 和 [外观 surface brief](docs/surfaces/appearance.md)，批准参考见 [样稿](docs/design/instruments-approved.png) 与 [批准记录](docs/design/instruments-approved.json)。样稿中的示例账号、数值、色板和冗余进度条不进入运行时。",
     "keyCharacteristics": [
       "中性外壳、柔彩数据、圆润而紧凑的表面。",
       "系统字体与等宽数字，主次信息一眼可分。",
@@ -280,7 +284,7 @@
       "**Don't** 用零代替未知值，用当前额度样式冒充历史记录，或让历史圆环播放更新动画。",
       "**Don't** 在 Box 中建立第二套表面、圆角和阴影规范。",
       "**Don't** 将用量页的双仪表与三组页签强制套用到其他模块。",
-      "**Don't** 把本轮用量和速览迁移描述为所有业务模块的视觉迁移已经完成。"
+      "**Don't** 把当前用量、速览与外观页面的迁移描述为所有业务页面的视觉迁移已经完成。"
     ]
   }
 }
