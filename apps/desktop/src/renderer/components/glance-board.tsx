@@ -2,7 +2,7 @@ import { ArrowUpRight, Activity, ChartNoAxesColumn, Clock3, Ticket } from "lucid
 import { Button } from "@codex-coco/ui/components/button";
 import { Card, CardHeader, CardContent, CardTitle } from "@codex-coco/ui/components/card";
 import { ProgressRing } from "@codex-coco/ui/components/progress-ring";
-import type { GlanceItem, GlanceSnapshot } from "../../contracts/glance";
+import type { AppearanceQuickAction, GlanceItem, GlanceSnapshot } from "../../contracts/glance";
 import {
   glanceBlocks,
   defaultGlanceLayout,
@@ -75,12 +75,14 @@ export function GlanceBoard({
   now,
   busy = false,
   onOpen,
+  onAppearanceAction,
 }: {
   snapshot: GlanceSnapshot;
   layout?: GlanceLayout;
   now: number;
   busy?: boolean;
   onOpen(page: MainPage): void;
+  onAppearanceAction?: ((action: AppearanceQuickAction) => void) | undefined;
 }) {
   const groups: GlanceBlockId[][] = [];
   for (const id of layout.blocks) {
@@ -109,7 +111,13 @@ export function GlanceBoard({
       {snapshot.items
         .filter((item) => item.phase === "error")
         .map((item) => (
-          <GlanceModule key={item.id} item={item} busy={busy} onOpen={() => onOpen(item.page)} />
+          <GlanceModule
+            onAppearanceAction={onAppearanceAction}
+            key={item.id}
+            item={item}
+            busy={busy}
+            onOpen={() => onOpen(item.page)}
+          />
         ))}
       {pendingUsage && (
         <Card density="compact" aria-label="用量读取状态">
@@ -149,7 +157,12 @@ export function GlanceBoard({
                     {status.phase === "error" ? (
                       <p className="glance-status-failed">{block.title} · 异常已置顶</p>
                     ) : (
-                      <GlanceModule item={status} busy={busy} onOpen={() => onOpen(block.page)} />
+                      <GlanceModule
+                        onAppearanceAction={onAppearanceAction}
+                        item={status}
+                        busy={busy}
+                        onOpen={() => onOpen(block.page)}
+                      />
                     )}
                   </GlanceSortableBlock>
                 ) : null;

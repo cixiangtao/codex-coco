@@ -118,3 +118,25 @@ describe("glance placement in screen DIP coordinates", () => {
     expect(result.y + result.height).toBeLessThanOrEqual(workArea.y + workArea.height);
   });
 });
+
+it("projects only the appearance module's bounded quick action without exposing task or configuration", () => {
+  const appearance = moduleSnapshot("appearance");
+  const other = moduleSnapshot("extra");
+  const items = buildGlanceItems(
+    [appearance, other],
+    new Map([
+      ["appearance", { description: "请重启", appearanceAction: "restart", busy: false }],
+      ["extra", { description: "其他模块", appearanceAction: "restart" }],
+    ]),
+  );
+  expect(items.find((item) => item.id === "appearance")?.appearanceAction).toBe("restart");
+  expect(items.find((item) => item.id === "extra")?.appearanceAction).toBeUndefined();
+  expect(JSON.stringify(items)).not.toMatch(/PRIVATE_|private-task|secret|generation/);
+  appearance.phase = "disabled";
+  expect(
+    buildGlanceItems(
+      [appearance],
+      new Map([["appearance", { description: "请重启", appearanceAction: "restart" }]]),
+    ).find((item) => item.id === "appearance")?.appearanceAction,
+  ).toBeUndefined();
+});

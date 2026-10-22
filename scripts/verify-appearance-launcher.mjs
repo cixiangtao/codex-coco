@@ -20,6 +20,14 @@ const pids = new Set();
 const packaged = process.argv.includes("--packaged");
 let session;
 const canonicalDirectory = await realpath(directory);
+async function waitForPage(page, predicate, argument, options = {}) {
+  const deadline = Date.now() + (options.timeout ?? 10_000);
+  do {
+    if (await page.evaluate(predicate, argument)) return;
+    await delay(50);
+  } while (Date.now() < deadline);
+  assert.fail("Controlled UI condition did not become ready");
+}
 async function signalTarget(pid, signal) {
   try {
     const { stdout } = await exec("/bin/ps", ["-p", String(pid), "-o", "command="], {
@@ -56,7 +64,7 @@ try {
   const fixture = join(directory, "target.cjs");
   await writeFile(
     fixture,
-    `const {app,BrowserWindow,protocol}=require('electron');app.setPath('userData',${JSON.stringify(join(directory, "target-data"))});const port=process.argv.find(arg=>arg.startsWith('--remote-debugging-port=')).split('=')[1];app.commandLine.appendSwitch('remote-debugging-port',port);app.commandLine.appendSwitch('remote-debugging-address','127.0.0.1');protocol.registerSchemesAsPrivileged([{scheme:'app',privileges:{standard:true,secure:true}}]);app.whenReady().then(async()=>{protocol.handle('app',()=>new Response('<html data-codex-window-type="electron"><body><main data-app-shell-main-surface>Controlled</main></body></html>',{headers:{'content-type':'text/html'}}));const w=new BrowserWindow({show:false});await w.loadURL('app://-/index.html');});`,
+    `const {app,BrowserWindow,protocol}=require('electron');app.setPath('userData',${JSON.stringify(join(directory, "target-data"))});const port=process.argv.find(arg=>arg.startsWith('--remote-debugging-port='))?.split('=')[1];if(port){app.commandLine.appendSwitch('remote-debugging-port',port);app.commandLine.appendSwitch('remote-debugging-address','127.0.0.1');}protocol.registerSchemesAsPrivileged([{scheme:'app',privileges:{standard:true,secure:true}}]);app.whenReady().then(async()=>{protocol.handle('app',()=>new Response('<html data-codex-window-type="electron"><body><main data-app-shell-main-surface>Controlled</main></body></html>',{headers:{'content-type':'text/html'}}));const w=new BrowserWindow({show:false});await w.loadURL('app://-/index.html');});`,
   );
   const source = join(directory, "launcher.swift");
   await writeFile(
@@ -153,16 +161,16 @@ try {
       }),
     );
     assert.equal(response.ok, true);
-    await page.waitForFunction(async (id) => {
-      const module = (await window.codexCoco.modules()).value.find(
-        (entry) => entry.id === "appearance",
-      );
-      return (
-        module.operation?.id === id &&
-        module.operation.phase === "succeeded" &&
-        module.state?.status === "ready"
-      );
-    }, response.value.operation.id);
+    await waitForPage(
+      page,
+      async (id) => {
+        const module = (await window.codexCoco.modules()).value.find(
+          (entry) => entry.id === "appearance",
+        );
+        return module.operation?.id === id && module.operation.phase === "succeeded";
+      },
+      response.value.operation.id,
+    );
   };
   await refreshProjection();
   await feedback.getByText("请先选择 Codex 应用。", { exact: true }).waitFor();
@@ -170,7 +178,8 @@ try {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
   }, bundle);
   await page.getByRole("button", { name: "选择 Codex 应用", exact: true }).click();
-  await page.waitForFunction(
+  await waitForPage(
+    page,
     async () =>
       (await window.codexCoco.modules()).value.find((entry) => entry.id === "appearance").state
         ?.appSelected === true,
@@ -210,16 +219,207 @@ try {
   await stopTarget();
   await delay(500);
   await rm(marker, { force: true });
-  await launchButton.click();
-  await feedback.getByText("Codex 已启动并连接", { exact: true }).waitFor({ timeout: 40_000 });
+  // Ordinary startup is a separate controlled process, with no debug arguments.
+  await exec("/usr/bin/open", ["-n", "-a", bundle]);
+  for (let i = 0; i < 100 && !(await markerValue()); i++) await delay(50);
+  assert(await markerValue());
+  const nativeProbe = createAppearanceLauncher({
+    file: join(directory, "desktop-data", "appearance-launcher.json"),
+    pick: async () => null,
+  });
+  assert.deepEqual(await nativeProbe.probe(AbortSignal.timeout(10_000)), {
+    running: true,
+    debugPort: null,
+  });
+  const observe = async () => {
+    await waitForPage(page, async () => {
+      const module = (await window.codexCoco.modules()).value.find(
+        (entry) => entry.id === "appearance",
+      );
+      return !["running", "cancelling"].includes(module.operation?.phase);
+    });
+    const response = await page.evaluate(() =>
+      window.codexCoco.runModuleOperation({
+        moduleId: "appearance",
+        operation: "monitor",
+        input: {},
+      }),
+    );
+    assert.equal(response.ok, true);
+    await waitForPage(
+      page,
+      async (id) => {
+        const module = (await window.codexCoco.modules()).value.find(
+          (entry) => entry.id === "appearance",
+        );
+        return module.operation?.id === id && module.operation.phase === "succeeded";
+      },
+      response.value.operation.id,
+    );
+  };
+  await observe();
+  assert.equal(
+    (await page.evaluate(() => window.codexCoco.modules())).value.find(
+      (entry) => entry.id === "appearance",
+    ).state.connection,
+    "needs-restart",
+  );
+  await application.evaluate(({ dialog }) => {
+    globalThis.__restartConfirmations = 0;
+    dialog.showMessageBox = async () => {
+      globalThis.__restartConfirmations++;
+      return { response: 0, checkboxChecked: false };
+    };
+  });
+  const popupEvent = application.waitForEvent("window");
+  await application.evaluate(({ Menu }) =>
+    Menu.getApplicationMenu()
+      .items.flatMap((item) => item.submenu?.items ?? [])
+      .find((item) => item.label === "显示或收起速览")
+      .click(),
+  );
+  const popup = await popupEvent;
+  const quickRestart = popup.getByRole("button", { name: "重启并应用布景", exact: true });
+  await quickRestart.waitFor();
+  const ordinaryTarget = await markerValue();
+  await quickRestart.click();
+  await waitForPage(
+    popup,
+    async () =>
+      (await window.codexCoco.glance()).value.items.find((item) => item.id === "appearance")
+        ?.appearanceAction === "restart",
+  );
+  assert.equal(await application.evaluate(() => globalThis.__restartConfirmations), 1);
+  assert.deepEqual(
+    await markerValue(),
+    ordinaryTarget,
+    "Cancelling native quick-restart confirmation keeps the running target",
+  );
+  assert.equal(
+    (
+      await popup.evaluate(() =>
+        window.codexCoco.appearanceQuickAction({ action: "restart", path: "/private" }),
+      )
+    ).error.code,
+    "INVALID_INPUT",
+  );
+  assert.equal(
+    (await page.evaluate(() => window.codexCoco.appearanceQuickAction({ action: "restart" }))).error
+      .code,
+    "FORBIDDEN",
+  );
+  await popup.screenshot({
+    path: join(output, "glance-quick-restart.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+  await popup.evaluate(() => window.codexCoco.dismissGlance());
+  await stopTarget();
+  await delay(500);
+  await rm(marker, { force: true });
+  // Save a real imported image, then launch from the panel. Applying needs no second click.
+  await application.browserWindow(page).then((win) =>
+    win.evaluate((win) => {
+      win.show();
+      win.focus();
+    }),
+  );
+  await observe();
+  const imagePath = join(directory, "source.png");
+  await writeFile(
+    imagePath,
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jGv8AAAAASUVORK5CYII=",
+      "base64",
+    ),
+  );
+  await application.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+  }, imagePath);
+  const imported = await page.evaluate(() =>
+    window.codexCoco.runModuleOperation({
+      moduleId: "appearance",
+      operation: "import-image",
+      input: {},
+    }),
+  );
+  assert.equal(imported.ok, true);
+  await waitForPage(
+    page,
+    async (id) => {
+      const op = (await window.codexCoco.modules()).value.find(
+        (entry) => entry.id === "appearance",
+      ).operation;
+      return op?.id === id && op.phase === "succeeded";
+    },
+    imported.value.operation.id,
+  );
+  const saved = await page.evaluate(async () => {
+    const snapshot = (await window.codexCoco.modules()).value.find(
+      (entry) => entry.id === "appearance",
+    );
+    const image = snapshot.operation.result.imported;
+    if (!image) throw new Error("Missing imported fixture");
+    return window.codexCoco.saveModuleConfig({
+      moduleId: "appearance",
+      expectedRevision: snapshot.config.revision,
+      value: {
+        ...snapshot.config.value,
+        main: { ...snapshot.config.value.main, image, enabled: true },
+      },
+    });
+  });
+  assert.equal(saved.ok, true);
+  await observe();
+  await application.evaluate(({ Menu }) =>
+    Menu.getApplicationMenu()
+      .items.flatMap((item) => item.submenu?.items ?? [])
+      .find((item) => item.label === "显示或收起速览")
+      .click(),
+  );
+  await popup.getByRole("button", { name: "启动并应用布景", exact: true }).click();
+  await waitForPage(
+    page,
+    async () => {
+      const state = (await window.codexCoco.modules()).value.find(
+        (entry) => entry.id === "appearance",
+      ).state;
+      return state?.active === true && state.connection === "ready";
+    },
+    null,
+    { timeout: 40_000 },
+  );
+  await popup.getByText("布景已应用，持续同步 1 个窗口。", { exact: true }).waitFor();
+  // Launching the target can move native focus and close the panel. Reopen it for visual evidence.
+  await application.browserWindow(popup).then((win) =>
+    win.evaluate((win) => {
+      win.show();
+      win.focus();
+    }),
+  );
+  await delay(200);
+  await popup.screenshot({
+    path: join(output, "glance-auto-applied.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+  await popup.evaluate(() => window.codexCoco.dismissGlance());
+  await application.browserWindow(page).then((win) =>
+    win.evaluate((win) => {
+      win.show();
+      win.focus();
+    }),
+  );
+
   const launchedState = (await page.evaluate(() => window.codexCoco.modules())).value.find(
     (entry) => entry.id === "appearance",
   ).state;
   assert.equal(launchedState.targets, 1);
-  assert.equal(launchedState.active, false);
-  await feedback.scrollIntoViewIfNeeded();
+  assert.equal(launchedState.active, true);
+  await page.getByRole("tab", { name: "布景编辑", exact: true }).click();
+  await page.getByRole("heading", { name: "外观", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: join(output, "launch-ready-feedback.png"),
+    path: join(output, "glance-launch-main-state.png"),
     animations: "disabled",
     scale: "css",
   });
@@ -239,6 +439,9 @@ try {
         runningAppGuard: true,
         controlledRestart: true,
         quitSignalIntercepted: true,
+        ordinaryLaunchDetection: true,
+        glanceRestartConsentCancellation: true,
+        glanceLaunchAutomaticallyAppliesAndVerifies: true,
         realCodexUntouched: true,
       },
       null,

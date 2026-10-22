@@ -52,6 +52,9 @@ export function buildGlanceItems(
       if (detail.capturedAt !== undefined) item.capturedAt = detail.capturedAt;
       if (detail.identity) item.identity = detail.identity;
       if (detail.series) item.series = detail.series;
+      if (snapshot.id === "appearance" && detail.appearanceAction)
+        item.appearanceAction = detail.appearanceAction;
+      if (detail.busy !== undefined) item.busy = detail.busy;
     }
     if (target) items[items.indexOf(target)] = item;
     else items.push(item);

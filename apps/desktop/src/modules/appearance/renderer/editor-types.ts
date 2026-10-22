@@ -11,6 +11,7 @@ export type AppearanceRun = (
 /** User-initiated launch feedback survives background module projection updates. */
 export interface AppearanceLaunchFeedback {
   operation: "launch-application" | "restart-application";
-  phase: "pending" | "ready" | "error";
+  phase: "pending" | "ready" | "error" | "cancelled";
   reason: AppearanceFailure | null;
+  applied?: boolean;
 }

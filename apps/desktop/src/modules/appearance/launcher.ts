@@ -14,6 +14,8 @@ const selectionSchema = z.strictObject({
 });
 export interface AppearanceLauncher {
   selected(): Promise<boolean>;
+  /** Reads only the selected bundle's process arguments; paths and arguments stay private. */
+  probe?(signal: AbortSignal): Promise<{ running: boolean; debugPort: number | null }>;
   choose(signal: AbortSignal): Promise<boolean>;
   port(config: AppearanceConfig): Promise<number>;
   launch(config: AppearanceConfig, restart: boolean, signal: AbortSignal): Promise<number>;
@@ -98,6 +100,24 @@ export function createAppearanceLauncher(options: {
   }
   return {
     selected: async () => Boolean(await selection()),
+    probe: async (signal) => {
+      const selected = await selection();
+      if (!selected) return { running: false, debugPort: null };
+      const chosen = await bundle(selected.path, signal);
+      const processes = await run("/bin/ps", ["-ww", "-axo", "pid=,comm="], signal);
+      const matches = processes.split("\n").flatMap((line) => {
+        const match = /^\s*(\d+)\s+(.+)$/.exec(line);
+        return match?.[2]?.trim() === chosen.executable ? [match[1]!] : [];
+      });
+      for (const pid of matches) {
+        const args = await run("/bin/ps", ["-ww", "-p", pid, "-o", "args="], signal);
+        const match = /(?:^|\s)--remote-debugging-port(?:=|\s+)(\d+)(?=\s|$)/.exec(args);
+        const port = Number(match?.[1]);
+        if (Number.isInteger(port) && port >= 1024 && port <= 65535)
+          return { running: true, debugPort: port };
+      }
+      return { running: matches.length > 0, debugPort: null };
+    },
     choose: async (signal) => {
       const path = await options.pick();
       signal.throwIfAborted();

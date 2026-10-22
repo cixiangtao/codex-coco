@@ -92,6 +92,9 @@ export const appearanceResultSchema = z.strictObject({
   checkedAt: z.number().int().nonnegative(),
   reason: appearanceFailureSchema.nullable(),
   appSelected: z.boolean().default(false),
+  connection: z
+    .enum(["unchecked", "not-selected", "stopped", "needs-restart", "unavailable", "ready"])
+    .default("unchecked"),
   connectedPort: z.number().int().nullable().default(null),
   gallery: z.array(galleryItemSchema).max(60).default([]),
   imported: assetIdSchema.nullable(),

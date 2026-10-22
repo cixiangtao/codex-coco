@@ -222,13 +222,131 @@ it("keeps an applied scene when launch or a confirmed quit is refused, and waits
     expect(await launching).toMatchObject({
       status: "ready",
       connectedPort: 9330,
-      active: false,
+      active: true,
       targets: 1,
     });
     expect(connection.remove).not.toHaveBeenCalled();
-    expect(await runtime.execute("list-gallery", {}, context)).toMatchObject({ active: false });
+    expect(await runtime.execute("list-gallery", {}, context)).toMatchObject({ active: true });
+    expect(connection.apply).toHaveBeenLastCalledWith(9330, expect.any(String), context.signal);
+    expect(connection.verify).toHaveBeenLastCalledWith(9330, context.signal, expect.any(String));
+    vi.useRealTimers();
+    connection.inspect.mockResolvedValue(1);
+    launcher.launch.mockResolvedValueOnce(9330);
+    connection.apply.mockRejectedValueOnce(new Error("PRIVATE_APPLY_ERROR"));
+    expect(await runtime.execute("restart-application", {}, context)).toMatchObject({
+      status: "error",
+      reason: "APPLY_FAILED",
+      active: false,
+    });
+    expect(runtime.state?.()).toMatchObject({ status: "error", reason: "APPLY_FAILED" });
   } finally {
     await runtime.stop();
     controller.abort();
+  }
+});
+
+it("detects parameters only on the selected executable and never exposes the process command", async () => {
+  const dir = await directory();
+  const path = join(dir, "Chosen Codex.app");
+  await mkdir(path);
+  const executable = join(await realpath(path), "Contents/MacOS/Codex");
+  let processes = `12 /other/Codex\n42 ${executable}\n43 ${executable} Helper`;
+  let command = `${executable} --remote-debugging-port=9345 --private-value=secret`;
+  const launcher = createAppearanceLauncher({
+    file: join(dir, "selection.json"),
+    pick: async () => path,
+    run: async (bin, args) => {
+      if (bin.endsWith("plutil"))
+        return JSON.stringify({
+          CFBundleIdentifier: "com.openai.codex",
+          CFBundleExecutable: "Codex",
+        });
+      if (args.includes("pid=,comm=")) return processes;
+      expect(args).toEqual(["-ww", "-p", "42", "-o", "args="]);
+      return command;
+    },
+  });
+  await launcher.choose(AbortSignal.timeout(1000));
+  expect(await launcher.probe!(AbortSignal.timeout(1000))).toEqual({
+    running: true,
+    debugPort: 9345,
+  });
+  command = executable;
+  expect(await launcher.probe!(AbortSignal.timeout(1000))).toEqual({
+    running: true,
+    debugPort: null,
+  });
+  command = `${executable} --remote-debugging-port=99999`;
+  expect(await launcher.probe!(AbortSignal.timeout(1000))).toEqual({
+    running: true,
+    debugPort: null,
+  });
+  processes = "12 /other/Codex";
+  expect(await launcher.probe!(AbortSignal.timeout(1000))).toEqual({
+    running: false,
+    debugPort: null,
+  });
+});
+
+it("monitors ordinary and debug launches without applying or restarting and verifies the actual debug endpoint", async () => {
+  const dir = await directory();
+  const probe = vi.fn(async (): Promise<{ running: boolean; debugPort: number | null }> => ({
+    running: true,
+    debugPort: null,
+  }));
+  const launch = vi.fn(async () => 9330);
+  const connection = {
+    inspect: vi.fn(async () => 2),
+    apply: vi.fn(async () => 2),
+    verify: vi.fn(async () => 2),
+    remove: vi.fn(async () => 2),
+  };
+  const module = createAppearanceModule({
+    directory: dir,
+    pickImage: async () => null,
+    connection,
+    launcher: {
+      selected: async () => true,
+      choose: async () => true,
+      port: async () => 9229,
+      probe,
+      launch,
+    },
+  });
+  const controller = new AbortController();
+  const runtime = await module.start(controller.signal, {
+    configuration: () => appearanceDefaults,
+    requestOperation: () => true,
+  });
+  const context = {
+    signal: controller.signal,
+    config: appearanceDefaults,
+    report: () => undefined,
+  };
+  try {
+    expect(await runtime.execute("monitor", {}, context)).toMatchObject({
+      connection: "needs-restart",
+      active: false,
+    });
+    expect(connection.inspect).not.toHaveBeenCalled();
+    probe.mockResolvedValue({ running: false, debugPort: null });
+    expect(await runtime.execute("monitor", {}, context)).toMatchObject({ connection: "stopped" });
+    probe.mockResolvedValue({ running: true, debugPort: 9330 });
+    expect(await runtime.execute("monitor", {}, context)).toMatchObject({
+      connection: "ready",
+      connectedPort: 9330,
+      targets: 2,
+    });
+    expect(connection.inspect).toHaveBeenLastCalledWith(9330, controller.signal);
+    connection.inspect.mockRejectedValueOnce(new Error("PRIVATE_NETWORK_ERROR"));
+    expect(await runtime.execute("monitor", {}, context)).toMatchObject({
+      connection: "unavailable",
+      active: false,
+    });
+    expect(connection.apply).not.toHaveBeenCalled();
+    expect(launch).not.toHaveBeenCalled();
+  } finally {
+    controller.abort();
+    await runtime.stop();
   }
 });

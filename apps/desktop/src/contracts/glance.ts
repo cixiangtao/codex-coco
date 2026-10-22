@@ -2,6 +2,16 @@ import type { MainPage } from "./windows";
 import { z } from "zod";
 import type { GlanceLayout } from "./glance-layout";
 
+export const appearanceQuickActionSchema = z.strictObject({
+  action: z.enum(["launch", "restart", "apply"]),
+});
+export type AppearanceQuickAction = z.infer<typeof appearanceQuickActionSchema>["action"];
+export const appearanceQuickActionLabels: Record<AppearanceQuickAction, string> = {
+  launch: "启动并应用布景",
+  restart: "重启并应用布景",
+  apply: "应用已保存布景",
+};
+
 export type GlancePhase =
   | "unavailable"
   | "disabled"
@@ -19,6 +29,8 @@ export interface GlanceItem {
   metrics?: GlanceMetric[];
   capturedAt?: number;
   statusText?: string;
+  appearanceAction?: AppearanceQuickAction;
+  busy?: boolean;
   identity?: { label: string; plan: string };
   series?: { points: { day: string; tokens: number }[]; estimated: boolean; limited: boolean };
 }
@@ -35,6 +47,8 @@ export interface GlanceMetric {
   group?: string | undefined;
 }
 export const glanceDetailSchema = z.strictObject({
+  appearanceAction: appearanceQuickActionSchema.shape.action.optional(),
+  busy: z.boolean().optional(),
   page: z.enum(["usage", "appearance", "modules", "settings"]).optional(),
   phase: z.enum(["unavailable", "disabled", "starting", "running", "stopping", "error"]).optional(),
   description: z.string().max(256),

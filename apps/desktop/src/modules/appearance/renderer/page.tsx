@@ -126,8 +126,34 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
             : parsed.success
               ? (parsed.data.reason ?? "LAUNCH_FAILED")
               : "LAUNCH_FAILED";
-        setLaunchFeedback({ operation, phase: reason ? "error" : "ready", reason });
+        setLaunchFeedback({
+          operation,
+          phase: completed.phase === "cancelled" ? "cancelled" : reason ? "error" : "ready",
+          reason,
+          applied: parsed.success && parsed.data.active,
+        });
         if (operation === "launch-application" && reason === "APP_RUNNING") setConfirmRestart(true);
+      }
+      if (!launching && !layer && response.value.operation) {
+        const completed = await waitForModuleOperation(
+          "appearance",
+          response.value.operation.id,
+          300_000,
+        );
+        const result = appearanceResultSchema.safeParse(completed.result);
+        if (completed.phase === "cancelled") setMessage("操作已取消。");
+        else if (completed.phase !== "succeeded" || !result.success)
+          setMessage("操作未完成，请重试。");
+        else if (result.data.status === "error")
+          setMessage(appearanceFailures[result.data.reason!]);
+        else if (operation === "apply")
+          setMessage(
+            result.data.active
+              ? "已应用当前布景，并开始同步窗口。"
+              : "所有图层已关闭，当前没有布景需要应用。",
+          );
+        else if (operation === "remove") setMessage("布景已撤销。");
+        else if (operation === "verify") setMessage("布景验证通过。");
       }
       if (layer && response.value.operation) {
         const completed = await waitForModuleOperation(
@@ -209,6 +235,46 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
         </Badge>
       </header>
       {message && <output aria-live="polite">{message}</output>}
+      {enabled &&
+        result &&
+        !result.active &&
+        ["not-selected", "stopped", "needs-restart", "unavailable"].includes(result.connection) && (
+          <Alert aria-label="布景连接状态">
+            <AlertTitle>
+              {result.connection === "needs-restart"
+                ? "重启 Codex 后即可应用布景"
+                : result.connection === "stopped"
+                  ? "启动 Codex 并应用布景"
+                  : result.connection === "not-selected"
+                    ? "先选择 Codex 应用"
+                    : "Codex 连接暂不可用"}
+            </AlertTitle>
+            <AlertDescription>
+              <p>
+                {dirty
+                  ? "有未保存修改，请先保存；快捷启动使用已保存设置。"
+                  : "启动或重启完成后会自动应用已保存布景。"}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || dirty}
+                onClick={() => {
+                  if (result.connection === "needs-restart") setConfirmRestart(true);
+                  else if (result.connection === "stopped") {
+                    void run("launch-application");
+                  } else setActiveTab("connection");
+                }}
+              >
+                {result.connection === "needs-restart"
+                  ? "重启并应用布景"
+                  : result.connection === "stopped"
+                    ? "启动并应用布景"
+                    : "打开连接设置"}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
       {result?.status === "error" && (
         <Alert variant="destructive">
           <AlertTitle>布景操作未完成</AlertTitle>
@@ -368,7 +434,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
             <DialogTitle>重启所选应用？</DialogTitle>
             <DialogDescription>
               请先保存目标应用中的工作。Codex Coco
-              会请求所选应用正常退出，等待退出后带本机调试参数启动；拒绝退出时不会强制终止。此操作只在明确确认后执行。
+              会请求所选应用正常退出，等待退出后开启布景连接并应用已保存设置；拒绝退出时不会强制终止。未保存的修改不会应用。
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3">

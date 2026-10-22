@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/a
 import { ThemeProvider } from "@codex-coco/ui/theme";
 import { useSavedSettings } from "../client/settings";
 import { useGlance, refreshGlance } from "../client/glance";
+import type { AppearanceQuickAction } from "../../contracts/glance";
 import type { MainPage } from "../../contracts/windows";
 
 /** Public cross-module projection with direct, restricted information-block reordering. */
@@ -51,6 +52,19 @@ export function GlancePage() {
       if (!result.ok) setMessage(result.error.message);
     } catch {
       setMessage("速览暂时无法收起，请重试。");
+    }
+  }
+  async function appearanceAction(action: AppearanceQuickAction) {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await window.codexCoco.appearanceQuickAction({ action });
+      if (!result.ok) setMessage(result.error.message);
+      await refreshGlance();
+    } catch {
+      setMessage("布景操作未能发出，请重试或打开外观页面。");
+    } finally {
+      setBusy(false);
     }
   }
   async function open(page?: MainPage) {
@@ -144,6 +158,9 @@ export function GlancePage() {
             <GlanceReorder snapshot={summary.snapshot} visible={visible} busy={busy}>
               {(layout) => (
                 <GlanceBoard
+                  onAppearanceAction={(action) => {
+                    void appearanceAction(action);
+                  }}
                   snapshot={summary.snapshot!}
                   layout={layout}
                   now={now}

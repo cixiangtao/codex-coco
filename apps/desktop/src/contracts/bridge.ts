@@ -1,7 +1,7 @@
 import type { GlanceLayoutSnapshot, SaveGlanceLayout, ReorderGlanceLayout } from "./glance-layout";
 import type { UpdateSnapshot, SaveUpdatePreferences, UpdateAction } from "./updates";
 import type { WindowContext, MainPage } from "./windows";
-import type { GlanceSnapshot } from "./glance";
+import type { GlanceSnapshot, AppearanceQuickAction } from "./glance";
 import type { SaveThemeInput, SettingsSnapshot } from "./settings";
 import type {
   CancelModuleOperationInput,
@@ -12,6 +12,7 @@ import type {
 } from "./modules";
 
 export const channels = {
+  appearanceQuickAction: "codex-coco:appearance-quick-action",
   glanceLayout: "codex-coco:glance-layout",
   saveGlanceLayout: "codex-coco:save-glance-layout",
   reorderGlanceLayout: "codex-coco:reorder-glance-layout",
@@ -58,6 +59,9 @@ export type Result<T> =
 
 /** Whitelisted bridge; never exposes raw IPC channels, events or system APIs. */
 export interface DesktopBridge {
+  appearanceQuickAction(input: {
+    action: AppearanceQuickAction;
+  }): Promise<Result<{ outcome: "started" | "cancelled" }>>;
   glanceLayout(): Promise<Result<GlanceLayoutSnapshot>>;
   saveGlanceLayout(input: SaveGlanceLayout): Promise<Result<GlanceLayoutSnapshot>>;
   reorderGlanceLayout(input: ReorderGlanceLayout): Promise<Result<GlanceLayoutSnapshot>>;

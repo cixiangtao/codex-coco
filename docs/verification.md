@@ -403,3 +403,11 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - `pnpm run pack` 生成的 macOS arm64 本地未签名应用，通过六组真实 Electron 回归：usage、usage-policy、usage-parity、local-usage、usage-reset、usage-tools。每日统计、目录切换、菜单栏原生标题、显式兑换确认、重启同键重试、样本工具和 CLI 维护使用受控服务与临时数据，未读取真实账号或发出真实消费/升级操作。
 - 已查看生产入口的 `work/usage-verification/startup-cached.png` 和 `startup-failure.png`，确认缓存时间与历史状态提示、后台读取进度、错误优先及旧数据折叠。打包版截图位于 `work/usage-verification-packaged/`。这些目录为 ignored 验证产物。
 - 未运行完整 `verify:packaged` 汇总，没有签名、公证、发布或修改系统安装目录；真实账号的网络读取结果仍需用户环境验证。
+
+## 外观快捷恢复与启动自动应用（2026-10-22）
+
+- `pnpm run check`：25 个测试文件、186 项测试通过；Oxfmt、Oxlint、123 个源文件依赖边界、分进程类型检查和生产构建通过。
+- 生产入口 `verify-appearance-launcher`：用临时原生应用包装受控 Electron 目标，验证普通启动参数检测、速览重启原生确认取消、额外字段拒绝、主窗口不能调用速览专用通道，以及速览启动后自动应用并验证已保存图片。原有已运行保护、受控正常重启和独立启动反馈仍通过。修正验证脚本对异步 IPC 条件的等待，避免读取旧状态。
+- 生产入口 `verify-appearance`：三层像素位置、滚动/缩放、图库预设、保存与应用分离、多窗口同步、退出清理和 opt-in 恢复通过。
+- 生产入口 `verify-menu-bar`：权限、主题同步、快速开合、重建、失败恢复和旧响应隔离通过。首次运行在保存主题后重新打开速览的可见性断言失败；未修改产品逻辑，单独复跑整组通过。该原生焦点/开合路径仍有一次未稳定复现的失败记录。
+- 验证仅操作临时目标；生产重启确认测试选择取消，受控重启的退出请求拦截到测试进程，没有重启或注入真实 Codex。本轮未重新打包，不代表签名、发布或真实客户端全部路由验收。

@@ -8,6 +8,7 @@ import type { ModuleSnapshot } from "../../contracts/modules";
 import type { SettingsSnapshot } from "../../contracts/settings";
 
 const bridge: DesktopBridge = {
+  appearanceQuickAction: (input) => ipcRenderer.invoke(channels.appearanceQuickAction, input),
   glanceLayout: () => ipcRenderer.invoke(channels.glanceLayout),
   saveGlanceLayout: (input) => ipcRenderer.invoke(channels.saveGlanceLayout, input),
   reorderGlanceLayout: (input) => ipcRenderer.invoke(channels.reorderGlanceLayout, input),

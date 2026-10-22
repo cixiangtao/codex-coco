@@ -65,7 +65,7 @@ export function AppearanceConnectionPanel({
           <FieldDescription>启动参数示例：--remote-debugging-port=9229。</FieldDescription>
         </SettingsRow>
         <SettingsRow>
-          <FieldLabel htmlFor="appearance-restore">启动后恢复已保存布景</FieldLabel>
+          <FieldLabel htmlFor="appearance-restore">Codex Coco 启用时恢复布景</FieldLabel>
           <Switch
             id="appearance-restore"
             checked={draft.restoreOnEnable}
@@ -112,7 +112,7 @@ export function AppearanceConnectionPanel({
           <FieldDescription>
             {dirty
               ? "有未保存修改，请先点击底部的“仅保存配置”，再启动或重启。"
-              : "重启会提示确认，并等待目标正常退出。"}
+              : "启动或重启成功后自动应用已保存布景。重启前会提示确认。"}
           </FieldDescription>
           {launchFeedback && (
             <Alert
@@ -125,16 +125,24 @@ export function AppearanceConnectionPanel({
                     ? "正在重启 Codex"
                     : "正在启动 Codex"
                   : launchFeedback.phase === "ready"
-                    ? "Codex 已启动并连接"
-                    : "Codex 启动未完成"}
+                    ? launchFeedback.applied
+                      ? "Codex 已启动，布景已应用"
+                      : "Codex 已启动并连接"
+                    : launchFeedback.phase === "cancelled"
+                      ? "启动操作已停止"
+                      : "Codex 启动未完成"}
               </AlertTitle>
               <AlertDescription>
                 <p>
                   {launchFeedback.phase === "pending"
-                    ? "正在等待 Codex 主窗口与本机调试端口就绪，请稍候。"
+                    ? "正在等待 Codex 主窗口就绪，随后自动应用并验证已保存布景。"
                     : launchFeedback.phase === "ready"
-                      ? "已识别 Codex 主窗口。需要修改布景时，请点击“保存并应用布景”。"
-                      : appearanceFailures[launchFeedback.reason ?? "LAUNCH_FAILED"]}
+                      ? launchFeedback.applied
+                        ? "已保存布景已应用，正在持续同步窗口。"
+                        : "已保存设置中的所有图层均已关闭，无需应用布景。"
+                      : launchFeedback.phase === "cancelled"
+                        ? "已停止后续操作；已经启动的 Codex 会保留，可以检查连接后继续。"
+                        : appearanceFailures[launchFeedback.reason ?? "LAUNCH_FAILED"]}
                 </p>
                 {launchFeedback.phase === "error" && launchFeedback.reason === "APP_RUNNING" && (
                   <Button

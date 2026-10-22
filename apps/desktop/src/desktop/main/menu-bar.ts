@@ -22,6 +22,10 @@ export class MenuBarController {
   private ready = false;
   private wanted = false;
   private disposed = false;
+  private interactionPending = false;
+  setInteractionPending(value: boolean) {
+    this.interactionPending = value;
+  }
   private suppressTrayClickUntil = 0;
   private readonly reposition = () => {
     if (this.popover?.isVisible()) this.position(this.popover);
@@ -88,6 +92,7 @@ export class MenuBarController {
       this.popover = window;
       this.ready = false;
       window.on("blur", () => {
+        if (this.interactionPending) return;
         const point = screen.getCursorScreenPoint();
         const bounds = this.tray?.getBounds();
         if (

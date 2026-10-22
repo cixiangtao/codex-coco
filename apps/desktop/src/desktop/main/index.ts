@@ -1,3 +1,4 @@
+import { AppearanceQuickActions } from "../../application/appearance-quick-actions";
 import { GlanceLayoutStore } from "../../application/glance-layout-store";
 import { appearanceThumbnail } from "./appearance-thumbnail";
 import { ApplicationUpdates } from "../../application/updates";
@@ -165,6 +166,23 @@ const modules = new ModuleHost(
   2500,
   diagnostics,
 );
+const appearanceQuickActions = new AppearanceQuickActions(modules);
+let lastAppearanceProbe = 0;
+function probeAppearance() {
+  if (quitting || appearanceQuickActions.busy || Date.now() - lastAppearanceProbe < 3000) return;
+  const snapshot = modules.snapshots().find((item) => item.id === "appearance");
+  if (
+    snapshot?.phase !== "running" ||
+    (snapshot.operation && ["running", "cancelling"].includes(snapshot.operation.phase))
+  )
+    return;
+  lastAppearanceProbe = Date.now();
+  try {
+    modules.run({ moduleId: "appearance", operation: "monitor", input: {} });
+  } catch {
+    /* A concurrent task owns the module. */
+  }
+}
 const windowStarts = new Map<number, number>();
 let store: SettingsStore;
 let quitting = false;
@@ -221,12 +239,23 @@ function createWindow(context: WindowContext = { kind: "main", page: "appearance
   contexts.set(contentsId, context);
   if (context.kind === "glance") {
     // macOS panels may keep document.visibilityState="visible" after a native hide.
-    win.on("show", () => publishGlanceVisibility(win, true));
-    win.on("hide", () => publishGlanceVisibility(win, false));
+    let monitor: ReturnType<typeof setInterval> | undefined;
+    win.on("show", () => {
+      publishGlanceVisibility(win, true);
+      probeAppearance();
+      clearInterval(monitor);
+      monitor = setInterval(probeAppearance, 10_000);
+    });
+    win.on("hide", () => {
+      clearInterval(monitor);
+      publishGlanceVisibility(win, false);
+    });
+    win.on("closed", () => clearInterval(monitor));
   }
   if (context.kind === "main")
     win.on("focus", () => {
       lastMainId = contentsId;
+      probeAppearance();
     });
   windowStarts.set(contentsId, began);
   win.on("closed", () => {
@@ -388,6 +417,34 @@ function registerIpc() {
     return publishLayout();
   });
   handle(
+    channels.appearanceQuickAction,
+    (input, correlationId, window) =>
+      appearanceQuickActions.execute(
+        input,
+        async () => {
+          menuBar?.setInteractionPending(true);
+          try {
+            const choice = await dialog.showMessageBox(window, {
+              type: "question",
+              title: "重启 Codex 并应用布景？",
+              message: "重启 Codex 并应用已保存布景？",
+              detail:
+                "请先保存 Codex 中的工作。Codex Coco 会等待应用正常退出，再开启布景连接并应用已保存设置；拒绝退出时不会强制终止。主窗口中未保存的修改不会应用。",
+              buttons: ["取消", "重启并应用"],
+              defaultId: 0,
+              cancelId: 0,
+              noLink: true,
+            });
+            return choice.response === 1;
+          } finally {
+            menuBar?.setInteractionPending(false);
+          }
+        },
+        correlationId,
+      ),
+    "glance",
+  );
+  handle(
     channels.reorderGlanceLayout,
     async (input) => {
       await glanceLayoutStore.reorder(input);
@@ -407,6 +464,7 @@ function registerIpc() {
     channels.glance,
     (input) => {
       if (input !== undefined) throw new SettingsError("INVALID_INPUT", "速览请求无效。");
+      probeAppearance();
       return glance;
     },
     "glance",

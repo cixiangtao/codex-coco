@@ -3,7 +3,12 @@ import { ArrowUpRight, Palette, Activity, TriangleAlert } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@codex-coco/ui/components/card";
 import { Badge } from "@codex-coco/ui/components/badge";
 import { Button } from "@codex-coco/ui/components/button";
-import type { GlanceItem, GlancePhase } from "../../contracts/glance";
+import {
+  appearanceQuickActionLabels,
+  type AppearanceQuickAction,
+  type GlanceItem,
+  type GlancePhase,
+} from "../../contracts/glance";
 const phaseLabels: Record<GlancePhase, string> = {
   unavailable: "尚未接入",
   disabled: "已停用",
@@ -16,10 +21,12 @@ export function GlanceModule({
   item,
   busy,
   onOpen,
+  onAppearanceAction,
 }: {
   item: GlanceItem;
   busy: boolean;
   onOpen(): void;
+  onAppearanceAction?: ((action: AppearanceQuickAction) => void) | undefined;
 }) {
   const statistics = item.phase === "error" ? [] : (item.metrics ?? []);
   return (
@@ -40,7 +47,7 @@ export function GlanceModule({
             item.phase === "error" ? "danger" : item.phase === "running" ? "success" : "neutral"
           }
         >
-          {phaseLabels[item.phase]}
+          {item.busy ? "处理中" : phaseLabels[item.phase]}
         </Badge>
         {item.phase !== "error" && (
           <Button
@@ -78,6 +85,15 @@ export function GlanceModule({
             </dl>
           )}
         </CardContent>
+      )}
+      {item.appearanceAction && onAppearanceAction && (
+        <Button
+          size="sm"
+          disabled={busy || item.busy}
+          onClick={() => onAppearanceAction(item.appearanceAction!)}
+        >
+          {appearanceQuickActionLabels[item.appearanceAction]}
+        </Button>
       )}
       {item.phase === "error" && (
         <Button
