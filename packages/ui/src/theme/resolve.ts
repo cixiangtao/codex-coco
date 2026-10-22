@@ -93,8 +93,23 @@ export function resolveTheme(preference: ThemePreference, mode: ResolvedMode) {
   for (let step = 1; contrastRatio(ring, base.background) < 3 && step <= 10; step++) {
     ring = mix(primary, mode === "light" ? "#000000" : "#ffffff", step / 10);
   }
+  let instrument =
+    custom ??
+    (preference.presetId === "neutral" ? (mode === "light" ? "#7464df" : "#b7a9ff") : primary);
+  const surface = (color: string) => mix(base.card, color, mode === "light" ? 0.1 : 0.16);
+  for (let step = 1; contrastRatio(instrument, surface(instrument)) < 3 && step <= 10; step++) {
+    instrument = mix(instrument, mode === "light" ? "#000000" : "#ffffff", step / 10);
+  }
+  const green = mode === "light" ? "#26896d" : "#75cdb1";
+  const amber = mode === "light" ? "#a16b20" : "#e2b576";
   return {
     ...base,
+    "data-primary": instrument,
+    "data-success": green,
+    "data-warning": amber,
+    "data-primary-surface": surface(instrument),
+    "data-success-surface": surface(green),
+    "data-warning-surface": surface(amber),
     primary,
     "primary-foreground": text,
     "primary-hover": mix(primary, shade, 0.12),
