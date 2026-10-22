@@ -31,7 +31,7 @@ export class MenuBarController {
       this.tray = new Tray(createTrayIcon());
       this.tray.setToolTip("Codex Coco");
       if (process.platform === "darwin") {
-        this.tray.setTitle("Codex Coco");
+        this.tray.setTitle("");
         this.tray.setIgnoreDoubleClickEvents(true);
       }
       this.tray.on("click", () => {
@@ -73,8 +73,8 @@ export class MenuBarController {
   updateSummary(snapshot: GlanceSnapshot) {
     if (!this.tray || process.platform !== "darwin") return;
     const usage = snapshot.items.find((item) => item.id === "usage");
-    const suffix = usage?.phase === "running" ? usage.statusText : "";
-    this.tray.setTitle(`Codex Coco${suffix ? ` · ${suffix}` : ""}`);
+    const title = usage?.phase === "running" ? (usage.statusText ?? "") : "";
+    this.tray.setTitle(title);
   }
   toggle() {
     if (this.disposed) return;

@@ -279,3 +279,7 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - 明暗背景模拟图位于 ignored 的 `work/tray-colors-packaged/basketball-mask.png`，使用正式管线输出的 alpha；不是原生菜单栏截图。未修改系统主题或壁纸，未宣称多显示器、壁纸和辅助显示设置已完成实屏验收；未运行完整 `verify:packaged` 汇总。
 
 上次 cat3/my0 模板标记检查无法发现像素已经错误填底，不能继续作为该问题已解决的证据。本次以独立 GIF 解码器和完整篮球动画的实际像素为回归依据。
+
+## 状态栏标题精简（2026-10-22）
+
+取消常驻的 Codex Coco 名称前缀：默认只显示图标，有可用用量时仅附加公开摘要，无摘要或停用时清空标题；完整名称继续用于悬停提示、菜单和主窗口。`pnpm run check` 的 158 项测试及生产构建通过。本地未签名包的 usage-parity 通过实际 Tray.getTitle 检查默认空标题、用量摘要和停用后清空，已有用量与图标回归同时通过。

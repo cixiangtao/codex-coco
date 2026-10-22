@@ -103,14 +103,27 @@ try {
   assert.equal(page.url(), "app://codex-coco/index.html");
   await application.evaluate(({ Tray }) => {
     globalThis.parityImages = [];
+    globalThis.parityTitles = [];
+    const setTitle = Tray.prototype.setTitle;
+    Tray.prototype.setTitle = function (...args) {
+      const result = setTitle.apply(this, args);
+      globalThis.parityTitles.push(this.getTitle());
+      return result;
+    };
     const original = Tray.prototype.setImage;
     Tray.prototype.setImage = function (image) {
+      globalThis.parityTitles.push(this.getTitle());
       globalThis.parityImages.push({ template: image.isTemplateImage(), size: image.getSize() });
       return original.call(this, image);
     };
     globalThis.fetch = async () =>
       new Response(JSON.stringify({ tag_name: "rust-v1.2.3", draft: false, prerelease: false }));
   });
+  await page.evaluate(() =>
+    window.codexCoco.enableModule({ moduleId: "desktop-tools", enabled: true }),
+  );
+  await task(page, "apply-menu-bar", {}, "desktop-tools");
+  assert.equal(await application.evaluate(() => globalThis.parityTitles.at(-1)), "");
   await page.getByRole("navigation").getByRole("button", { name: "用量", exact: true }).click();
   await page.getByRole("button", { name: "启用并读取用量", exact: true }).click();
   await page.getByText("30 天 · 600 tokens", { exact: true }).waitFor();
@@ -175,6 +188,7 @@ try {
   const usage = glance.value.items.find((item) => item.id === "usage");
   assert.equal(usage.phase, "running");
   assert.equal(usage.statusText, "5h 75% · 7d 40%");
+  assert.equal(await application.evaluate(() => globalThis.parityTitles.at(-1)), usage.statusText);
   assert.equal(usage.metrics.find((metric) => metric.id === "tokens:today").value, "100 tokens");
   assert.match(usage.description, /p\*\*\*e@example\.com.*Plus/);
   assert(!JSON.stringify(glance).match(/private@example|private-token|account-a/));
@@ -218,6 +232,11 @@ try {
   const output = join(root, packaged ? "work/usage-parity-packaged" : "work/usage-parity");
   await mkdir(output, { recursive: true });
   await page.screenshot({ path: join(output, "usage.png"), scale: "css", animations: "disabled" });
+  const disabled = await page.evaluate(() =>
+    window.codexCoco.enableModule({ moduleId: "usage", enabled: false }),
+  );
+  assert.equal(disabled.ok, true);
+  assert.equal(await application.evaluate(() => globalThis.parityTitles.at(-1)), "");
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify(
@@ -231,6 +250,7 @@ try {
         glance: true,
         selectedHome: true,
         nativeTemplateAndColor: true,
+        compactNativeTitle: true,
         productionIgnoresDevUrl: true,
         screenshots: output,
       },
