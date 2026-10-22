@@ -200,7 +200,7 @@ try {
   }, other);
   await task(page, "choose-local-home");
   await task(page, "refresh");
-  await page.getByText("14 天 · 2,000 tokens", { exact: true }).waitFor();
+  await page.getByText("14 天 · 2K tokens", { exact: true }).waitFor();
   await task(page, "list-models");
   const commands = (await readFile(trace, "utf8"))
     .trim()

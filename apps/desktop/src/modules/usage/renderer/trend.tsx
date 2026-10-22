@@ -1,3 +1,5 @@
+import { UsageDailyChart } from "./daily-chart";
+import { formatTokens, formatExactTokens } from "../../../renderer/lib/token-format";
 import {
   Card,
   CardHeader,
@@ -34,15 +36,8 @@ export function UsageTokenSummary({ trend }: { trend: TrendSnapshot }) {
               <span aria-hidden="true" />
               {label}
             </dt>
-            <dd title={`${value.toLocaleString("zh-CN")} tokens`}>
-              <strong>
-                {trend.source === "none"
-                  ? "暂无数据"
-                  : new Intl.NumberFormat("en", {
-                      notation: "compact",
-                      maximumFractionDigits: 1,
-                    }).format(value)}
-              </strong>
+            <dd title={`${formatExactTokens(value)} tokens`}>
+              <strong>{trend.source === "none" ? "暂无数据" : formatTokens(value)}</strong>
               {trend.source !== "none" && <span>tokens</span>}
             </dd>
           </div>
@@ -67,7 +62,6 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
   const days = config.success ? config.data.trendDays : 30;
   const points = trend?.points.slice(-days) ?? [];
   const total = points.reduce((sum, point) => sum + point.tokens, 0);
-  const maximum = Math.max(1, ...points.map((point) => point.tokens));
   async function run(operation: string, input: Record<string, boolean> = {}) {
     setPending(true);
     setMessage("");
@@ -171,62 +165,7 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
               </Alert>
             )}
             {trend && trend.source !== "none" ? (
-              <>
-                <div className="usage-chart-wrap" aria-hidden="true">
-                  <div className="usage-chart-axis">
-                    <span>
-                      {new Intl.NumberFormat("en", { notation: "compact" }).format(maximum)}
-                    </span>
-                    <span>0</span>
-                  </div>
-                  <div className="usage-chart h-32">
-                    {points.map((point, index) => (
-                      <div
-                        key={point.day}
-                        className="usage-chart-bar"
-                        data-last={index === points.length - 1}
-                        title={`${point.day}: ${point.tokens}`}
-                        style={{ transform: `scaleY(${point.tokens / maximum})` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div
-                  className="usage-chart-dates"
-                  style={{ gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))` }}
-                  aria-hidden="true"
-                >
-                  {points.map((point, index) => (
-                    <span key={point.day}>
-                      {index === 0 ||
-                      index === points.length - 1 ||
-                      (index % Math.ceil(points.length / 5) === 0 && index < points.length - 2)
-                        ? point.day.slice(5).replace("-", "/")
-                        : ""}
-                    </span>
-                  ))}
-                </div>
-                <details className="usage-data-details">
-                  <summary>查看每日计数</summary>
-                  <table className="w-full text-left text-sm">
-                    <caption className="sr-only">本机每日 token 计数</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">日期</th>
-                        <th scope="col">Tokens</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {points.map((point) => (
-                        <tr key={point.day}>
-                          <th scope="row">{point.day}</th>
-                          <td>{point.tokens.toLocaleString("zh-CN")}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </details>
-              </>
+              <UsageDailyChart points={points} source={trend.source} />
             ) : (
               <div className="usage-chart-empty">
                 <p>
@@ -250,7 +189,7 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
         {trend && trend.source !== "none" && (
           <CardFooter className="usage-trend-footer">
             <span>
-              {days} 天 · {total.toLocaleString("zh-CN")} tokens
+              {days} 天 · {formatTokens(total)} tokens
             </span>
             {trend && (
               <time dateTime={new Date(trend.capturedAt).toISOString()}>
@@ -277,8 +216,8 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
                 {trend.scope === "current-account-and-unassigned"
                   ? "已排除可识别的其他账号，仍包含无归属记录。"
                   : "尚未关联当前账号，展示此目录的本机记录。"}{" "}
-                无归属 tokens：{trend.unassignedTokens.toLocaleString("zh-CN")}。扫描{" "}
-                {trend.scannedFiles} 个文件，复用 {trend.reusedFiles} 个索引。
+                无归属 tokens：{formatTokens(trend.unassignedTokens)}。扫描 {trend.scannedFiles}{" "}
+                个文件，复用 {trend.reusedFiles} 个索引。
               </p>
             )}
             <p className="usage-source">

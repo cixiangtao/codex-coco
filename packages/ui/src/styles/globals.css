@@ -460,3 +460,17 @@
 .coco-settings-row[data-layout="stacked"] > input[type="number"] {
   width: 100px;
 }
+.coco-tooltip-data {
+  display: block;
+  padding: 12px;
+  width: 224px;
+  max-width: calc(100vw - 32px);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+.coco-tooltip-data .coco-tooltip-arrow {
+  background: var(--card);
+  fill: var(--card);
+}

@@ -1,3 +1,4 @@
+import { formatTokens } from "../lib/token-format";
 import { ArrowUpRight, Palette, Activity, TriangleAlert } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@codex-coco/ui/components/card";
 import { Badge } from "@codex-coco/ui/components/badge";
@@ -65,7 +66,11 @@ export function GlanceModule({
                 <div key={metric.id}>
                   <dt>{metric.label}</dt>
                   <dd>
-                    <strong>{metric.value}</strong>
+                    <strong>
+                      {metric.unit === "tokens" && metric.numericValue !== undefined
+                        ? `${formatTokens(metric.numericValue)} tokens`
+                        : metric.value}
+                    </strong>
                     <span>{metric.detail}</span>
                   </dd>
                 </div>

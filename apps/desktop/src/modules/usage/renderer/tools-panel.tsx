@@ -1,3 +1,4 @@
+import { formatTokens } from "../../../renderer/lib/token-format";
 import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
 import { useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
@@ -192,8 +193,9 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
                     {(sample.elapsedMs / 1000).toFixed(1)} 秒
                   </summary>
                   <p>
-                    答案：{sample.answer ?? "未知"} · 输入 {sample.inputTokens ?? "未知"} / 输出{" "}
-                    {sample.outputTokens ?? "未知"} / 推理 {sample.reasoningTokens ?? "未知"} tokens
+                    答案：{sample.answer ?? "未知"} · 输入 {formatTokens(sample.inputTokens)} / 输出{" "}
+                    {formatTokens(sample.outputTokens)} / 推理{" "}
+                    {formatTokens(sample.reasoningTokens)} tokens
                   </p>
                   <p className="whitespace-pre-wrap">{sample.explanation}</p>
                 </details>

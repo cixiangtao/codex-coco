@@ -26,7 +26,7 @@ await writeFile(
 for (let index = 0; index < 30; index++) {
   const time = new Date();
   time.setDate(time.getDate() - index);
-  const count = 24000 + ((index * 7919) % 26000);
+  const count = index === 29 ? 0 : 24000 + ((index * 7919) % 26000);
   await writeFile(
     join(home, "sessions", `${index}.jsonl`),
     [
@@ -142,10 +142,54 @@ try {
     });
     assert.equal(aligned, true, "Date labels must match their actual bar columns");
   }
+  await page.locator(".usage-chart-point").first().hover();
+  await page
+    .getByRole("tooltip")
+    .locator(".usage-chart-tooltip-value strong")
+    .getByText("0", { exact: true })
+    .waitFor();
+  await page.waitForFunction(() => {
+    const node = document.querySelector(".usage-chart-tooltip")?.closest('[role="tooltip"]');
+    return node && getComputedStyle(node).opacity === "1";
+  });
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: join(output, "chart-zero-tooltip.png"), scale: "css" });
+  await page.mouse.move(0, 0);
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "14 天", exact: true }).click();
   await assertFits(page);
   await capture(page, "main-light");
 
+  const lastPoint = page.locator(".usage-chart-point").last();
+  await lastPoint.hover();
+  await page.getByRole("tooltip").getByText("24K", { exact: true }).waitFor();
+  assert.equal(await page.getByRole("tooltip").locator("dd").first().textContent(), "24,000");
+  await page.waitForFunction(() => {
+    const node = document.querySelector(".usage-chart-tooltip")?.closest('[role="tooltip"]');
+    if (!node) return false;
+    const rect = node.getBoundingClientRect();
+    return (
+      getComputedStyle(node).opacity === "1" &&
+      rect.top >= 0 &&
+      rect.right <= innerWidth &&
+      rect.bottom <= innerHeight
+    );
+  });
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: join(output, "chart-hover-tooltip.png"), scale: "css" });
+  await page.mouse.move(0, 0);
+  const firstPoint = page.locator(".usage-chart-point").first();
+  const firstDate = (
+    await page.locator(".usage-chart-point").nth(1).getAttribute("aria-label")
+  ).split(" · ")[0];
+  await firstPoint.focus();
+  await page.keyboard.press("Tab");
+  await page
+    .getByRole("tooltip")
+    .getByText(firstDate.replaceAll("-", "/"), { exact: true })
+    .waitFor();
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelectorAll('[role="tooltip"]').length === 0);
   const beforeTabs = (await readFile(trace, "utf8")).split('"method":"spawn"').length;
   await page.getByRole("tab", { name: "辅助工具", exact: true }).click();
   await page.getByRole("button", { name: "开始样本检测", exact: true }).waitFor();
