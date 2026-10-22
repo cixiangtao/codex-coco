@@ -10,7 +10,18 @@ export function decodeTrayGif(
   const gif = parseGIF(Uint8Array.from(bytes).buffer);
   const width = gif.lsd.width;
   const height = gif.lsd.height;
-  const frames = gif.frames.filter((frame) => "image" in frame);
+  type ImageFrame = Extract<(typeof gif.frames)[number], { image: unknown }>;
+  const frames: ImageFrame[] = [];
+  let control: ImageFrame["gce"] | undefined;
+  // GCE applies to the next graphic, even across comment/application extensions.
+  // gifuct-js groups parsed blocks; filtering for images first loses pending GCEs.
+  for (const block of gif.frames) {
+    if ("gce" in block && block.gce) control = block.gce;
+    if ("image" in block && block.image) {
+      frames.push({ ...block, ...(control ? { gce: control } : {}) });
+      control = undefined;
+    } else if ("text" in block) control = undefined;
+  }
   if (
     width < 1 ||
     height < 1 ||
@@ -25,12 +36,8 @@ export function decodeTrayGif(
   );
   if (pixels > 32_000_000) throw new Error("IMAGE_INVALID");
   let canvas = new Uint8Array(width * height * 4);
-  const background = gif.gct?.[gif.lsd.backgroundColorIndex];
-  const firstTransparent =
-    frames[0]?.gce?.extras?.transparentColorGiven &&
-    frames[0]?.gce?.transparentColorIndex === gif.lsd.backgroundColorIndex;
-  if (background && !firstTransparent)
-    for (let at = 0; at < canvas.length; at += 4) canvas.set([...background, 255], at);
+  // Like browser GIF rendering, the logical canvas starts transparent. The global
+  // background palette entry is not a matte for transparent or partial frames.
   let restore: Uint8Array<ArrayBuffer> | null = null;
   let previous: {
     left: number;
@@ -38,23 +45,18 @@ export function decodeTrayGif(
     width: number;
     height: number;
     disposal: number;
-    transparent: number;
   } | null = null;
   const result: TrayFrames = { frames: [] };
   let encodedBytes = 0;
   const contrast = new TrayContrast();
   for (let index = 0; index < frames.length; index++) {
     if (previous?.disposal === 2) {
-      const background = gif.gct?.[gif.lsd.backgroundColorIndex];
-      const transparent = previous.transparent === gif.lsd.backgroundColorIndex;
       for (let y = previous.top; y < previous.top + previous.height; y++)
-        for (let x = previous.left; x < previous.left + previous.width; x++) {
-          const at = (y * width + x) * 4;
-          canvas[at] = background?.[0] ?? 0;
-          canvas[at + 1] = background?.[1] ?? 0;
-          canvas[at + 2] = background?.[2] ?? 0;
-          canvas[at + 3] = transparent || !background ? 0 : 255;
-        }
+        canvas.fill(
+          0,
+          (y * width + previous.left) * 4,
+          (y * width + previous.left + previous.width) * 4,
+        );
     }
     if (previous?.disposal === 3 && restore) canvas = restore;
     const frame = decompressFrame(frames[index]!, gif.gct, true);
@@ -94,7 +96,6 @@ export function decodeTrayGif(
       width: fw,
       height: fh,
       disposal: frame.disposalType,
-      transparent: frame.transparentIndex,
     };
     report(Math.round(((index + 1) / frames.length) * 100));
   }

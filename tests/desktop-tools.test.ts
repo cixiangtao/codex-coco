@@ -1,3 +1,4 @@
+import { inflateSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -41,7 +42,7 @@ describe("local tray frames", () => {
         new URL(`../apps/desktop/resources/tray/${icon.id.slice(8)}.gif`, import.meta.url),
       );
       const result = decodeTrayGif(await readFile(path));
-      if (["builtin:cat3", "builtin:my0"].includes(icon.id)) expect(result.template).toBe(true);
+      if (icon.id === "builtin:zhiyin_basketball") expect(result.template).toBe(true);
       if (icon.id === "builtin:pink_cat") expect(result.template).toBe(false);
       expect(result.frames.length).toBeGreaterThan(1);
       expect(result.frames.length).toBeLessThanOrEqual(300);
@@ -53,6 +54,42 @@ describe("local tray frames", () => {
       if (icon.id === "builtin:everonecat0") expect(result.frames).toHaveLength(121);
     },
   );
+  it("keeps palette backgrounds transparent even when frame-local transparency has a different index", () => {
+    // Two frames: transparent/black, then black at the left after disposal=2.
+    // Global background is green (index 2); transparency is local index 1.
+    const gif = Buffer.from(
+      "47494638396102000100810200000000ffffff00ff00ff000021f90409010001002c00000000020001000002020c0a0021f90409010001002c00000000010001000002024401003b",
+      "hex",
+    );
+    const result = decodeTrayGif(gif);
+    const pixels = (index: number) => {
+      const png = Buffer.from(result.frames[index]!.png, "base64"),
+        chunks: Buffer[] = [];
+      for (let at = 8; at < png.length;) {
+        const length = png.readUInt32BE(at);
+        if (png.toString("ascii", at + 4, at + 8) === "IDAT")
+          chunks.push(png.subarray(at + 8, at + 8 + length));
+        at += 12 + length;
+      }
+      const raw = inflateSync(Buffer.concat(chunks));
+      return (x: number, y: number) =>
+        Array.from(raw.subarray(y * 145 + 1 + x * 4, y * 145 + 1 + x * 4 + 4));
+    };
+    expect(pixels(0)(8, 15)[3]).toBe(0);
+    expect(pixels(0)(26, 15)).toEqual([0, 0, 0, 255]);
+    expect(pixels(1)(8, 15)).toEqual([0, 0, 0, 255]);
+    expect(pixels(1)(26, 15)[3]).toBe(0);
+    expect(result.template).toBe(true);
+  });
+  it("retains graphic control through metadata before the next image", () => {
+    const prefix = "47494638396102000100810200000000ffffff00ff00ff000021f9040901000100";
+    const application = "21ff0b4e45545343415045322e300301000000";
+    const image = "2c00000000020001000002020c0a003b";
+    const result = decodeTrayGif(Buffer.from(prefix + application + application + image, "hex"));
+    expect(result.frames).toHaveLength(1);
+    expect(result.frames[0]!.delay).toBe(16);
+    expect(result.template).toBe(true);
+  });
   it("rejects malformed and excessive logical dimensions before allocating frames", () => {
     const minimal = Buffer.from(
       "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",

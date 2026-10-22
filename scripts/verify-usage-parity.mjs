@@ -200,8 +200,8 @@ try {
     window.codexCoco.enableModule({ moduleId: "desktop-tools", enabled: true }),
   );
   for (const [iconId, template] of [
-    ["builtin:cat3", true],
-    ["builtin:my0", true],
+    ["builtin:zhiyin_basketball", true],
+    ["builtin:zhiyin", true],
     ["builtin:pink_cat", false],
   ]) {
     await configure(page, "desktop-tools", { iconId, animate: false, followsCpu: false });
