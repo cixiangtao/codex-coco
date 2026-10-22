@@ -39,7 +39,7 @@ export function WindowShell({
                 <TooltipTrigger
                   render={
                     <Button
-                      variant={page === id ? "secondary" : "ghost"}
+                      variant="navigation"
                       size="icon-lg"
                       className={cn("desktop-nav-item", id === "modules" && "desktop-nav-utility")}
                       aria-label={label}
