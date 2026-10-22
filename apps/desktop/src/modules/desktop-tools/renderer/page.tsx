@@ -64,6 +64,29 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
         return;
       }
       acceptModuleSnapshot(response.value);
+      if (operation !== "import-tray-icon" && response.value.operation) {
+        const completed = await waitForModuleOperation(
+          "desktop-tools",
+          response.value.operation.id,
+          300_000,
+        );
+        const result = desktopToolsResultSchema.safeParse(completed.result);
+        if (completed.phase === "cancelled") setMessage("操作已取消。");
+        else if (
+          completed.phase !== "succeeded" ||
+          !result.success ||
+          result.data.status === "error"
+        )
+          setMessage("系统偏好操作未完成，请检查下方状态后重试。");
+        else if (operation === "apply-login")
+          setMessage(result.data.openAtLogin ? "已开启开机启动。" : "已关闭开机启动。");
+        else if (operation === "apply-sharing")
+          setMessage(result.data.sharing ? "共享快照已开启。" : "共享快照已关闭。");
+        else if (operation === "inspect-system")
+          setMessage(
+            `系统状态已更新；开机启动${result.data.openAtLogin ? "已开启" : "已关闭"}，共享快照${result.data.sharing ? "已开启" : "已关闭"}。`,
+          );
+      }
       if (operation === "import-tray-icon" && response.value.operation) {
         const completed = await waitForModuleOperation(
           "desktop-tools",

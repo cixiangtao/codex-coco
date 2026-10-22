@@ -144,6 +144,12 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
           </div>
         )}
       </header>
+      {message && (
+        <Alert variant="destructive">
+          <AlertTitle>操作未完成</AlertTitle>
+          <AlertDescription>{message}</AlertDescription>
+        </Alert>
+      )}
       <Tabs defaultValue="overview">
         <TabsList aria-label="用量功能">
           <TabsTrigger value="overview">总览</TabsTrigger>
@@ -152,12 +158,6 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
         </TabsList>
         <TabsContent value="overview">
           <Box gap="lg">
-            {message && (
-              <Alert variant="destructive">
-                <AlertTitle>操作未完成</AlertTitle>
-                <AlertDescription>{message}</AlertDescription>
-              </Alert>
-            )}
             {unavailable ? (
               <Alert variant="destructive">
                 <AlertTitle>用量模块需要处理</AlertTitle>

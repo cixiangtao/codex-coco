@@ -1,3 +1,4 @@
+import { ModuleOperationStatus } from "./components/module-operation-status";
 import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
 import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
 import { Suspense, useState } from "react";
@@ -91,6 +92,7 @@ function ModulePanel({ snapshot }: { snapshot: ModuleSnapshot }) {
       </output>
       {Page && (
         <Suspense fallback={<p>正在载入模块验证区…</p>}>
+          <ModuleOperationStatus snapshot={snapshot} />
           <Page snapshot={snapshot} />
         </Suspense>
       )}
@@ -118,6 +120,7 @@ export function RegisteredModulePage({ moduleId }: { moduleId: string }) {
   const Page = Object.hasOwn(modulePages, moduleId) ? modulePages[moduleId] : undefined;
   return snapshot && Page ? (
     <Suspense fallback={<p>正在载入模块页面…</p>}>
+      <ModuleOperationStatus snapshot={snapshot} />
       <Page snapshot={snapshot} />
     </Suspense>
   ) : (
