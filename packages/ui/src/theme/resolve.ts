@@ -1,4 +1,9 @@
-import { normalizePrimaryColor, type ResolvedMode, type ThemePreference } from "./contract";
+import {
+  normalizePrimaryColor,
+  type ResolvedMode,
+  type ThemePreference,
+  type ThemePresetId,
+} from "./contract";
 
 const colors = {
   light: {
@@ -39,9 +44,12 @@ const colors = {
 
 const primaryColors = {
   neutral: { light: "#343434", dark: "#e6e6e6" },
+  red: { light: "#c84252", dark: "#ff9da8" },
+  yellow: { light: "#e3b524", dark: "#f2d46d" },
   blue: { light: "#245dd8", dark: "#8cafff" },
+  green: { light: "#258366", dark: "#83d8b7" },
   violet: { light: "#7042c1", dark: "#c5a4ff" },
-} as const;
+} as const satisfies Record<ThemePresetId, Record<ResolvedMode, string>>;
 
 function rgb(hex: string) {
   return [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));

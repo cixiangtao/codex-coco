@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { normalizePrimaryColor, type ThemePreference } from "@codex-coco/ui/theme/contract";
+import {
+  normalizePrimaryColor,
+  type ThemePreference,
+  type ThemePresetId,
+} from "@codex-coco/ui/theme/contract";
 import { useSavedSettings } from "./settings";
 
 /** Window-owned preview survives page navigation; only save broadcasts to other windows. */
@@ -84,6 +88,10 @@ export function useThemeEditor() {
     cancel,
     save,
     recover,
+    selectPreset(presetId: ThemePresetId) {
+      setColorInput(null);
+      update({ presetId, primaryColor: null });
+    },
     changeColor(value: string) {
       setColorInput(value);
       const parsed = normalizePrimaryColor(value);

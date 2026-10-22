@@ -430,3 +430,9 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - 设置页接入受控 ColorPicker，拖动二维色板和色相条即时预览，保留 HEX 输入与使用预设主色。新依赖 react-colorful 5.8.1 精确锁定，MIT 许可随桌面资源保留。
 - `pnpm run check` 通过：186 项测试、格式、Oxlint、124 个源文件依赖边界、类型检查及生产构建。生产入口 `verify-desktop` 新增真实鼠标按住拖动时主题已更新、色值同步、拖动不落盘和方向键调整验证；已有取消、无效输入、系统模式、跨窗口、保存与重启保持通过。`verify-ui-instruments` 通过明暗、自定义色、草稿与速览同步回归。
 - 已核对 `work/desktop-verification/color-picker-light.png`、`color-picker-dark.png` 和 `compact.png` 的真实 Electron 画面。本轮未重新打包。
+
+## 六套配色预设（2026-10-22）
+
+- 在中性、蓝色、紫色基础上补齐红色、黄色、绿色，各自提供明暗主色；选项用实际色点展示，窄窗可换行。选择预设会清除自定义颜色草稿并预览，保存、取消与跨窗口边界沿用主题编辑器。
+- `pnpm run check` 通过：25 个测试文件、192 项测试、格式、Oxlint、124 个源文件依赖边界、类型检查和生产构建。对比度测试覆盖全部预设的文字、交互状态、焦点与仪表表面。
+- 生产入口 `verify-desktop` 通过六套预设明暗切换、自定义及无效输入切回预设、草稿不落盘、保存/取消、多窗口、重启与损坏恢复。已核对深色 `presets-1.png` 和 720px 窄窗 `compact.png`，无水平溢出。使用临时数据，本轮未重新打包。

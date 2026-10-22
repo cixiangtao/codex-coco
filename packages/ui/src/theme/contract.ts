@@ -1,6 +1,6 @@
 /** Pure theme contract. This entry is safe to consume outside React and the DOM. */
 export const themeModes = ["light", "dark", "system"] as const;
-export const themePresetIds = ["neutral", "blue", "violet"] as const;
+export const themePresetIds = ["neutral", "red", "yellow", "blue", "green", "violet"] as const;
 export type ThemeMode = (typeof themeModes)[number];
 export type ThemePresetId = (typeof themePresetIds)[number];
 export type ResolvedMode = Exclude<ThemeMode, "system">;

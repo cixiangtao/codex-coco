@@ -20,7 +20,14 @@ import {
 import { themeModes, themePresetIds } from "@codex-coco/ui/theme/contract";
 import type { ThemeEditor } from "../client/theme-editor";
 const modeLabels = { light: "浅色", dark: "深色", system: "跟随系统" };
-const presetLabels = { neutral: "中性", blue: "蓝色", violet: "紫色" };
+const presetLabels = {
+  neutral: "中性",
+  red: "红色",
+  yellow: "黄色",
+  blue: "蓝色",
+  green: "绿色",
+  violet: "紫色",
+};
 
 /** Edits the shared host-backed theme with a window-local draft. */
 export function SettingsPage({ editor }: { editor: ThemeEditor }) {
@@ -35,6 +42,7 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
     dirty,
     update,
     changeColor,
+    selectPreset,
     cancel,
     save,
   } = editor;
@@ -74,15 +82,26 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
             <FieldTitle id="preset-label">配色预设</FieldTitle>
             <ToggleGroup
               aria-labelledby="preset-label"
-              value={[theme.presetId]}
+              className="flex-wrap"
+              value={theme.primaryColor === null ? [theme.presetId] : []}
               onValueChange={(values) => {
                 const presetId = themePresetIds.find((item) => item === values[0]);
-                if (presetId) update({ presetId });
+                if (presetId) selectPreset(presetId);
               }}
               variant="outline"
             >
               {themePresetIds.map((preset) => (
                 <ToggleGroupItem key={preset} value={preset}>
+                  <span
+                    aria-hidden="true"
+                    className="size-3 shrink-0 rounded-full border border-foreground/10"
+                    style={{
+                      backgroundColor: resolveTheme(
+                        { ...theme, presetId: preset, primaryColor: null },
+                        resolvedMode,
+                      ).primary,
+                    }}
+                  />
                   {presetLabels[preset]}
                 </ToggleGroupItem>
               ))}

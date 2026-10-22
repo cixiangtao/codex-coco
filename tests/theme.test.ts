@@ -61,15 +61,17 @@ describe("theme contract", () => {
   });
   it("keeps instrument tracks visible and text readable across theme and custom primary changes", () => {
     for (const mode of ["light", "dark"] as const) {
-      for (const primaryColor of [null, "#ffffff", "#000000", "#ffff00", "#00ff00", "#f400fc"]) {
-        const theme = resolveTheme({ mode, presetId: "neutral", primaryColor }, mode);
-        for (const tone of ["primary", "success", "warning"] as const) {
-          expect(
-            contrastRatio(theme[`data-${tone}`], theme[`data-${tone}-surface`]),
-          ).toBeGreaterThanOrEqual(3);
-          expect(
-            contrastRatio(theme.foreground, theme[`data-${tone}-surface`]),
-          ).toBeGreaterThanOrEqual(4.5);
+      for (const presetId of themePresetIds) {
+        for (const primaryColor of [null, "#ffffff", "#000000", "#ffff00", "#00ff00", "#f400fc"]) {
+          const theme = resolveTheme({ mode, presetId, primaryColor }, mode);
+          for (const tone of ["primary", "success", "warning"] as const) {
+            expect(
+              contrastRatio(theme[`data-${tone}`], theme[`data-${tone}-surface`]),
+            ).toBeGreaterThanOrEqual(3);
+            expect(
+              contrastRatio(theme.foreground, theme[`data-${tone}-surface`]),
+            ).toBeGreaterThanOrEqual(4.5);
+          }
         }
       }
     }

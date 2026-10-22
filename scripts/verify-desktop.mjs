@@ -151,6 +151,42 @@ export async function verifyDesktopSession(session) {
   assert.equal(initialBounds.height, 800);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
 
+  console.log("QA: preset palettes and custom override reset");
+  const presetColors = [
+    ["中性", "#343434", "#e6e6e6"],
+    ["红色", "#c84252", "#ff9da8"],
+    ["黄色", "#e3b524", "#f2d46d"],
+    ["蓝色", "#245dd8", "#8cafff"],
+    ["绿色", "#258366", "#83d8b7"],
+    ["紫色", "#7042c1", "#c5a4ff"],
+  ];
+  for (const [modeIndex, modeName] of ["浅色", "深色"].entries()) {
+    await page.getByRole("button", { name: modeName, exact: true }).click();
+    for (const [label, light, dark] of presetColors) {
+      await page.getByRole("button", { name: label, exact: true }).click();
+      await page.waitForFunction(
+        (expected) => document.documentElement.style.getPropertyValue("--primary") === expected,
+        modeIndex === 0 ? light : dark,
+      );
+    }
+    await page.screenshot({ path: join(output, `presets-${modeIndex}.png`), scale: "css" });
+  }
+  await page.getByLabel("自定义主色", { exact: true }).fill("#123456");
+  assert.equal(
+    await page.getByRole("button", { name: "紫色", exact: true }).getAttribute("aria-pressed"),
+    "false",
+  );
+  // Selecting the same stored preset must also leave custom-color mode.
+  await page.getByRole("button", { name: "紫色", exact: true }).click();
+  assert.equal(await page.getByLabel("自定义主色", { exact: true }).inputValue(), "");
+  assert.equal(await primary(page), "#c5a4ff");
+  await page.getByLabel("自定义主色", { exact: true }).fill("invalid");
+  await page.getByRole("button", { name: "黄色", exact: true }).click();
+  assert.equal(await page.getByLabel("自定义主色", { exact: true }).inputValue(), "");
+  assert.equal(await page.getByRole("button", { name: "保存主题", exact: true }).isEnabled(), true);
+  assert.equal((await saved(page)).settings.revision, 0, "Preset selection is only a preview");
+  await page.getByRole("button", { name: "取消预览", exact: true }).click();
+
   console.log("QA: mode and color preview");
   await page.getByRole("button", { name: "深色", exact: true }).click();
   await waitTheme(page, "dark");
@@ -321,6 +357,8 @@ export async function verifyDesktopSession(session) {
   const nativeWindow = await application.browserWindow(page);
   await nativeWindow.evaluate((window) => window.setSize(720, 640));
   await page.waitForFunction(() => innerWidth === 720);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.getByRole("button", { name: "红色", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({
     path: join(output, "compact.png"),
     scale: "css",
