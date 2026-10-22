@@ -169,6 +169,33 @@
 .coco-box {
   min-width: 0;
 }
+.coco-color-picker {
+  min-width: 0;
+}
+.coco-color-picker[data-disabled="true"] {
+  opacity: 0.5;
+}
+.coco-color-picker .react-colorful {
+  width: 100%;
+  height: 176px;
+  gap: 14px;
+}
+.coco-color-picker .react-colorful__saturation {
+  border-bottom: 0;
+  border-radius: var(--radius-control);
+}
+.coco-color-picker .react-colorful__hue {
+  height: 14px;
+  border-radius: 999px;
+}
+.coco-color-picker .react-colorful__pointer {
+  width: 18px;
+  height: 18px;
+}
+.coco-color-picker .react-colorful__interactive:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
 .coco-badge {
   display: inline-flex;
   align-items: center;

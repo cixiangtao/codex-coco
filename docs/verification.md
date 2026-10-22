@@ -424,3 +424,9 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - 配置损坏恢复从旧编辑区移到主窗口统一异常提示，正常配置不显示。真实 Electron 验证在外观页完成备份恢复，原文件备份内容保持一致。
 - `pnpm run check` 通过：186 项测试、格式、Oxlint、123 个源文件依赖边界、类型检查和生产构建。生产入口 `verify-glance-layout` 与 `verify-ui-instruments` 通过，覆盖编辑区移除、图钉、原生拖动与键盘排序、自动保存/冲突/失败重试、跨窗口、重启、权限及明暗与窄窗界面。
 - 已核对 `work/glance-layout/settings-light.png`。使用临时数据与受控 CLI；本轮未重新打包。
+
+## 自定义主色面板（2026-10-22）
+
+- 设置页接入受控 ColorPicker，拖动二维色板和色相条即时预览，保留 HEX 输入与使用预设主色。新依赖 react-colorful 5.8.1 精确锁定，MIT 许可随桌面资源保留。
+- `pnpm run check` 通过：186 项测试、格式、Oxlint、124 个源文件依赖边界、类型检查及生产构建。生产入口 `verify-desktop` 新增真实鼠标按住拖动时主题已更新、色值同步、拖动不落盘和方向键调整验证；已有取消、无效输入、系统模式、跨窗口、保存与重启保持通过。`verify-ui-instruments` 通过明暗、自定义色、草稿与速览同步回归。
+- 已核对 `work/desktop-verification/color-picker-light.png`、`color-picker-dark.png` 和 `compact.png` 的真实 Electron 画面。本轮未重新打包。

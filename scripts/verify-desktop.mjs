@@ -173,6 +173,36 @@ export async function verifyDesktopSession(session) {
   assert.equal(await primary(page), "#8cafff");
   await waitTheme(page, "dark");
   const color = page.getByLabel("自定义主色", { exact: true });
+  const picker = page.getByRole("group", { name: "自定义主色调色板", exact: true });
+  await picker.scrollIntoViewIfNeeded();
+  const saturation = picker.locator(".react-colorful__saturation");
+  const paletteBounds = await saturation.boundingBox();
+  assert(paletteBounds && paletteBounds.width > 150 && paletteBounds.height > 100);
+  const savedBeforePicking = await saved(page);
+  await page.mouse.move(
+    paletteBounds.x + paletteBounds.width * 0.35,
+    paletteBounds.y + paletteBounds.height * 0.25,
+  );
+  await page.mouse.down();
+  const firstPick = await primary(page);
+  await page.mouse.move(
+    paletteBounds.x + paletteBounds.width * 0.75,
+    paletteBounds.y + paletteBounds.height * 0.45,
+    { steps: 5 },
+  );
+  const draggedColor = await primary(page);
+  assert.notEqual(draggedColor, firstPick, "Preview changes before the pointer is released");
+  assert.equal(await color.inputValue(), draggedColor);
+  assert.deepEqual(await saved(page), savedBeforePicking, "Dragging never persists a draft");
+  await page.mouse.up();
+  await picker.getByRole("slider", { name: "Hue", exact: true }).press("ArrowRight");
+  await page.waitForFunction(
+    (previous) => document.documentElement.style.getPropertyValue("--primary") !== previous,
+    draggedColor,
+  );
+  assert.notEqual(await primary(page), draggedColor, "Keyboard hue changes preview immediately");
+  assert.equal(await color.inputValue(), await primary(page));
+  await page.screenshot({ path: join(output, "color-picker-dark.png"), scale: "css" });
   await color.fill("#000000");
   assert.equal(
     await page.evaluate(() =>
@@ -211,6 +241,8 @@ export async function verifyDesktopSession(session) {
     nativeTheme.themeSource = "light";
   });
   await waitTheme(page, "light");
+  await page.getByRole("group", { name: "自定义主色调色板", exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(output, "color-picker-light.png"), scale: "css" });
   await page.getByRole("button", { name: "深色", exact: true }).click();
   await waitTheme(page, "dark");
   await application.evaluate(({ nativeTheme }) => {

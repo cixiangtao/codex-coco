@@ -65,3 +65,7 @@ electron-updater 6.8.9（MIT，Copyright (c) 2015 Loopline Systems）用于手�
 ## 图片尺寸读取
 
 image-size 2.0.4（MIT，Copyright © 2013-Present Aditya Yadav）仅在桌面后台读取本地图片头部的宽高和 EXIF 方向，为原生异步缩略图保留宽高比；不执行网络请求，不解码完整图片，不把路径公开给界面。完整许可保留于 resources/licenses/image-size.txt，并随应用分发。
+
+## 自定义主色选色器
+
+UI 包使用 [react-colorful](https://github.com/omgovich/react-colorful) 5.8.1 的 HexColorPicker，采用 MIT，Copyright (c) 2020-present Vlad Shilov。完整许可保留于 resources/licenses/react-colorful.txt，随桌面资源分发。依赖版本锁定，仅在渲染器进行选色和键盘交互；Codex Coco 自行封装受控组件、主题样式、禁用状态与草稿保存流程，不复制上游源码。

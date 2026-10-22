@@ -3,6 +3,9 @@ import { UpdateSettings } from "../update-settings";
 import { RegisteredModulePage } from "../modules-panel";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
+import { ColorPicker } from "@codex-coco/ui/components/color-picker";
+import { useResolvedTheme } from "@codex-coco/ui/theme";
+import { resolveTheme } from "@codex-coco/ui/theme/resolve";
 import { FieldDescription, FieldLabel, FieldTitle } from "@codex-coco/ui/components/field";
 import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
 import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
@@ -35,6 +38,8 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
     cancel,
     save,
   } = editor;
+  const resolvedMode = useResolvedTheme();
+  const currentColor = resolveTheme(theme, resolvedMode).primary;
   return (
     <div className="settings-page">
       <header className="desktop-page-heading">
@@ -85,31 +90,46 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
           </SettingsRow>
           <SettingsRow layout="stacked" data-invalid={invalid}>
             <FieldLabel htmlFor="primary-color">自定义主色</FieldLabel>
-            <div className="flex flex-wrap gap-3">
-              <Input
-                id="primary-color"
-                className="w-52"
-                placeholder="例如 #245dd8"
-                value={color}
-                aria-invalid={invalid}
-                aria-describedby="color-help"
-                onChange={(event) => {
-                  changeColor(event.target.value);
-                }}
+            <div className="theme-color-editor">
+              <ColorPicker
+                label="自定义主色调色板"
+                value={currentColor}
+                onValueChange={changeColor}
+                disabled={busy || unavailable}
               />
-              <Button
-                variant="outline"
-                onClick={() => {
-                  changeColor("");
-                }}
-              >
-                使用预设主色
-              </Button>
+              <div className="theme-color-details">
+                <div className="flex items-center gap-3">
+                  <span className="theme-color-swatch" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-medium">{color ? "自定义颜色" : "跟随配色预设"}</p>
+                    <p className="text-xs text-muted-foreground">{currentColor.toUpperCase()}</p>
+                  </div>
+                </div>
+                <Input
+                  id="primary-color"
+                  placeholder="输入 HEX 色值"
+                  value={color}
+                  aria-invalid={invalid}
+                  aria-describedby="color-help"
+                  spellCheck={false}
+                  onChange={(event) => {
+                    changeColor(event.target.value);
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    changeColor("");
+                  }}
+                >
+                  使用预设主色
+                </Button>
+              </div>
             </div>
             <FieldDescription id="color-help">
               {invalid
                 ? "请输入 #RGB 或 #RRGGBB 格式的颜色。"
-                : "留空使用预设主色；文字与焦点颜色自动适配。"}
+                : "拖动色板或色相条即可即时预览，也可用方向键微调。保存后同步到所有窗口，取消可恢复原主题。"}
             </FieldDescription>
           </SettingsRow>
         </SettingsGroup>
