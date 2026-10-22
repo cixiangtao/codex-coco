@@ -1179,6 +1179,91 @@ body {
   display: flex;
   gap: 2px;
 }
+.glance-order-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.glance-order-card {
+  flex-shrink: 0;
+}
+.glance-order-card .coco-card-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.glance-order-card .coco-card-title {
+  font-size: 14px;
+}
+.glance-order-card .coco-card-header p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.glance-order-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.glance-order-list > li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.glance-order-list > li:last-child {
+  border-bottom: 0;
+}
+.glance-order-list > li[data-dragging="true"] {
+  opacity: 0.45;
+}
+.glance-order-list > li[data-drop]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--primary);
+  pointer-events: none;
+}
+.glance-order-list > li[data-drop="before"]::after {
+  top: -1px;
+}
+.glance-order-list > li[data-drop="after"]::after {
+  bottom: -1px;
+}
+.glance-sort-handle {
+  flex: 1;
+  min-width: 0;
+  height: 50px;
+  padding: 4px;
+  gap: 6px;
+  justify-content: flex-start;
+  cursor: grab;
+}
+.glance-sort-handle:active {
+  cursor: grabbing;
+}
+.glance-sort-number {
+  width: 12px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.glance-sort-label {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+  font-size: 13px;
+  text-align: start;
+  align-items: flex-start;
+}
+.glance-sort-label small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
 .glance-editor-preview {
   min-width: 0;
 }

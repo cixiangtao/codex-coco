@@ -1,4 +1,4 @@
-import type { GlanceLayoutSnapshot, SaveGlanceLayout } from "./glance-layout";
+import type { GlanceLayoutSnapshot, SaveGlanceLayout, ReorderGlanceLayout } from "./glance-layout";
 import type { UpdateSnapshot, SaveUpdatePreferences, UpdateAction } from "./updates";
 import type { WindowContext, MainPage } from "./windows";
 import type { GlanceSnapshot } from "./glance";
@@ -14,6 +14,7 @@ import type {
 export const channels = {
   glanceLayout: "codex-coco:glance-layout",
   saveGlanceLayout: "codex-coco:save-glance-layout",
+  reorderGlanceLayout: "codex-coco:reorder-glance-layout",
   resetGlanceLayout: "codex-coco:reset-glance-layout",
   glanceLayoutChanged: "codex-coco:glance-layout-changed",
   glancePreview: "codex-coco:glance-preview",
@@ -27,6 +28,7 @@ export const channels = {
   navigate: "codex-coco:navigate",
   glance: "codex-coco:glance",
   glanceChanged: "codex-coco:glance-changed",
+  glanceVisibilityChanged: "codex-coco:glance-visibility-changed",
   bootstrap: "codex-coco:bootstrap",
   saveTheme: "codex-coco:save-theme",
   resetSettings: "codex-coco:reset-settings",
@@ -58,6 +60,7 @@ export type Result<T> =
 export interface DesktopBridge {
   glanceLayout(): Promise<Result<GlanceLayoutSnapshot>>;
   saveGlanceLayout(input: SaveGlanceLayout): Promise<Result<GlanceLayoutSnapshot>>;
+  reorderGlanceLayout(input: ReorderGlanceLayout): Promise<Result<GlanceLayoutSnapshot>>;
   resetGlanceLayout(): Promise<Result<GlanceLayoutSnapshot>>;
   onGlanceLayoutChanged(listener: (snapshot: GlanceLayoutSnapshot) => void): () => void;
   glancePreview(): Promise<Result<GlanceSnapshot>>;
@@ -71,6 +74,7 @@ export interface DesktopBridge {
   onNavigate(listener: (page: MainPage) => void): () => void;
   glance(): Promise<Result<GlanceSnapshot>>;
   onGlanceChanged(listener: (snapshot: GlanceSnapshot) => void): () => void;
+  onGlanceVisibilityChanged(listener: (visible: boolean) => void): () => void;
   ready(): void;
   modules(): Promise<Result<ModuleSnapshot[]>>;
   enableModule(input: EnableModuleInput): Promise<Result<ModuleSnapshot>>;

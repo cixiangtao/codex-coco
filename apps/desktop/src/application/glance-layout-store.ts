@@ -4,6 +4,7 @@ import {
   defaultGlanceLayout,
   glanceLayoutSchema,
   saveGlanceLayoutSchema,
+  reorderGlanceLayoutSchema,
   type GlanceLayoutSnapshot,
 } from "../contracts/glance-layout";
 
@@ -38,6 +39,22 @@ export class GlanceLayoutStore {
   }
   async reset() {
     await this.store.reset();
+    return this.snapshot();
+  }
+  /** Validate the selection before the revision-checked atomic write; stale writes cannot change it. */
+  async reorder(input: unknown) {
+    const parsed = reorderGlanceLayoutSchema.safeParse(input);
+    if (!parsed.success) throw new SettingsError("INVALID_INPUT", "速览排序无效。");
+    const current = this.snapshot();
+    if (parsed.data.expectedRevision !== current.revision)
+      throw new SettingsError("CONFLICT", "速览组合已更新，请载入最新顺序后重试。");
+    const { blocks } = parsed.data;
+    if (
+      blocks.length !== current.value.blocks.length ||
+      blocks.some((id) => !current.value.blocks.includes(id))
+    )
+      throw new SettingsError("INVALID_INPUT", "悬浮窗只能调整已添加信息块的顺序。");
+    await this.store.update({ value: { blocks } }, parsed.data.expectedRevision);
     return this.snapshot();
   }
   flush() {

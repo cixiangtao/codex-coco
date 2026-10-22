@@ -36,7 +36,7 @@
 - pnpm run check：Oxfmt、Oxlint、AST 依赖边界、分进程/包/测试类型检查、合同测试和生产构建。
 - pnpm run verify:diagnostics：真实 Electron 验证日志关联、隐私字段排除与写入失败隔离。
 - pnpm run profile:desktop / profile:packaged：显式采样生产文件/打包应用的启动和全进程资源，使用临时数据，不作为性能达标声明。
-- pnpm run verify:menu-bar：验证真实菜单栏回调、只读窗口权限、速览状态/主题同步、开合和主窗口重开。
+- pnpm run verify:menu-bar：验证真实菜单栏回调、业务只读权限、速览状态/主题同步、开合和主窗口重开。
 - pnpm run verify:modules：生产入口的真实模块链路回归，仅注册合成模块并使用临时数据，结束后清理。
 - pnpm run verify:workers：验证真实 Electron 中独立 worker 构建入口、进度、结果与实际退出；打包回归包含同一资源验证。
 - pnpm run verify:usage：临时 PATH 中的受控 stdio 服务验证读取、失败恢复、取消、重启与只读摘要；不得使用真实账号代替测试数据。
@@ -61,7 +61,7 @@
 
 窗口交互提案独立放在 renderer/design-review，通过 pnpm run design:review 查看，不接入正常 Electron 入口或真实业务。用户认可侧栏布局方向并要求参考 Codex 客户端精简导航，目前默认 A 精简侧栏并保留 B/C 对照；正式 Electron 已独立实现 A 的布局，视觉细节仍可打磨。主窗口承载完整模块能力，菜单栏悬浮窗跨模块速览。异常时优先展示恢复路径，旧数据默认收起。详见 docs/design-review.md。
 
-菜单栏速览通过主进程注册的窗口身份限制为只读，仅接收 application/glance.ts 的公开状态投影，不接收完整模块事件、配置或结果。跳转只接受固定 MainPage；新摘要数据或业务刷新接入时同步合同、权限与隐私测试。原生生命周期与边界见 docs/menu-bar.md。
+菜单栏速览按主进程注册的窗口身份只读取 application/glance.ts 的公开状态投影，不接收完整模块事件、配置或结果。2026-10-22 用户授权悬浮窗直接拖动排序，唯一写入例外是专用 reorderGlanceLayout：仅可重排当前选择的同一集合，严格校验 ID、重复、revision 和原子写入，不可增删、恢复或执行业务任务。跳转只接受固定 MainPage；新摘要数据或写入接入时同步合同、权限与隐私测试。原生生命周期与边界见 docs/menu-bar.md。
 
 重计算通过 application/worker-task.ts 执行。Worker 工厂由组合根静态注入，不接受 renderer 或配置传入的代码路径；禁止失败后回退主线程。取消、停用与退出须等待实际线程退出，终止失败不得伪装清理成功。worker 返回严格 JSON 消息，公开输出仍须模块自己的 schema 校验。构建入口与打包资源一同验证，详见 docs/worker-tasks.md。
 

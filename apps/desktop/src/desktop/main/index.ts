@@ -169,6 +169,15 @@ const windowStarts = new Map<number, number>();
 let store: SettingsStore;
 let quitting = false;
 
+function publishGlanceVisibility(window: BrowserWindow, visible: boolean) {
+  if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+  try {
+    window.webContents.send(channels.glanceVisibilityChanged, visible);
+  } catch {
+    /* An unavailable renderer cannot block the native window lifecycle. */
+  }
+}
+
 function createWindow(context: WindowContext = { kind: "main", page: "appearance" }) {
   const began = performance.now();
   const theme = store.getSnapshot().settings.theme;
@@ -210,6 +219,11 @@ function createWindow(context: WindowContext = { kind: "main", page: "appearance
   const contentsId = win.webContents.id;
   windows.set(contentsId, win);
   contexts.set(contentsId, context);
+  if (context.kind === "glance") {
+    // macOS panels may keep document.visibilityState="visible" after a native hide.
+    win.on("show", () => publishGlanceVisibility(win, true));
+    win.on("hide", () => publishGlanceVisibility(win, false));
+  }
   if (context.kind === "main")
     win.on("focus", () => {
       lastMainId = contentsId;
@@ -265,13 +279,23 @@ function openMain(page?: MainPage) {
 
 function updateGlance() {
   const items = buildGlanceItems(modules.snapshots(), modules.glanceDetails());
-  const layout = glanceLayoutStore.snapshot().value;
+  const savedLayout = glanceLayoutStore.snapshot();
+  const layout = savedLayout.value;
+  const layoutEditable = ["ok", "missing"].includes(savedLayout.health);
   if (
     JSON.stringify(items) === JSON.stringify(glance.items) &&
-    JSON.stringify(layout) === JSON.stringify(glance.layout)
+    JSON.stringify(layout) === JSON.stringify(glance.layout) &&
+    savedLayout.revision === glance.layoutRevision &&
+    layoutEditable === glance.layoutEditable
   )
     return;
-  glance = { revision: glance.revision + 1, items, layout };
+  glance = {
+    revision: glance.revision + 1,
+    items,
+    layout,
+    layoutRevision: savedLayout.revision,
+    layoutEditable,
+  };
   menuBar?.updateSummary(glance);
   desktopPreferences.updateGlance(glance);
   for (const win of windows.values()) {
@@ -364,6 +388,14 @@ function registerIpc() {
     return publishLayout();
   });
   handle(
+    channels.reorderGlanceLayout,
+    async (input) => {
+      await glanceLayoutStore.reorder(input);
+      return publishLayout();
+    },
+    "glance",
+  );
+  handle(
     channels.windowContext,
     (input, _correlationId, window) => {
       if (input !== undefined) throw new SettingsError("INVALID_INPUT", "窗口请求无效。");
@@ -438,11 +470,12 @@ function registerIpc() {
   });
   ipcMain.on(channels.rendererReady, (event) => {
     if (!trusted(event)) return;
+    const window = windows.get(event.sender.id)!;
+    const context = contexts.get(event.sender.id)!;
+    if (context.kind === "glance") publishGlanceVisibility(window, window.isVisible());
     const began = windowStarts.get(event.sender.id);
     if (began === undefined) return;
     windowStarts.delete(event.sender.id);
-    const window = windows.get(event.sender.id)!;
-    const context = contexts.get(event.sender.id)!;
     if (context.kind === "glance") menuBar?.rendererReady(window);
     else {
       window.webContents.send(channels.navigate, context.page);

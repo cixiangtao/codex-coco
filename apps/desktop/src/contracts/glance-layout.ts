@@ -43,6 +43,12 @@ export const saveGlanceLayoutSchema = z.strictObject({
   value: glanceLayoutSchema,
 });
 export type SaveGlanceLayout = z.infer<typeof saveGlanceLayoutSchema>;
+/** Popovers may only permute the currently saved selection. */
+export const reorderGlanceLayoutSchema = z.strictObject({
+  expectedRevision: z.number().int().nonnegative(),
+  blocks: glanceLayoutSchema.shape.blocks,
+});
+export type ReorderGlanceLayout = z.infer<typeof reorderGlanceLayoutSchema>;
 export interface GlanceLayoutSnapshot {
   revision: number;
   value: GlanceLayout;

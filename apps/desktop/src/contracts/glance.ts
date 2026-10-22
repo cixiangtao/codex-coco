@@ -78,4 +78,7 @@ export interface GlanceSnapshot {
   revision: number;
   items: GlanceItem[];
   layout?: GlanceLayout;
+  /** Preference revision, independent of live business updates. */
+  layoutRevision?: number;
+  layoutEditable?: boolean;
 }

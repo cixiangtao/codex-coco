@@ -10,6 +10,7 @@ import type { SettingsSnapshot } from "../../contracts/settings";
 const bridge: DesktopBridge = {
   glanceLayout: () => ipcRenderer.invoke(channels.glanceLayout),
   saveGlanceLayout: (input) => ipcRenderer.invoke(channels.saveGlanceLayout, input),
+  reorderGlanceLayout: (input) => ipcRenderer.invoke(channels.reorderGlanceLayout, input),
   resetGlanceLayout: () => ipcRenderer.invoke(channels.resetGlanceLayout),
   glancePreview: () => ipcRenderer.invoke(channels.glancePreview),
   onGlanceLayoutChanged: (listener) => {
@@ -42,6 +43,13 @@ const bridge: DesktopBridge = {
     };
   },
   glance: () => ipcRenderer.invoke(channels.glance),
+  onGlanceVisibilityChanged: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, visible: boolean) => listener(visible);
+    ipcRenderer.on(channels.glanceVisibilityChanged, handler);
+    return () => {
+      ipcRenderer.removeListener(channels.glanceVisibilityChanged, handler);
+    };
+  },
   onGlanceChanged: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, snapshot: GlanceSnapshot) =>
       listener(snapshot);
