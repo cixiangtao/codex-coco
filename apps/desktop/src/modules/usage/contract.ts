@@ -222,6 +222,13 @@ export const usageToolsSchema = z.strictObject({
 export type UsageTools = z.infer<typeof usageToolsSchema>;
 export const usageResultSchema = z.discriminatedUnion("status", [
   z.strictObject({
+    status: z.literal("cached"),
+    data: usageSnapshotSchema,
+    trend: trendSnapshotSchema.nullable(),
+    reset: resetFeedbackSchema.nullable().default(null),
+    tools: usageToolsSchema.nullable().default(null),
+  }),
+  z.strictObject({
     status: z.literal("tools"),
     tools: usageToolsSchema.nullable().default(null),
     trend: trendSnapshotSchema.nullable(),

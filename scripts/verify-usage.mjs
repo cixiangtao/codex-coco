@@ -204,16 +204,78 @@ try {
     .getByRole("navigation")
     .getByRole("button", { name: "用量", exact: true })
     .click();
-  await session.page.getByRole("heading", { name: "准备读取额度", exact: true }).waitFor();
-  assert.equal(
-    (await traces()).length,
-    beforeRestart,
-    "Restoring enable intent must not read an account",
+  await session.page.getByText("已恢复上次用量记录", { exact: true }).waitFor();
+  await session.page.getByText("剩余 75%", { exact: true }).waitFor();
+  await task(session.page, "running");
+  assert(
+    (await traces()).length > beforeRestart,
+    "Enabled modules refresh automatically on restart",
   );
+  const restoredPopupEvent = session.application.waitForEvent("window");
+  await toggle(session.application);
+  const restoredPopup = await restoredPopupEvent;
+  await restoredPopup
+    .getByText("已恢复上次记录，当前额度尚未确认；请在主窗口查看更新进度。", { exact: true })
+    .waitFor();
+  const restored = await restoredPopup.evaluate(() => window.codexCoco.glance());
+  assert.equal(restored.ok, true);
+  const restoredUsage = restored.value.items.find((item) => item.id === "usage");
+  assert.equal(restoredUsage.metrics, undefined);
+  assert.equal(restoredUsage.statusText, undefined);
+  await restoredPopup.keyboard.press("Escape");
+  await session.page.bringToFront();
+  await capture(session.page, "startup-cached.png");
+  await session.page.getByRole("button", { name: "取消读取", exact: true }).click();
+  await task(session.page, "cancelled");
+  await assertChildrenExited();
   await writeFile(mode, "ready");
   await session.page.getByRole("button", { name: "刷新用量", exact: true }).click();
+  await task(session.page, "succeeded");
   await session.page.getByText("剩余 75%", { exact: true }).waitFor();
   await assertChildrenExited();
+  const cache = await readFile(join(directory, "data/usage-snapshot.json"), "utf8");
+  assert(!cache.match(/private-token|private@example|accessToken|attemptKey|reference|samples/));
+  await session.application.close();
+  session = undefined;
+  const beforeAutomatic = (await traces()).filter((event) => event.method === "spawn").length;
+  session = await createDesktopSession(
+    join(directory, "data"),
+    environment,
+    packaged
+      ? join(root, "apps/desktop/release/mac-arm64/Codex Coco.app/Contents/MacOS/Codex Coco")
+      : undefined,
+  );
+  await task(session.page, "succeeded");
+  assert.equal(
+    (await traces()).filter((event) => event.method === "spawn").length,
+    beforeAutomatic + 1,
+  );
+  assert.equal((await snapshot(session.page)).state.status, "ready");
+  const successfulCache = await readFile(join(directory, "data/usage-snapshot.json"), "utf8");
+  await session.application.close();
+  session = undefined;
+  await writeFile(mode, "error");
+  session = await createDesktopSession(
+    join(directory, "data"),
+    environment,
+    packaged
+      ? join(root, "apps/desktop/release/mac-arm64/Codex Coco.app/Contents/MacOS/Codex Coco")
+      : undefined,
+  );
+  await task(session.page, "succeeded");
+  await session.page
+    .getByRole("navigation")
+    .getByRole("button", { name: "用量", exact: true })
+    .click();
+  await session.page.getByText("暂时无法更新用量", { exact: true }).waitFor();
+  assert.equal(await session.page.locator(".usage-previous").getAttribute("open"), null);
+  assert.equal(await session.page.getByText("剩余 75%", { exact: true }).isVisible(), false);
+  assert.equal(
+    await readFile(join(directory, "data/usage-snapshot.json"), "utf8"),
+    successfulCache,
+    "A failed startup read must preserve the last successful disk snapshot",
+  );
+  await capture(session.page, "startup-failure.png");
   assert.deepEqual(errors, []);
   assert.deepEqual(session.errors, []);
   assert(
@@ -236,7 +298,7 @@ try {
         sharedSnapshot: true,
         failedDataHidden: true,
         cancellation: true,
-        restartWithoutRead: true,
+        startupReadAndCache: true,
         privateDataExcluded: true,
         screenshots: output,
       },

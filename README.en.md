@@ -36,7 +36,9 @@ Optional `verify:appearance-launcher` and `verify:widget` require an existing Sw
 
 `apps/desktop` owns the Electron host, application services, contracts, renderer and independent `usage`, `appearance`, `desktop-tools` modules. `packages/ui` owns Tailwind/shadcn components and theme primitives without Node, Electron, IPC or storage dependencies. `native/widget` contains the native extension source. Task workers have static build entries, bounded messages and real cancellation/exit verification.
 
-Business modules are disabled by default. Usage reads and local scanning require explicit actions or saved opt-in policies; model inference, credit redemption and CLI updates require their own confirmations. Credentials stay with the CLI. Sample answers are excluded from persisted history, diagnostics and menu-bar projections.
+Business modules are disabled by default. Enabled usage modules read on startup; recurring reads and failure fallback use separately saved policies. Model inference, credit redemption and CLI updates require their own confirmations. Credentials stay with the CLI. Sample answers are excluded from persisted history, diagnostics and menu-bar projections.
+
+Usage stays disabled by default. An enabled module reads once on startup; recurring refresh is a separate setting. Restart restores only the last successful public quota, labeled as historical until refreshed. New windows share the same runtime.
 
 The main window hosts full operations; the menu-bar popover receives only public summaries and cannot write. Failures hide old quota values. Appearance saving and previewing do not apply changes. Opt-in restoration reconnects without automatically launching or restarting Codex; shutdown removes only Codex Coco styles.
 

@@ -68,10 +68,10 @@ describe("usage notification policy", () => {
   });
 });
 describe("usage scheduling", () => {
-  it("keeps the default manual, activates saved policy and releases every timer on stop", async () => {
+  it("refreshes once without polling, activates saved policy and releases every timer on stop", async () => {
     vi.useFakeTimers();
     const read = vi.fn(async () => raw);
-    const request = vi.fn(() => false);
+    const request = vi.fn(() => true);
     const controller = new AbortController();
     const definition = createUsageModule(read);
     const runtime = await definition.start(controller.signal, {
@@ -79,8 +79,10 @@ describe("usage scheduling", () => {
       requestOperation: request,
     });
     await vi.advanceTimersByTimeAsync(3_600_000);
-    expect(request).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledTimes(1);
     expect(read).not.toHaveBeenCalled();
+    request.mockClear();
+    request.mockReturnValue(false);
     runtime.configurationChanged!({ ...usageDefaults, refreshIntervalSeconds: 30 });
     await vi.advanceTimersByTimeAsync(29_999);
     expect(request).not.toHaveBeenCalled();
@@ -133,6 +135,59 @@ describe("usage scheduling", () => {
       runtime.execute("refresh", {}, { signal: aborted.signal, config, report: () => undefined }),
     ).rejects.toThrow();
     expect(notify).toHaveBeenCalledTimes(1);
+    await runtime.stop();
+  });
+  it("defers startup while busy, lets a manual refresh replace it and cancels on stop", async () => {
+    vi.useFakeTimers();
+    const request = vi.fn(() => false);
+    const controller = new AbortController();
+    const runtime = await createUsageModule(async () => raw).start(controller.signal, {
+      configuration: () => usageDefaults,
+      requestOperation: request,
+    });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(request).toHaveBeenCalledTimes(3);
+    await runtime.execute(
+      "refresh",
+      {},
+      { signal: controller.signal, config: usageDefaults, report: () => undefined },
+    );
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(request).toHaveBeenCalledTimes(3);
+    await runtime.stop();
+    const second = await createUsageModule(async () => raw).start(controller.signal, {
+      configuration: () => usageDefaults,
+      requestOperation: request,
+    });
+    await second.stop();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+  it("waits for an auxiliary task to settle before issuing the pending startup read", async () => {
+    vi.useFakeTimers();
+    const request = vi.fn(() => true);
+    let finish = () => {};
+    const picked = new Promise<boolean>((resolve) => {
+      finish = () => resolve(false);
+    });
+    const signal = new AbortController().signal;
+    const runtime = await createUsageModule(async () => raw, undefined, {
+      chooseHome: () => picked,
+      scan: async () => {
+        throw new Error("UNEXPECTED_SCAN");
+      },
+    }).start(signal, { configuration: () => usageDefaults, requestOperation: request });
+    const pending = runtime.execute(
+      "choose-local-home",
+      {},
+      { signal, config: usageDefaults, report: () => undefined },
+    );
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(request).not.toHaveBeenCalled();
+    finish();
+    await pending;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(request).toHaveBeenCalledTimes(1);
     await runtime.stop();
   });
   it("rejects invalid refresh intervals and threshold relationships", () => {

@@ -25,6 +25,7 @@ import { createDesktopPreferences } from "./desktop-preferences";
 import { createUsageToolsService } from "../../modules/usage/tools";
 import { createResetService } from "../../modules/usage/reset";
 import { createLocalUsageService } from "../../modules/usage/local-service";
+import { createUsageCache } from "../../modules/usage/cache";
 import { registeredModules } from "../../modules/registry";
 import { channels, type Result } from "../../contracts/bridge";
 import { resolveTheme } from "@codex-coco/ui/theme/resolve";
@@ -146,6 +147,7 @@ const definitions = registeredModules(
     command: usageEnvironment,
   }),
   desktopPreferences.dependencies,
+  createUsageCache(join(app.getPath("userData"), "usage-snapshot.json"), usageEnvironment),
 );
 const diagnostics = new DiagnosticLog(join(app.getPath("userData"), "diagnostics"), {
   modules: definitions.map((definition) => ({

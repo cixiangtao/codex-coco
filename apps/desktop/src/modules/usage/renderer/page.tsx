@@ -132,6 +132,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
           return;
         }
         acceptModuleSnapshot(activated.value);
+        return;
       }
       const response = await window.codexCoco.runModuleOperation({
         moduleId: "usage",
@@ -201,7 +202,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
                 ? "任务已取消，已读取的数据已保留。"
                 : automatic > 0
                   ? `已开启自动刷新，间隔 ${automatic} 秒；失败时会延长。`
-                  : "手动刷新，不在后台轮询。"}
+                  : "启动时刷新一次，之后按需刷新。"}
           </output>
         </div>
       )}
@@ -226,7 +227,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
             <EmptyTitle>按需读取用量</EmptyTitle>
             <EmptyDescription>
               启用后通过本机 Codex CLI 读取订阅额度。Codex Coco
-              不接收或保存登录令牌；默认仅手动读取，可在下方设置中开启自动刷新，不会创建对话。
+              不接收或保存登录令牌；启用或重启后读取一次，可单独开启定时刷新，不会创建对话。
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -279,6 +280,17 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
               <QuotaData data={result.data} />
             </details>
           )}
+        </>
+      ) : result?.status === "cached" ? (
+        <>
+          <Alert>
+            <AlertTitle>已恢复上次用量记录</AlertTitle>
+            <AlertDescription>
+              记录于 {dateTime(result.data.capturedAt)}，可能属于此前的登录，不代表当前账号状态。
+              {running ? "正在更新当前额度…" : "请刷新确认当前额度。"}
+            </AlertDescription>
+          </Alert>
+          <QuotaData data={result.data} />
         </>
       ) : current ? (
         <>

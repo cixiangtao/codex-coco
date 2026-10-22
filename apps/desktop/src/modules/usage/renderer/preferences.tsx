@@ -58,7 +58,7 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
             onChange={(e) => update({ refreshIntervalSeconds: e.target.valueAsNumber })}
           />
           <FieldDescription>
-            0 表示仅手动读取；自动刷新允许 30–3600
+            0 表示不定时刷新，启动时仍读取一次；自动刷新允许 30–3600
             秒。保存后按间隔读取，失败逐步延长间隔；关闭窗口后仍会运行。停用模块即停止。
           </FieldDescription>
         </Field>

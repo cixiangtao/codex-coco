@@ -3,6 +3,7 @@ import { createFoundationFixture } from "./foundation-fixture/runtime";
 import type { WorkerFactory } from "../application/worker-task";
 import { createAppearanceModule, type AppearanceDependencies } from "./appearance/runtime";
 import { createDesktopToolsModule, type DesktopToolsDependencies } from "./desktop-tools/runtime";
+import type { UsageCache } from "./usage/cache";
 import type { UsageToolsService } from "./usage/tools";
 import type { ResetService } from "./usage/reset";
 import type { LocalUsageService } from "./usage/local-service";
@@ -22,10 +23,20 @@ export function registeredModules(
   resetService?: ResetService,
   usageTools?: UsageToolsService,
   desktopTools?: DesktopToolsDependencies,
+  usageCache?: UsageCache,
 ): readonly BuiltinModule[] {
   const definitions = [
     ...(notifyUsage
-      ? [createUsageModule(undefined, notifyUsage, localUsage, resetService, usageTools)]
+      ? [
+          createUsageModule(
+            undefined,
+            notifyUsage,
+            localUsage,
+            resetService,
+            usageTools,
+            usageCache,
+          ),
+        ]
       : moduleDefinitions),
     ...(appearance ? [createAppearanceModule(appearance)] : []),
     ...(desktopTools ? [createDesktopToolsModule(desktopTools)] : []),

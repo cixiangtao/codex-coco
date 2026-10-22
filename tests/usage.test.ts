@@ -3,7 +3,6 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 import { createUsageReader } from "../apps/desktop/src/modules/usage/app-server";
 import { normalizeUsage, UsageReadError } from "../apps/desktop/src/modules/usage/normalize";
 import { createUsageModule } from "../apps/desktop/src/modules/usage/runtime";
@@ -200,7 +199,7 @@ describe("read-only App Server connection", () => {
 });
 
 describe("usage module and glance projection", () => {
-  it("does not read on enable or restart, handles recoverable errors and hides old quotas from glance", async () => {
+  it("reads once on enable and restart, handles recoverable errors and hides old quotas from glance", async () => {
     let calls = 0;
     const definition = createUsageModule(async () => {
       if (++calls === 2) throw new UsageReadError("READ_FAILED");
@@ -211,10 +210,8 @@ describe("usage module and glance projection", () => {
     try {
       await host.load();
       await host.setEnabled({ moduleId: "usage", enabled: true });
-      expect(calls).toBe(0);
       const run = () => host.run({ moduleId: "usage", operation: "refresh", input: {} });
       const result = () => usageResultSchema.parse(host.snapshots()[0]!.operation?.result);
-      run();
       await expect.poll(() => host.snapshots()[0]!.operation?.phase).toBe("succeeded");
       expect(result().status).toBe("ready");
       const summary = buildGlanceItems(host.snapshots(), host.glanceDetails()).find(
@@ -241,9 +238,8 @@ describe("usage module and glance projection", () => {
     const restarted = new ModuleHost([definition], path);
     try {
       await restarted.load();
-      await delay(10);
-      expect(calls).toBe(3);
-      expect(restarted.snapshots()[0]!.operation).toBeNull();
+      await expect.poll(() => restarted.snapshots()[0]!.operation?.phase).toBe("succeeded");
+      expect(calls).toBe(4);
     } finally {
       await restarted.shutdown();
     }

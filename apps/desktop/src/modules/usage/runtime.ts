@@ -1,3 +1,4 @@
+import type { UsageCache } from "./cache";
 import type { UsageToolsService } from "./tools";
 import type { ResetService } from "./reset";
 import type { LocalUsageService } from "./local-service";
@@ -28,13 +29,14 @@ import {
   type UsageSnapshot,
 } from "./contract";
 
-/** Reads remain opt-in; an explicitly saved policy schedules bounded tasks without renderer timers. */
+/** Enabled modules refresh once at startup; recurring reads require a saved interval. */
 export function createUsageModule(
   read: UsageReader | undefined = undefined,
   notify?: UsageNotifier,
   local?: LocalUsageService,
   resetService?: ResetService,
   tools?: UsageToolsService,
+  cache?: UsageCache,
 ): BuiltinModule {
   const reader =
     read ?? createUsageReader(local?.environment ? { environment: local.environment } : {});
@@ -99,9 +101,35 @@ export function createUsageModule(
       let trend: TrendSnapshot | null = null;
       let latest: UsageResult | null = null;
       let reset: ResetFeedback | null = null;
+      const restored = await cache?.load().catch(() => null);
+      signal.throwIfAborted();
+      if (restored) {
+        previous = restored.data;
+        accountScope = restored.scope;
+        latest = { status: "cached", data: restored.data, trend: null, reset: null, tools: null };
+      }
+      const persist = async () => {
+        if (previous) await cache?.save(previous, accountScope).catch(() => undefined);
+      };
+      let startupPending = true;
+      let startupTimer: ReturnType<typeof setTimeout> | undefined;
+      const scheduleStartup = () => {
+        clearTimeout(startupTimer);
+        if (!startupPending || stopped || signal.aborted) return;
+        // The host installs the runtime after start resolves. Busy tasks defer this one read.
+        startupTimer = setTimeout(() => {
+          if (host.requestOperation("refresh", {})) startupPending = false;
+          else scheduleStartup();
+        }, 100);
+      };
       const current = (): UsageResult | null =>
         latest
-          ? usageResultSchema.parse({ ...latest, trend, reset, tools: tools?.snapshot() ?? null })
+          ? usageResultSchema.parse({
+              ...latest,
+              trend,
+              reset,
+              tools: tools?.snapshot() ?? null,
+            })
           : trend
             ? {
                 status: "local",
@@ -117,7 +145,13 @@ export function createUsageModule(
       const result = () => current() ?? { status: "tools" as const, trend, reset, tools: null };
       const schedule = () => {
         clearTimeout(timer);
-        if (!stopped && !signal.aborted && config.refreshIntervalSeconds > 0) {
+        if (
+          !startupPending &&
+          !executing &&
+          !stopped &&
+          !signal.aborted &&
+          config.refreshIntervalSeconds > 0
+        ) {
           const seconds = Math.min(
             3600,
             config.refreshIntervalSeconds * 2 ** Math.min(failures, 5),
@@ -127,8 +161,15 @@ export function createUsageModule(
           }, seconds * 1000);
         }
       };
-      signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
-      schedule();
+      signal.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          clearTimeout(startupTimer);
+        },
+        { once: true },
+      );
+      scheduleStartup();
       return {
         state: current,
         configurationChanged: (value) => {
@@ -139,6 +180,8 @@ export function createUsageModule(
           if (stopped) throw new Error("USAGE_STOPPED");
           executing = true;
           clearTimeout(timer);
+          clearTimeout(startupTimer);
+          if (name === "refresh") startupPending = false;
           const settings = usageConfigSchema.parse(context.config);
           try {
             if (
@@ -180,8 +223,16 @@ export function createUsageModule(
                     reset,
                   };
                 const refreshed = await reader(context.signal);
+                const refreshedScope = usageAccountScope(refreshed);
+                if (refreshedScope !== accountScope) {
+                  trend = null;
+                  notifications = new UsageNotifications(notify);
+                  accountScope = refreshedScope;
+                }
                 previous = normalizeUsage(refreshed, Date.now());
                 latest = { status: "ready", data: previous, trend, reset, tools: null };
+                await persist();
+                context.signal.throwIfAborted();
                 return latest;
               } catch {
                 context.signal.throwIfAborted();
@@ -213,6 +264,7 @@ export function createUsageModule(
                 reset = null;
                 accountScope = null;
                 notifications = new UsageNotifications(notify);
+                await cache?.clear().catch(() => undefined);
               }
               return current() ?? { status: "source", changed, trend };
             }
@@ -260,6 +312,8 @@ export function createUsageModule(
               notificationsEnabled: settings.notificationsEnabled && config.notificationsEnabled,
             });
             latest = { status: "ready", data, trend, reset, tools: null };
+            await persist();
+            context.signal.throwIfAborted();
             // Quota success remains usable even if independent local history is unavailable.
             context.report(5);
             if (local) {
@@ -322,11 +376,13 @@ export function createUsageModule(
           } finally {
             executing = false;
             if (stopped) tools?.reset?.();
+            scheduleStartup();
             schedule();
           }
         },
         stop: async () => {
           stopped = true;
+          clearTimeout(startupTimer);
           if (!executing) tools?.reset?.();
           clearTimeout(timer);
           previous = null;
@@ -337,7 +393,11 @@ export function createUsageModule(
     },
     glance: (snapshot) => {
       const state = usageState(snapshot);
-      if (!state) return { description: "已启用，打开主窗口手动读取 Codex CLI 的订阅额度。" };
+      if (!state) return { description: "已启用，正在准备读取 Codex CLI 的订阅额度。" };
+      if (state.status === "cached")
+        return {
+          description: "已恢复上次记录，当前额度尚未确认；请在主窗口查看更新进度。",
+        };
       const parsed = { data: state };
       const totals = state.trend && state.trend.source !== "none" ? trendTotals(state.trend) : null;
       const statistics = totals

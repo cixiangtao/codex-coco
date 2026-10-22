@@ -89,7 +89,15 @@ try {
     };
   });
   await page.evaluate(() => window.codexCoco.enableModule({ moduleId: "usage", enabled: true }));
-  assert.equal(await spawns(), 0);
+  await poll(
+    () =>
+      page.evaluate(
+        async () =>
+          (await window.codexCoco.modules()).value.find((m) => m.id === "usage").operation?.phase,
+      ),
+    (phase) => phase === "succeeded",
+  );
+  assert.equal(await spawns(), 1);
   await configure(page, {
     notificationsEnabled: true,
     warningThreshold: 80,
@@ -143,7 +151,7 @@ try {
       {
         ok: true,
         packaged,
-        noReadOnEnable: true,
+        singleStartupRead: true,
         notificationTransitions: true,
         notificationDeduplication: true,
         backgroundWithoutWindow: true,

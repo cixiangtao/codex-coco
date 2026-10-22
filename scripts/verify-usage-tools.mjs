@@ -43,6 +43,18 @@ try {
   });
   await page.getByRole("navigation").getByRole("button", { name: "用量", exact: true }).click();
   await page.evaluate(() => window.codexCoco.enableModule({ moduleId: "usage", enabled: true }));
+  const startupDeadline = Date.now() + 15_000;
+  let startup;
+  do {
+    startup = await page.evaluate(
+      async () =>
+        (await window.codexCoco.modules()).value.find((module) => module.id === "usage").operation,
+    );
+    if (startup?.phase === "succeeded") break;
+    await delay(50);
+  } while (Date.now() < startupDeadline);
+  assert.equal(startup?.name, "refresh");
+  assert.equal(startup?.phase, "succeeded");
   await page.getByText("样本检测与 CLI 维护", { exact: true }).click();
   await page.getByRole("button", { name: "读取可用模型", exact: true }).click();
   await page.getByRole("button", { name: "受控模型", exact: true }).waitFor();

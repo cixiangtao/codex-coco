@@ -78,8 +78,21 @@ try {
   const { application, page, errors } = session;
   await page.getByRole("navigation").getByRole("button", { name: "用量", exact: true }).click();
   await page.evaluate(() => window.codexCoco.enableModule({ moduleId: "usage", enabled: true }));
+  const startupDeadline = Date.now() + 15_000;
+  let startup;
+  do {
+    startup = await page.evaluate(
+      async () =>
+        (await window.codexCoco.modules()).value.find((module) => module.id === "usage").operation,
+    );
+    if (startup?.phase === "succeeded") break;
+    await delay(50);
+  } while (Date.now() < startupDeadline);
+  assert.equal(startup?.name, "refresh");
+  assert.equal(startup?.phase, "succeeded");
   const result = await task(page, "scan-trend", { force: false });
-  assert.equal(result.status, "local");
+  assert.equal(result.status, "error");
+  assert.equal(result.reason, "READ_FAILED");
   assert.equal(
     result.trend.points.reduce((sum, point) => sum + point.tokens, 0),
     1234,

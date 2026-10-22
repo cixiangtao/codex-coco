@@ -6,7 +6,7 @@
 
 2026-10-21：用户授权移除原型，从零建立新基建。原型源码、测试、依赖、构建配置、设计记录与生成物已从工作树清理，清理前做了仓库外可恢复归档。不要恢复原型或添加兼容层作为默认起点。
 
-已从零建立可运行的 Electron、React、TypeScript 工程，独立 UI 包与主题基础、版本化配置、模块生命周期和白名单桌面桥已接入。正式主窗口使用固定图标侧栏和真实主题设置；用量模块已接入默认停用的 CLI App Server 手动读取，主窗口与菜单栏共享公开额度。外观已接入三层布景、自定义图片与显式可撤销的本机 CDP 应用；完整二期目标见 docs/phase-two.md。实际状态与未完成目标见 docs/verification.md。
+已从零建立可运行的 Electron、React、TypeScript 工程，独立 UI 包与主题基础、版本化配置、模块生命周期和白名单桌面桥已接入。正式主窗口使用固定图标侧栏和真实主题设置；用量模块已接入默认停用的 CLI App Server 启用后读取，主窗口与菜单栏共享公开额度。外观已接入三层布景、自定义图片与显式可撤销的本机 CDP 应用；完整二期目标见 docs/phase-two.md。实际状态与未完成目标见 docs/verification.md。
 
 ## 长期约定
 
@@ -60,13 +60,13 @@
 
 重计算通过 application/worker-task.ts 执行。Worker 工厂由组合根静态注入，不接受 renderer 或配置传入的代码路径；禁止失败后回退主线程。取消、停用与退出须等待实际线程退出，终止失败不得伪装清理成功。worker 返回严格 JSON 消息，公开输出仍须模块自己的 schema 校验。构建入口与打包资源一同验证，详见 docs/worker-tasks.md。
 
-用量只在主窗口明确操作或已保存自动刷新策略触发后启动短期 codex app-server，固定调用 initialize/initialized、account/read(refreshToken:false) 与 account/rateLimits/read；不读取原始令牌，不启动模型对话或登录。默认手动策略下启用或重启不读取；主窗口可显式保存 30–3600 秒自动刷新间隔，恢复已保存 opt-in 策略后按间隔执行。stdout 在后台限量解析，stderr 丢弃，子进程退出后才结算。BuiltinModule.glance 的公开字段须宿主严格校验；失败时摘要不携带旧额度。详见 docs/usage.md。
+用量仅在模块已启用时启动短期 codex app-server：启用或应用重启时自动读取一次，也可手动读取或保存定时策略，固定调用 initialize/initialized、account/read(refreshToken:false) 与 account/rateLimits/read；不读取原始令牌，不启动模型对话或登录。2026-10-22 用户授权将启动读取与定时刷新分开；间隔 0 不定时轮询，已启用模块仍在启用或重启时读取一次，新窗口共享状态。成功额度按来源隔离保存到私有缓存，恢复时明确为历史记录；失败时旧数据折叠，菜单栏不将缓存当作当前额度。主窗口可单独保存 30–3600 秒定时间隔。stdout 在后台限量解析，stderr 丢弃，子进程退出后才结算。BuiltinModule.glance 的公开字段须宿主严格校验；失败时摘要不携带旧额度。详见 docs/usage.md。
 
 二期从 2026-10-21 起要求覆盖两个旧项目的全部能力，按 docs/phase-two.md 逐项推进。用户允许先实现核心功能，UI 后期调整，不再以“只迁核心”缩小二期目标。外观支持固定或自动本机 CDP 端口、私有应用选择、显式启动/重启、图库预设与 opt-in 恢复。真实聊天客户端未操作；默认手动应用，保存与应用分离，停用和退出清理自己的样式，不接管旧服务。
 
-用量配置版本 2 将旧空配置迁移为手动读取、通知关闭。自动刷新通过宿主 requestOperation 执行，失败退避、单模块任务约束和停止清理保持有效。系统通知由桌面依赖注入，只接收固定标题和公开额度文案。菜单栏 statusText 为严格限长公开字段，不接收配置或原始账号；完整名称 Codex Coco 始终保留。配置保存通知 runtime.configurationChanged，观察者失败不能把已成功持久化的操作伪报为失败。
+用量配置版本 2 将旧空配置迁移为不定时刷新、通知关闭。自动刷新通过宿主 requestOperation 执行，失败退避、单模块任务约束和停止清理保持有效。系统通知由桌面依赖注入，只接收固定标题和公开额度文案。菜单栏 statusText 为严格限长公开字段，不接收配置或原始账号；完整名称 Codex Coco 始终保留。配置保存通知 runtime.configurationChanged，观察者失败不能把已成功持久化的操作伪报为失败。
 
-用量配置当前 v3 增加 localFallbackEnabled（默认 false）与 trendDays（7/14/30）。本机扫描仅由主窗口明确请求或已保存的本地回退策略触发，在 usage-worker 中执行；独立静态构建入口必须随打包验证。source.json 中的目录属于私有服务状态，不进入公共模块配置。公开趋势只有按日数值、来源、范围和完整性；JSONL 与 SQLite 估算不可混加；无归属记录不得冒充当前账号统计。
+用量配置当前 v3 增加 localFallbackEnabled（默认 false）与 trendDays（7/14/30）。本机扫描由成功额度刷新、主窗口明确请求或已保存的本地回退策略触发，在 usage-worker 中执行；独立静态构建入口必须随打包验证。source.json 中的目录属于私有服务状态，不进入公共模块配置。公开趋势只有按日数值、来源、范围和完整性；JSONL 与 SQLite 估算不可混加；无归属记录不得冒充当前账号统计。
 
 重置卡已通过官方 account/rateLimits/read 与 account/rateLimitResetCredit/consume 接入。消费只允许主窗口明确确认，后台先重新核对账号与引用，发送前持久化 pending 幂等请求；重试必须复用 UUID，未确认请求不能被新请求覆盖。usage-reset-attempts.json 是私有业务状态，允许保存卡 ID 与匿名账号关联，权限 0600，禁止存储令牌。取消/重启后通过检查上次兑换恢复，不代用户消费真实卡。
 
