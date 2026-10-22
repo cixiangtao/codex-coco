@@ -102,6 +102,7 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
       email: "private@example.com",
       token: "private-token",
     };
+    if (mode() === "primary-only") delete result.rateLimitsByLimitId.codex.secondary;
     if (mode() === "multi-quota") {
       result.rateLimitsByLimitId.additional = {
         primary: { usedPercent: 95, windowDurationMins: 60, resetsAt: null },

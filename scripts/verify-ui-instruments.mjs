@@ -286,12 +286,45 @@ try {
       })),
     };
   });
+  assert.equal(await popup.locator("[data-sort-handle]").count(), 7);
+  assert.equal(await popup.getByRole("button", { name: "调整速览顺序", exact: true }).count(), 0);
   await capture(popup, "glance-light");
   assert(
     summariesVisible.items.every((item) => item.bottom <= summariesVisible.bottom),
     `Ordinary summaries fit below the core quota overview: ${JSON.stringify(summariesVisible)}`,
   );
   await assertFits(popup);
+  // The real data cells are drag targets; no editor or manual completion is involved.
+  const originalOrder = (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value
+    .blocks;
+  const today = popup.locator('[data-sort-handle="usage.today"]');
+  const week = popup.locator('[data-sort-id="usage.week"]');
+  const weekBox = await week.boundingBox();
+  await today.dragTo(week, { targetPosition: { x: weekBox.width - 3, y: weekBox.height / 2 } });
+  await popup.waitForFunction(
+    () =>
+      document.querySelector(".glance-reorder")?.getAttribute("aria-busy") === "false" &&
+      document
+        .querySelector(".glance-token-grid > div:first-child")
+        ?.getAttribute("data-sort-id") === "usage.week",
+  );
+  const directOrder = (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value
+    .blocks;
+  assert.deepEqual(directOrder.slice(2, 5), ["usage.week", "usage.today", "usage.month"]);
+  assert.equal(await popup.getByRole("meter").count(), 2);
+  await capture(popup, "glance-inline-drag");
+  await today.press("ArrowUp");
+  await popup.waitForFunction(
+    () =>
+      document.querySelector(".glance-reorder")?.getAttribute("aria-busy") === "false" &&
+      document
+        .querySelector(".glance-token-grid > div:first-child")
+        ?.getAttribute("data-sort-id") === "usage.today",
+  );
+  assert.deepEqual(
+    (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value.blocks,
+    originalOrder,
+  );
   await popup.getByRole("button", { name: "刷新速览", exact: true }).click();
   assert.equal((await readFile(trace, "utf8")).split('"method":"spawn"').length, beforeTabs);
   const denied = await popup.evaluate(() =>
@@ -377,10 +410,21 @@ try {
   await toggle();
   await popup.getByRole("meter").nth(3).waitFor({ state: "attached" });
   assert.equal(await popup.locator(".glance-capacity-groups > section").count(), 2);
+  assert.equal(await popup.locator('[data-sort-handle="usage.primary"]').count(), 1);
+  assert.equal(await popup.locator('[data-sort-handle="usage.secondary"]').count(), 1);
   await popup.getByText("恢复时间未知", { exact: true }).waitFor();
   await popup.getByText("等待刷新确认", { exact: true }).waitFor();
   await assertFits(popup);
   await capture(popup, "glance-multiple");
+  await popup.keyboard.press("Escape");
+  await page.bringToFront();
+  await writeFile(mode, "primary-only");
+  await refresh();
+  await toggle();
+  await popup.getByText("其他额度窗口 · 暂无数据", { exact: true }).waitFor();
+  assert.equal(await popup.locator('[data-sort-handle="usage.primary"]').count(), 1);
+  assert.equal(await popup.locator('[data-sort-handle="usage.secondary"]').count(), 1);
+  assert.equal(await popup.getByRole("meter").count(), 1);
   await popup.keyboard.press("Escape");
   await page.bringToFront();
   await writeFile(mode, "exhausted");

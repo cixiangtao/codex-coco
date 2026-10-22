@@ -963,7 +963,7 @@ body {
   border-bottom: 1px solid var(--border);
   background: transparent;
 }
-.glance-shortcuts .glance-item:last-child {
+.glance-shortcuts > div:last-child .glance-item {
   border-bottom: 0;
 }
 .glance-item .coco-card-header {
@@ -1179,46 +1179,19 @@ body {
   display: flex;
   gap: 2px;
 }
-.glance-order-content {
+.glance-reorder {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.glance-order-card {
-  flex-shrink: 0;
-}
-.glance-order-card .coco-card-header {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-}
-.glance-order-card .coco-card-title {
-  font-size: 14px;
-}
-.glance-order-card .coco-card-header p {
-  color: var(--muted-foreground);
-  font-size: 12px;
-}
-.glance-order-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.glance-order-list > li {
+.glance-sortable {
   position: relative;
-  display: flex;
-  align-items: center;
-  min-height: 52px;
-  gap: 6px;
-  border-bottom: 1px solid var(--border);
+  min-width: 0;
 }
-.glance-order-list > li:last-child {
-  border-bottom: 0;
-}
-.glance-order-list > li[data-dragging="true"] {
+.glance-sortable[data-dragging="true"] {
   opacity: 0.45;
 }
-.glance-order-list > li[data-drop]::after {
+.glance-sortable[data-drop]::after {
   content: "";
   position: absolute;
   inset-inline: 0;
@@ -1226,43 +1199,71 @@ body {
   background: var(--primary);
   pointer-events: none;
 }
-.glance-order-list > li[data-drop="before"]::after {
-  top: -1px;
+.glance-sortable[data-drop="before"]::after {
+  top: -2px;
 }
-.glance-order-list > li[data-drop="after"]::after {
-  bottom: -1px;
+.glance-sortable[data-drop="after"]::after {
+  bottom: -2px;
 }
-.glance-sort-handle {
-  flex: 1;
-  min-width: 0;
-  height: 50px;
-  padding: 4px;
-  gap: 6px;
-  justify-content: flex-start;
+.glance-quota-grid > .glance-sortable[data-drop]::after,
+.glance-token-grid > .glance-sortable[data-drop]::after {
+  inset-block: 0;
+  inset-inline: auto;
+  height: auto;
+  width: 2px;
+}
+.glance-quota-grid > .glance-sortable[data-drop="before"]::after,
+.glance-token-grid > .glance-sortable[data-drop="before"]::after {
+  left: -3px;
+}
+.glance-quota-grid > .glance-sortable[data-drop="after"]::after,
+.glance-token-grid > .glance-sortable[data-drop="after"]::after {
+  right: -3px;
+}
+.glance-drag-handle {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  color: var(--muted-foreground);
   cursor: grab;
 }
-.glance-sort-handle:active {
+.glance-drag-handle:active {
   cursor: grabbing;
 }
-.glance-sort-number {
-  width: 12px;
-  color: var(--muted-foreground);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
+.glance-sortable:has(> .glance-drag-handle) > .coco-card > .coco-card-header {
+  padding-right: 24px;
 }
-.glance-sort-label {
+.glance-quota:has(> .glance-drag-handle) h3 {
+  padding-inline: 8px 24px;
+}
+.glance-quota > .glance-drag-handle {
+  top: 0;
+  right: 0;
+}
+.glance-token-grid > .glance-sortable:has(.glance-drag-handle) dt {
+  padding-right: 18px;
+}
+.glance-token-grid .glance-drag-handle {
+  top: 0;
+  right: 0;
+}
+.glance-unavailable-selection {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  gap: 2px;
-  font-size: 13px;
-  text-align: start;
-  align-items: flex-start;
+  gap: 4px;
 }
-.glance-sort-label small {
-  color: var(--muted-foreground);
+.glance-unavailable-row {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
   font-size: 11px;
+}
+.glance-unavailable-row:has(> .glance-drag-handle) {
+  padding-right: 32px;
+}
+.glance-unavailable-row .glance-drag-handle {
+  top: 2px;
+  right: 0;
 }
 .glance-editor-preview {
   min-width: 0;
@@ -1292,4 +1293,13 @@ body {
     max-width: 360px;
     width: 100%;
   }
+}
+
+.glance-status-failed {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding-right: 28px;
+  font-size: 11px;
+  color: var(--destructive);
 }

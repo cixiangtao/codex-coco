@@ -11,6 +11,7 @@ import {
 } from "../../contracts/glance-layout";
 import type { MainPage } from "../../contracts/windows";
 import { GlanceModule } from "./glance-module";
+import { GlanceSortableBlock } from "./glance-reorder";
 import { formatTokens, formatExactTokens } from "../lib/token-format";
 import { freshnessLabel, recoveryLabel, shortDateTime } from "../lib/presentation-time";
 
@@ -20,12 +21,14 @@ const tokenIds: readonly GlanceBlockId[] = ["usage.today", "usage.week", "usage.
 
 function Unavailable({
   title,
+  ids,
   item,
   onOpen,
   actionLabel = "打开用量",
   busy = false,
 }: {
   title: string;
+  ids: GlanceBlockId[];
   item?: GlanceItem | undefined;
   onOpen(): void;
   actionLabel?: string;
@@ -46,6 +49,13 @@ function Unavailable({
         </Button>
       </CardHeader>
       <CardContent>
+        <div className="glance-unavailable-selection">
+          {ids.map((id) => (
+            <GlanceSortableBlock key={id} id={id} className="glance-unavailable-row">
+              <span>{glanceBlocks.find((block) => block.id === id)!.title}</span>
+            </GlanceSortableBlock>
+          ))}
+        </div>
         <p>
           {item?.phase === "disabled"
             ? "来源模块已停用"
@@ -134,13 +144,14 @@ export function GlanceBoard({
               {ids.map((id) => {
                 const block = glanceBlocks.find((entry) => entry.id === id)!;
                 const status = snapshot.items.find((entry) => entry.id === block.moduleId);
-                return status && status.phase !== "error" ? (
-                  <GlanceModule
-                    key={id}
-                    item={status}
-                    busy={busy}
-                    onOpen={() => onOpen(block.page)}
-                  />
+                return status ? (
+                  <GlanceSortableBlock key={id} id={id}>
+                    {status.phase === "error" ? (
+                      <p className="glance-status-failed">{block.title} · 异常已置顶</p>
+                    ) : (
+                      <GlanceModule item={status} busy={busy} onOpen={() => onOpen(block.page)} />
+                    )}
+                  </GlanceSortableBlock>
                 ) : null;
               })}
             </div>
@@ -149,6 +160,7 @@ export function GlanceBoard({
           return (
             <Unavailable
               key={key}
+              ids={ids}
               title={
                 ids.length > 1
                   ? definition.moduleId === "usage" && quotaIds.includes(ids[0]!)
@@ -171,6 +183,12 @@ export function GlanceBoard({
                   metric.progress !== undefined,
               ) ?? [],
           );
+          const missingIds = ids.filter(
+            (id) =>
+              !metrics.some((metric) =>
+                metric.id.endsWith(id === "usage.primary" ? ":primary" : ":secondary"),
+              ),
+          );
           const capacityGroups = new Map<string, typeof metrics>();
           for (const metric of metrics) {
             const group = metric.group ?? "订阅额度";
@@ -180,6 +198,7 @@ export function GlanceBoard({
             return (
               <Unavailable
                 key={key}
+                ids={ids}
                 title="订阅额度"
                 item={item}
                 onOpen={() => onOpen("usage")}
@@ -236,10 +255,20 @@ export function GlanceBoard({
                         }}
                       >
                         {entries.map((metric) => (
-                          <div
+                          <GlanceSortableBlock
                             key={metric.id}
+                            id={
+                              metric.id.endsWith(":primary") ? "usage.primary" : "usage.secondary"
+                            }
                             className="glance-quota"
-                            data-tone={
+                            sortable={
+                              metrics.find((entry) =>
+                                entry.id.endsWith(
+                                  metric.id.endsWith(":primary") ? ":primary" : ":secondary",
+                                ),
+                              ) === metric
+                            }
+                            tone={
                               metric.progress! <= 5
                                 ? "warning"
                                 : metric.id.endsWith(":secondary")
@@ -275,10 +304,15 @@ export function GlanceBoard({
                                 {shortDateTime(metric.resetsAt)}
                               </time>
                             )}
-                          </div>
+                          </GlanceSortableBlock>
                         ))}
                       </div>
                     </section>
+                  ))}
+                  {missingIds.map((id) => (
+                    <GlanceSortableBlock key={id} id={id} className="glance-unavailable-row">
+                      <span>{glanceBlocks.find((block) => block.id === id)!.title} · 暂无数据</span>
+                    </GlanceSortableBlock>
                   ))}
                 </div>
               </CardContent>
@@ -304,17 +338,23 @@ export function GlanceBoard({
                       (entry) => entry.id === `tokens:${id.split(".")[1]}`,
                     );
                     return (
-                      <div
+                      <GlanceSortableBlock
                         key={id}
-                        data-tone={
-                          index % 3 === 0 ? "primary" : index % 3 === 1 ? "success" : "warning"
-                        }
+                        id={id}
+                        tone={index % 3 === 0 ? "primary" : index % 3 === 1 ? "success" : "warning"}
                       >
-                        <dt>{glanceBlocks.find((block) => block.id === id)!.title}</dt>
-                        <dd title={`${formatExactTokens(metric?.numericValue)} tokens`}>
-                          {formatTokens(metric?.numericValue)}
-                        </dd>
-                      </div>
+                        {(handle) => (
+                          <>
+                            <dt>
+                              {glanceBlocks.find((block) => block.id === id)!.title}
+                              {handle}
+                            </dt>
+                            <dd title={`${formatExactTokens(metric?.numericValue)} tokens`}>
+                              {formatTokens(metric?.numericValue)}
+                            </dd>
+                          </>
+                        )}
+                      </GlanceSortableBlock>
                     );
                   })}
                 </dl>
@@ -333,6 +373,7 @@ export function GlanceBoard({
             return (
               <Unavailable
                 key={key}
+                ids={ids}
                 title={definition.title}
                 item={item}
                 onOpen={() => onOpen("usage")}
@@ -342,53 +383,59 @@ export function GlanceBoard({
             );
           const maximum = Math.max(1, ...item.series.points.map((point) => point.tokens));
           return (
-            <Card key={key} className="glance-trend-block" density="compact">
-              <CardHeader>
-                <CardTitle>
-                  <ChartNoAxesColumn aria-hidden="true" /> 每日用量趋势
-                </CardTitle>
-                <span className="glance-block-unit">近 7 天</span>
-              </CardHeader>
-              <CardContent>
-                <div className="glance-mini-chart">
-                  {item.series.points.map((point) => (
-                    <div
-                      key={point.day}
-                      title={`${point.day} · ${formatExactTokens(point.tokens)} tokens`}
-                    >
-                      <span style={{ height: `${(point.tokens / maximum) * 100}%` }} />
-                    </div>
-                  ))}
-                </div>
-                <div className="glance-trend-range">
-                  <span>{item.series.points[0]?.day.slice(5)}</span>
-                  <span>
-                    {formatTokens(item.series.points.reduce((sum, point) => sum + point.tokens, 0))}{" "}
-                    tokens
-                  </span>
-                  <span>{item.series.points.at(-1)?.day.slice(5)}</span>
-                </div>
-                <p className="glance-token-note">
-                  {item.series.estimated ? "线程累计量估算" : "本机计数 · 含无归属记录"}
-                  {item.series.limited ? " · 统计不完整" : ""}
-                </p>
-              </CardContent>
-            </Card>
+            <GlanceSortableBlock key={key} id={definition.id}>
+              <Card className="glance-trend-block" density="compact">
+                <CardHeader>
+                  <CardTitle>
+                    <ChartNoAxesColumn aria-hidden="true" /> 每日用量趋势
+                  </CardTitle>
+                  <span className="glance-block-unit">近 7 天</span>
+                </CardHeader>
+                <CardContent>
+                  <div className="glance-mini-chart">
+                    {item.series.points.map((point) => (
+                      <div
+                        key={point.day}
+                        title={`${point.day} · ${formatExactTokens(point.tokens)} tokens`}
+                      >
+                        <span style={{ height: `${(point.tokens / maximum) * 100}%` }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="glance-trend-range">
+                    <span>{item.series.points[0]?.day.slice(5)}</span>
+                    <span>
+                      {formatTokens(
+                        item.series.points.reduce((sum, point) => sum + point.tokens, 0),
+                      )}{" "}
+                      tokens
+                    </span>
+                    <span>{item.series.points.at(-1)?.day.slice(5)}</span>
+                  </div>
+                  <p className="glance-token-note">
+                    {item.series.estimated ? "线程累计量估算" : "本机计数 · 含无归属记录"}
+                    {item.series.limited ? " · 统计不完整" : ""}
+                  </p>
+                </CardContent>
+              </Card>
+            </GlanceSortableBlock>
           );
         }
         const reset = item.metrics?.find((entry) => entry.id === "reset:available");
         return (
-          <Card key={key} className="glance-reset-block" density="compact">
-            <CardHeader>
-              <CardTitle>
-                <Ticket aria-hidden="true" /> 重置卡
-              </CardTitle>
-              <span>{reset?.value ?? "数量未知"}</span>
-            </CardHeader>
-            <CardContent>
-              <p className="glance-token-note">在主窗口核对并兑换</p>
-            </CardContent>
-          </Card>
+          <GlanceSortableBlock key={key} id={definition.id}>
+            <Card className="glance-reset-block" density="compact">
+              <CardHeader>
+                <CardTitle>
+                  <Ticket aria-hidden="true" /> 重置卡
+                </CardTitle>
+                <span>{reset?.value ?? "数量未知"}</span>
+              </CardHeader>
+              <CardContent>
+                <p className="glance-token-note">在主窗口核对并兑换</p>
+              </CardContent>
+            </Card>
+          </GlanceSortableBlock>
         );
       })}
     </div>

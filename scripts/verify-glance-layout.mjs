@@ -215,8 +215,9 @@ try {
     animations: "disabled",
   });
   assert.equal(
-    await popup.getByRole("button", { name: "调整速览顺序", exact: true }).isDisabled(),
-    true,
+    await popup.locator("[data-sort-handle]").count(),
+    0,
+    "A singleton needs no sorting control",
   );
   const fullBlocks = [...initial.value.value.blocks, "usage.trend", "usage.reset"];
   const setBlocks = async (blocks) => {
@@ -234,26 +235,32 @@ try {
     popup
       .locator("[data-sort-id]")
       .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-sort-id")));
-  await popup.getByRole("button", { name: "调整速览顺序", exact: true }).click();
+  const waitSaved = async (blocks) => {
+    await popup.waitForFunction((blocks) => {
+      const board = document.querySelector(".glance-reorder");
+      return (
+        board?.getAttribute("aria-busy") === "false" &&
+        JSON.stringify(
+          [...document.querySelectorAll("[data-sort-id]")].map((node) =>
+            node.getAttribute("data-sort-id"),
+          ),
+        ) === JSON.stringify(blocks)
+      );
+    }, blocks);
+    assert.deepEqual((await read(page)).value.value.blocks, blocks);
+  };
+  await popup.locator('[data-sort-handle="usage.primary"]').waitFor();
   assert.deepEqual(await order(), fullBlocks);
+  assert.equal(await popup.getByRole("button", { name: "调整速览顺序", exact: true }).count(), 0);
   const primaryHandle = popup.getByRole("button", { name: "拖动主要额度窗口排序", exact: true });
-  const todayHandle = popup.getByRole("button", { name: "拖动今日消耗排序", exact: true });
-  await primaryHandle.dragTo(todayHandle, { targetPosition: { x: 80, y: 44 } });
-  assert.deepEqual((await order()).slice(0, 3), [
-    "usage.secondary",
-    "usage.today",
-    "usage.primary",
-  ]);
-  assert.deepEqual(
-    (await read(page)).value.value.blocks,
-    fullBlocks,
-    "Dragging only edits a local draft",
-  );
-  await primaryHandle.focus();
+  const todayBlock = popup.locator('[data-sort-id="usage.today"]');
+  await primaryHandle.dragTo(todayBlock, { targetPosition: { x: 80, y: 24 } });
+  const dragged = ["usage.secondary", "usage.today", "usage.primary", ...fullBlocks.slice(3)];
+  await waitSaved(dragged);
   await primaryHandle.press("ArrowUp");
+  const reordered = ["usage.secondary", "usage.primary", ...fullBlocks.slice(2)];
+  await waitSaved(reordered);
   assert.equal(await primaryHandle.evaluate((node) => node === document.activeElement), true);
-  const reordered = await order();
-  assert.deepEqual(reordered.slice(0, 3), ["usage.secondary", "usage.primary", "usage.today"]);
   await popup.screenshot({
     path: join(output, "popup-order-light.png"),
     scale: "css",
@@ -273,7 +280,7 @@ try {
   };
   await theme({ ...previousTheme, mode: "dark", primaryColor: "#e54673" });
   await popup.waitForFunction(() => document.documentElement.dataset.theme === "dark");
-  assert.deepEqual(await order(), reordered, "Theme changes must not replace the sorting draft");
+  assert.deepEqual(await order(), reordered);
   await popup.screenshot({
     path: join(output, "popup-order-dark.png"),
     scale: "css",
@@ -283,17 +290,14 @@ try {
     await popup.locator(".glance-content").evaluate((node) => node.scrollWidth <= node.clientWidth),
   );
   const footerBounds = await popup
-    .getByRole("button", { name: "完成排序", exact: true })
+    .getByRole("button", { name: "打开主窗口", exact: true })
     .boundingBox();
   assert(
     footerBounds && footerBounds.y + footerBounds.height <= 520,
-    "Completion stays outside the scrolling list",
+    "Main-window action remains outside the scrolling board",
   );
-  await popup.getByRole("button", { name: "完成排序", exact: true }).click();
-  await popup.getByText("速览顺序已保存。", { exact: true }).waitFor();
   const reorderedSnapshot = (await read(page)).value;
-  assert.equal(reorderedSnapshot.revision, reorderBase.revision + 1);
-  assert.deepEqual(reorderedSnapshot.value.blocks, reordered);
+  assert.equal(reorderedSnapshot.revision, reorderBase.revision + 2);
   assert.deepEqual(
     JSON.parse(await readFile(join(data, "glance-layout.json"), "utf8")).value.blocks,
     reordered,
@@ -335,27 +339,44 @@ try {
     previousMode,
   );
   await ensurePopupVisible();
-  // Keyboard boundary moves and Escape discard the draft without closing the panel.
-  await popup.getByRole("button", { name: "调整速览顺序", exact: true }).click();
   await primaryHandle.press("End");
-  assert.equal((await order()).at(-1), "usage.primary");
+  await waitSaved([...reordered.filter((id) => id !== "usage.primary"), "usage.primary"]);
   await primaryHandle.press("Home");
-  assert.equal((await order())[0], "usage.primary");
+  const homeOrder = ["usage.primary", ...reordered.filter((id) => id !== "usage.primary")];
+  await waitSaved(homeOrder);
+  // Dropping nowhere and a native drag cancellation never write a new revision.
+  const cancelRevision = (await read(page)).value.revision;
+  await primaryHandle.dragTo(popup.locator(".glance-toolbar"));
+  assert.equal((await read(page)).value.revision, cancelRevision);
+  assert.deepEqual(await order(), homeOrder);
+  await primaryHandle.scrollIntoViewIfNeeded();
+  const dragStart = await primaryHandle.boundingBox();
+  await popup.mouse.move(dragStart.x + dragStart.width / 2, dragStart.y + dragStart.height / 2);
+  await popup.mouse.down();
+  await popup.mouse.move(dragStart.x + dragStart.width / 2, dragStart.y + dragStart.height + 12, {
+    steps: 4,
+  });
+  await popup.locator('[data-sort-id="usage.primary"][data-dragging="true"]').waitFor();
   await popup.keyboard.press("Escape");
-  assert.equal(await popup.getByRole("main", { name: "调整速览顺序", exact: true }).count(), 0);
-  assert.deepEqual((await read(page)).value.value.blocks, reordered);
-  // A persistence failure retains both the draft and the saved revision for an explicit retry.
-  await popup.getByRole("button", { name: "调整速览顺序", exact: true }).click();
-  await popup.getByRole("button", { name: "下移其他额度窗口", exact: true }).click();
-  const retryOrder = await order();
+  await popup.mouse.up();
+  await popup.waitForFunction(() => !document.querySelector('[data-dragging="true"]'));
+  assert.equal(await nativePopup.evaluate((window) => window.isVisible()), true);
+  assert.equal(
+    (await read(page)).value.revision,
+    cancelRevision,
+    "Escape during a native drag does not persist",
+  );
+  // A failed automatic save retains the visible order and exposes inline retry/recovery.
   const layoutPath = join(data, "glance-layout.json");
   await rename(layoutPath, `${layoutPath}.qa`);
   await mkdir(layoutPath);
+  const retryOrder = [homeOrder[1], homeOrder[0], ...homeOrder.slice(2)];
   try {
-    await popup.getByRole("button", { name: "完成排序", exact: true }).click();
+    await primaryHandle.press("ArrowDown");
     await popup.getByText("顺序未能保存", { exact: true }).waitFor();
     assert.deepEqual(await order(), retryOrder);
-    assert.equal((await read(page)).value.revision, reorderedSnapshot.revision);
+    assert.equal((await read(page)).value.revision, cancelRevision);
+    assert.equal(await primaryHandle.isDisabled(), true);
     await popup.screenshot({
       path: join(output, "popup-order-retry.png"),
       scale: "css",
@@ -365,25 +386,24 @@ try {
     await rm(layoutPath, { recursive: true, force: true });
     await rename(`${layoutPath}.qa`, layoutPath);
   }
-  await popup.getByRole("button", { name: "完成排序", exact: true }).click();
-  await popup.getByText("速览顺序已保存。", { exact: true }).waitFor();
-  assert.deepEqual((await read(page)).value.value.blocks, retryOrder);
-  await popup.getByRole("button", { name: "调整速览顺序", exact: true }).click();
-  await popup.getByRole("button", { name: "下移主要额度窗口", exact: true }).click();
-  const staleDraft = await order();
+  await popup.getByRole("button", { name: "重试保存", exact: true }).click();
+  await waitSaved(retryOrder);
+  // An unsaved inline move cannot overwrite a newer selection from the main window.
+  await rename(layoutPath, `${layoutPath}.qa`);
+  await mkdir(layoutPath);
+  try {
+    await primaryHandle.press("ArrowDown");
+    await popup.getByText("顺序未能保存", { exact: true }).waitFor();
+  } finally {
+    await rm(layoutPath, { recursive: true, force: true });
+    await rename(`${layoutPath}.qa`, layoutPath);
+  }
   await setBlocks(fullBlocks.slice(0, -1));
   await popup.getByText("组合已在主窗口更新", { exact: true }).waitFor();
-  assert.deepEqual(await order(), staleDraft);
-  assert.equal(
-    await popup.getByRole("button", { name: "完成排序", exact: true }).isDisabled(),
-    true,
-  );
+  assert.equal(await popup.getByRole("button", { name: "重试保存", exact: true }).count(), 0);
   await popup.getByRole("button", { name: "载入最新顺序", exact: true }).click();
   assert.deepEqual(await order(), fullBlocks.slice(0, -1));
-  await popup.getByRole("button", { name: "取消排序", exact: true }).click();
-  // Native blur hides the popover and discards unsaved ordering.
-  await popup.getByRole("button", { name: "调整速览顺序", exact: true }).click();
-  await popup.getByRole("button", { name: "下移主要额度窗口", exact: true }).click();
+  // Native blur hides the panel; a completed move has already been persisted.
   await application.evaluate(({ app }) => app.focus({ steal: true }));
   await nativePopup.evaluate((window) => {
     window.show();
@@ -393,7 +413,7 @@ try {
   while (!(await nativePopup.evaluate((window) => window.isFocused()))) {
     assert(
       Date.now() < focusDeadline,
-      "The native popover must actually acquire focus before blur is tested",
+      "The native popover must acquire focus before blur is tested",
     );
     await new Promise((resolve) => setTimeout(resolve, 30));
   }
@@ -404,21 +424,11 @@ try {
   await popup.waitForFunction(
     () => document.querySelector(".glance-shell")?.getAttribute("data-visible") === "false",
     undefined,
-    {
-      polling: 50,
-    },
+    { polling: 50 },
   );
   assert.equal(await nativePopup.evaluate((window) => window.isVisible()), false);
-  await application.evaluate(({ Menu }) =>
-    Menu.getApplicationMenu()
-      .items.flatMap((item) => item.submenu?.items ?? [])
-      .find((item) => item.label === "显示或收起速览")
-      .click(),
-  );
-  await popup.waitForFunction(
-    () => document.querySelector(".glance-shell")?.getAttribute("data-visible") === "true",
-  );
-  assert.equal(await popup.getByRole("main", { name: "调整速览顺序", exact: true }).count(), 0);
+  await ensurePopupVisible();
+  assert.deepEqual(await order(), fullBlocks.slice(0, -1));
   assert.deepEqual((await read(page)).value.value.blocks, fullBlocks.slice(0, -1));
   const visibilityEvents = await popup.evaluate(() => window.__glanceVisibility);
   assert(visibilityEvents.includes(false) && visibilityEvents.at(-1) === true);
@@ -428,7 +438,7 @@ try {
   await popup.waitForFunction(
     () => document.querySelector(".glance-shell")?.getAttribute("data-visible") === "true",
   );
-  await popup.getByRole("button", { name: "调整速览顺序", exact: true }).waitFor();
+  await popup.locator('[data-sort-handle="usage.primary"]').waitFor();
   await setBlocks(["appearance.status"]);
   assert.equal(
     (await page.evaluate(() => window.codexCoco.modules())).value.every(
@@ -471,7 +481,7 @@ try {
         sourcePinning: true,
         restrictedPanelReordering: true,
         nativeDragAndKeyboard: true,
-        draftCancelBlurAndConflict: true,
+        inlineAutoSaveCancelBlurAndConflict: true,
         persistenceFailureRetry: true,
         restartAndRecovery: true,
         noModuleActivation: true,
