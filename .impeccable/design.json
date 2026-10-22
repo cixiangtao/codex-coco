@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-22T04:07:00.277417+00:00",
+  "generatedAt": "2026-10-22T06:25:27.805687+00:00",
   "title": "Design System: Codex Coco",
   "extensions": {
     "colorMeta": {
@@ -72,7 +72,7 @@
     "typographyMeta": {
       "title": {
         "displayName": "页面标题",
-        "purpose": "普通页面标题；主窗口用量标题可见且为 23px，速览用量分区标题仅保留可访问语义。"
+        "purpose": "普通页面标题；主窗口用量标题可见且为 23px，速览以公开账号标签作为身份标题。"
       },
       "body": {
         "displayName": "系统正文",
@@ -108,7 +108,7 @@
       },
       "summary": {
         "displayName": "速览计数",
-        "purpose": "速览内与单位按基线对齐的计数。"
+        "purpose": "速览核心计数；tokens 在统计组标题统一声明。"
       },
       "instrument-small": {
         "displayName": "小圆环读数",
@@ -116,26 +116,39 @@
       },
       "instrument-compact": {
         "displayName": "窄窗口圆环读数",
-        "purpose": "用量页紧凑额度圆环的局部字级。"
+        "purpose": "主窗口紧凑活动计数与窄窗口额度圆环的字级。"
+      },
+      "settings-label": {
+        "displayName": "设置行标签",
+        "purpose": "分组列表左侧标签，13px / 500 / 1.5。"
+      },
+      "settings-legend": {
+        "displayName": "组外标题",
+        "purpose": "SettingsGroup 的 legend，12px / 550。"
       }
     },
     "shadows": [
       {
         "name": "card",
         "value": "0 2px 12px color-mix(in srgb, var(--foreground) 4%, transparent)",
-        "purpose": "默认 Card 的轻环境阴影；用量和速览额度卡明确去掉。"
+        "purpose": "默认 Card 与主设置页分组表面的轻阴影；用量额度与速览监视表面去掉。"
       },
       {
         "name": "active-tab",
         "value": "0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent)",
         "purpose": "当前页签在灰轨道上形成轻层级。"
+      },
+      {
+        "name": "switch-thumb",
+        "value": "0 1px 3px color-mix(in srgb, var(--foreground) 18%, transparent)",
+        "purpose": "区分开关滑块和轨道。"
       }
     ],
     "motion": [
       {
         "name": "standard",
         "value": "220ms",
-        "purpose": "共享状态与速览开合过渡。"
+        "purpose": "共享状态、开关轨道与滑块、速览开合过渡。"
       },
       {
         "name": "ring",
@@ -258,7 +271,7 @@
   ],
   "narrative": {
     "northStar": "柔彩仪表台",
-    "overview": "Codex Coco 用安静的中性外壳承托柔彩数据表面，以圆环、圆润卡片和紧凑分组建立清楚的操作层级。颜色帮助辨认真实状态，文字说明来源、时间与恢复路径；界面保持桌面工具应有的准确和克制。\n\n用户已选择 A 柔彩仪表台方向，并明确要求保留圆环、圆润圆角、进一步压紧布局和先封装组件。本规范将该方向记录为新的视觉基线；当前完整落点为用量页面、菜单栏速览与外观布景工作台，设置等页面尚未全部迁移。具体页面策略见 [用量与速览 surface brief](docs/surfaces/usage-and-glance.md) 和 [外观 surface brief](docs/surfaces/appearance.md)，批准参考见 [样稿](docs/design/instruments-approved.png) 与 [批准记录](docs/design/instruments-approved.json)。样稿中的示例账号、数值、色板和冗余进度条不进入运行时。",
+    "overview": "Codex Coco 用安静的中性外壳承托柔彩数据表面，以圆环、圆润卡片和紧凑分组建立清楚的操作层级。颜色帮助辨认真实状态，文字说明来源、时间与恢复路径；界面保持桌面工具应有的准确和克制。\n\n用户已选择 A 柔彩仪表台方向，并明确要求保留圆环、圆润圆角、进一步压紧布局和先封装组件。本规范将该方向记录为新的视觉基线；当前覆盖用量页面、菜单栏速览、外观布景工作台，以及窗口主题、应用更新、系统与菜单栏等已接入的分组设置表单。设置行沿用用户明确指定的 iOS Field Group 组织方式：圆润列表、组外说明和组内细分隔，与柔彩仪表共用现有主题身份。具体页面策略见 [用量与速览 surface brief](docs/surfaces/usage-and-glance.md)、[外观 surface brief](docs/surfaces/appearance.md) 和 [设置 surface brief](docs/surfaces/settings.md)，批准参考见 [样稿](docs/design/instruments-approved.png) 与 [批准记录](docs/design/instruments-approved.json)。样稿中的示例账号、数值、色板和冗余进度条不进入运行时。",
     "keyCharacteristics": [
       "中性外壳、柔彩数据、圆润而紧凑的表面。",
       "系统字体与等宽数字，主次信息一眼可分。",
@@ -273,7 +286,7 @@
       }
     ],
     "dos": [
-      "**Do** 先复用 Card、Box、Tabs、Badge 和 ProgressRing，再组合业务页面。",
+      "**Do** 先复用 Card、Box、Tabs、Badge、ProgressRing 和分组设置组件，再组合业务页面。",
       "**Do** 通过主题语义 token 同时适配浅色、深色和极端自定义主色。",
       "**Do** 使用等宽数字、真实单位、来源与恢复时间帮助判断状态。",
       "**Do** 保留键盘焦点、图标名称、未知值语义和减少动态偏好。",
@@ -284,7 +297,7 @@
       "**Don't** 用零代替未知值，用当前额度样式冒充历史记录，或让历史圆环播放更新动画。",
       "**Don't** 在 Box 中建立第二套表面、圆角和阴影规范。",
       "**Don't** 将用量页的双仪表与三组页签强制套用到其他模块。",
-      "**Don't** 把当前用量、速览与外观页面的迁移描述为所有业务页面的视觉迁移已经完成。"
+      "**Don't** 将显示时钟、分组容器或偏好开关变成源读取与系统副作用的隐式入口。"
     ]
   }
 }

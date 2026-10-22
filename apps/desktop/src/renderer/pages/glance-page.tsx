@@ -1,18 +1,7 @@
 import { useEffect, useState } from "react";
-import {
-  ArrowUpRight,
-  Layers3,
-  RefreshCw,
-  Settings2,
-  TriangleAlert,
-  X,
-  Palette,
-  Activity,
-} from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@codex-coco/ui/components/card";
+import { ArrowUpRight, Layers3, RefreshCw, Settings2, X } from "lucide-react";
 import { Box } from "@codex-coco/ui/components/box";
-import { Badge } from "@codex-coco/ui/components/badge";
-import { ProgressRing } from "@codex-coco/ui/components/progress-ring";
+import { GlanceUsage } from "../components/glance-usage";
 import { Skeleton } from "@codex-coco/ui/components/skeleton";
 import { Button } from "@codex-coco/ui/components/button";
 import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
@@ -20,16 +9,7 @@ import { ThemeProvider } from "@codex-coco/ui/theme";
 import { useSavedSettings } from "../client/settings";
 import { useGlance, refreshGlance } from "../client/glance";
 import type { MainPage } from "../../contracts/windows";
-import type { GlancePhase } from "../../contracts/glance";
-
-const phaseLabels: Record<GlancePhase, string> = {
-  unavailable: "尚未接入",
-  disabled: "已停用",
-  starting: "启动中",
-  running: "运行中",
-  stopping: "停止中",
-  error: "需要处理",
-};
+import { GlanceModule } from "../components/glance-module";
 
 /** Read-only cross-module surface; it follows saved settings, never another window's preview draft. */
 export function GlancePage() {
@@ -37,6 +17,7 @@ export function GlancePage() {
   const summary = useGlance();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(Date.now);
   const [visible, setVisible] = useState(() => document.visibilityState === "visible");
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
@@ -45,7 +26,10 @@ export function GlancePage() {
         void dismiss();
       }
     };
-    const visibility = () => setVisible(document.visibilityState === "visible");
+    const visibility = () => {
+      setVisible(document.visibilityState === "visible");
+      setNow(Date.now());
+    };
     document.addEventListener("visibilitychange", visibility);
     window.addEventListener("keydown", escape);
     window.codexCoco.ready();
@@ -54,6 +38,12 @@ export function GlancePage() {
       document.removeEventListener("visibilitychange", visibility);
     };
   }, []);
+  useEffect(() => {
+    if (!visible) return;
+    // A visible-window display clock; this never refreshes module or account data.
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [visible]);
   async function dismiss() {
     try {
       const result = await window.codexCoco.dismissGlance();
@@ -150,188 +140,55 @@ export function GlancePage() {
               <Skeleton className="h-16" />
             </Box>
           ) : (
-            summary.snapshot.items.map((item) => {
-              const capacities =
-                item.phase === "error"
-                  ? []
-                  : (item.metrics?.filter((metric) => metric.progress !== undefined) ?? []);
-              const statistics =
-                item.phase === "error"
-                  ? []
-                  : (item.metrics?.filter((metric) => metric.progress === undefined) ?? []);
-              if (capacities.length)
-                return (
-                  <section key={item.id} className="glance-usage" aria-label={item.title}>
-                    <div className="glance-item-heading">
-                      <h2 className="sr-only">{item.title}</h2>
-                      <p className="glance-account">{item.description}</p>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`打开${item.title}`}
-                        disabled={busy}
-                        onClick={() => {
-                          void open(item.page);
-                        }}
-                      >
-                        <ArrowUpRight />
-                      </Button>
-                    </div>
-                    <div className="glance-quota-grid">
-                      {capacities.map((metric, index) => {
-                        const tone =
-                          metric.progress! <= 5
-                            ? "warning"
-                            : index % 2 === 0
-                              ? "primary"
-                              : "success";
-                        return (
-                          <Card
-                            key={metric.id}
-                            tone={tone}
-                            density="compact"
-                            className="glance-quota"
-                          >
-                            <CardHeader>
-                              <CardTitle>{metric.label.replace(/^通用额度 · /, "")}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <ProgressRing
-                                value={metric.progress!}
-                                label={metric.label}
-                                valuePrefix="剩余"
-                                caption="剩余额度"
-                                size="sm"
-                                tone={tone}
-                              />
-                              <p className="glance-quota-reset">{metric.detail}</p>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                    {statistics.length > 0 && (
-                      <Card density="compact">
-                        <CardContent>
-                          <dl className="glance-statistics">
-                            {statistics.map((metric) => (
-                              <div key={metric.id}>
-                                <dt>{metric.label}</dt>
-                                <dd title={`${metric.value} · ${metric.detail}`}>
-                                  <strong>
-                                    {metric.numericValue === undefined
-                                      ? metric.value
-                                      : new Intl.NumberFormat("en", {
-                                          notation: "compact",
-                                          maximumFractionDigits: 1,
-                                        }).format(metric.numericValue)}
-                                  </strong>
-                                  {metric.numericValue !== undefined && metric.unit && (
-                                    <span>{metric.unit}</span>
-                                  )}
-                                </dd>
-                              </div>
-                            ))}
-                          </dl>
-                        </CardContent>
-                      </Card>
-                    )}
-                    {item.capturedAt !== undefined && (
-                      <p className="glance-captured">
-                        读取于{" "}
-                        {new Date(item.capturedAt).toLocaleString("zh-CN", {
-                          month: "numeric",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}{" "}
-                        · 请在主窗口刷新确认
-                      </p>
-                    )}
-                  </section>
-                );
-              return (
-                <Card
-                  key={item.id}
-                  className="glance-item"
-                  density="compact"
-                  aria-label={item.title}
-                >
-                  <CardHeader>
-                    <div className="glance-module-title">
-                      {item.phase === "error" ? (
-                        <TriangleAlert aria-hidden="true" />
-                      ) : item.id === "appearance" ? (
-                        <Palette aria-hidden="true" />
-                      ) : (
-                        <Activity aria-hidden="true" />
-                      )}
-                      <CardTitle>{item.title}</CardTitle>
-                    </div>
-                    <Badge
-                      tone={
-                        item.phase === "error"
-                          ? "danger"
-                          : item.phase === "running"
-                            ? "success"
-                            : "neutral"
-                      }
-                    >
-                      {phaseLabels[item.phase]}
-                    </Badge>
-                    {item.phase !== "error" && (
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`打开${item.title}`}
-                        title={item.description}
-                        disabled={busy}
-                        onClick={() => {
-                          void open(item.page);
-                        }}
-                      >
-                        <ArrowUpRight />
-                      </Button>
-                    )}
-                  </CardHeader>
-                  {(item.phase === "error" ||
-                    statistics.length > 0 ||
-                    item.phase === "running") && (
-                    <CardContent>
-                      {(item.phase === "error" || item.phase === "running") && (
-                        <p>{item.description}</p>
-                      )}
-                      {statistics.length > 0 && (
-                        <dl className="glance-statistics">
-                          {statistics.map((metric) => (
-                            <div key={metric.id}>
-                              <dt>{metric.label}</dt>
-                              <dd>
-                                <strong>{metric.value}</strong>
-                                <span>{metric.detail}</span>
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                      )}
-                    </CardContent>
-                  )}
-                  {item.phase === "error" && (
-                    <Button
-                      variant="ghost"
-                      className="glance-module-open"
-                      disabled={busy}
-                      onClick={() => {
+            <div className="glance-modules">
+              {summary.snapshot.items
+                .filter((item) => item.phase === "error")
+                .map((item) => (
+                  <GlanceModule
+                    key={item.id}
+                    item={item}
+                    busy={busy}
+                    onOpen={() => {
+                      void open(item.page);
+                    }}
+                  />
+                ))}
+              {summary.snapshot.items
+                .filter(
+                  (item) =>
+                    item.phase !== "error" &&
+                    item.metrics?.some((metric) => metric.progress !== undefined),
+                )
+                .map((item) => (
+                  <GlanceUsage
+                    key={item.id}
+                    item={item}
+                    now={now}
+                    busy={busy}
+                    onOpen={() => {
+                      void open(item.page);
+                    }}
+                  />
+                ))}
+              <div className="glance-shortcuts">
+                {summary.snapshot.items
+                  .filter(
+                    (item) =>
+                      item.phase !== "error" &&
+                      !item.metrics?.some((metric) => metric.progress !== undefined),
+                  )
+                  .map((item) => (
+                    <GlanceModule
+                      key={item.id}
+                      item={item}
+                      busy={busy}
+                      onOpen={() => {
                         void open(item.page);
                       }}
-                    >
-                      前往处理
-                      <ArrowUpRight data-icon="inline-end" />
-                    </Button>
-                  )}
-                </Card>
-              );
-            })
+                    />
+                  ))}
+              </div>
+            </div>
           )}
         </main>
         <footer className="glance-actions">

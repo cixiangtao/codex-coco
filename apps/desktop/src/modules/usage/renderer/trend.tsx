@@ -17,40 +17,38 @@ import { usageConfigSchema, usageState, trendTotals, type TrendSnapshot } from "
 export function UsageTokenSummary({ trend }: { trend: TrendSnapshot }) {
   const totals = trendTotals(trend);
   return (
-    <Card className="usage-token-card" density="compact">
-      <CardContent>
-        <dl className="usage-token-summary" aria-label="用量统计摘要">
-          {(
-            [
-              ["今日估算", totals.today],
-              ["近 7 天", totals.week],
-              ["近 30 天", totals.month],
-            ] as const
-          ).map(([label, value], index) => (
-            <div
-              key={label}
-              data-tone={index === 0 ? "primary" : index === 1 ? "success" : "warning"}
-            >
-              <dt>
-                <span aria-hidden="true" />
-                {label}
-              </dt>
-              <dd title={`${value.toLocaleString("zh-CN")} tokens`}>
-                <strong>
-                  {trend.source === "none"
-                    ? "暂无数据"
-                    : new Intl.NumberFormat("en", {
-                        notation: "compact",
-                        maximumFractionDigits: 1,
-                      }).format(value)}
-                </strong>
-                {trend.source !== "none" && <span>tokens</span>}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </CardContent>
-    </Card>
+    <div className="usage-token-card">
+      <dl className="usage-token-summary" aria-label="用量统计摘要">
+        {(
+          [
+            ["今日估算", totals.today],
+            ["近 7 天", totals.week],
+            ["近 30 天", totals.month],
+          ] as const
+        ).map(([label, value], index) => (
+          <div
+            key={label}
+            data-tone={index === 0 ? "primary" : index === 1 ? "success" : "warning"}
+          >
+            <dt>
+              <span aria-hidden="true" />
+              {label}
+            </dt>
+            <dd title={`${value.toLocaleString("zh-CN")} tokens`}>
+              <strong>
+                {trend.source === "none"
+                  ? "暂无数据"
+                  : new Intl.NumberFormat("en", {
+                      notation: "compact",
+                      maximumFractionDigits: 1,
+                    }).format(value)}
+              </strong>
+              {trend.source !== "none" && <span>tokens</span>}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
@@ -107,7 +105,6 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
   }
   return (
     <Box gap="lg">
-      {trend && <UsageTokenSummary trend={trend} />}
       <Card aria-label="本地用量趋势" className="usage-trend-card">
         <CardHeader>
           <div>
@@ -131,6 +128,7 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
         </CardHeader>
         <CardContent>
           <Box gap="md">
+            {trend && <UsageTokenSummary trend={trend} />}
             {message && <output aria-live="polite">{message}</output>}
             {snapshot.operation?.name === "scan-trend" && busy && (
               <output aria-live="polite">

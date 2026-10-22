@@ -454,6 +454,10 @@ export function createUsageModule(
       const data = parsed.data.data;
       return {
         description: `${data.account?.label ?? "账号标识不可用"} · ${usagePlanTitle(data.account?.plan)} · 最近一次额度记录`,
+        identity: {
+          label: data.account?.label ?? "账号标识不可用",
+          plan: usagePlanTitle(data.account?.plan),
+        },
         statusText: (() => {
           const settings = usageConfigSchema.safeParse(snapshot.config.value);
           if (!settings.success) return "";
@@ -480,8 +484,10 @@ export function createUsageModule(
               bucket.windows.map((window) => ({
                 id: `${bucket.id}:${window.kind}`,
                 label: `${usageBucketTitle(bucket.id, index)} · ${usageWindowTitle(window)}`,
+                group: usageBucketTitle(bucket.id, index),
                 value: `剩余 ${Number(remainingPercent(window.usedPercent).toFixed(1))}%`,
                 progress: remainingPercent(window.usedPercent),
+                resetsAt: window.resetsAt === null ? null : window.resetsAt * 1000,
                 detail:
                   window.resetsAt === null
                     ? "恢复时间未知"

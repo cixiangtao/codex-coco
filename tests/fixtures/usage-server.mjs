@@ -102,6 +102,16 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
       email: "private@example.com",
       token: "private-token",
     };
+    if (mode() === "multi-quota") {
+      result.rateLimitsByLimitId.additional = {
+        primary: { usedPercent: 95, windowDurationMins: 60, resetsAt: null },
+        secondary: {
+          usedPercent: 100,
+          windowDurationMins: 1440,
+          resetsAt: Math.floor(Date.now() / 1000) - 60,
+        },
+      };
+    }
     const response = `${JSON.stringify({ id: request.id, result })}\n`;
     // Deliberately split the JSON-RPC frame across chunks.
     process.stdout.write(response.slice(0, 41));

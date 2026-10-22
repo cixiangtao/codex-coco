@@ -157,11 +157,22 @@ try {
   await page.getByRole("tab", { name: "用量设置", exact: true }).click();
   const interval = page.getByLabel("自动刷新间隔（秒）", { exact: true });
   await interval.fill("60");
+  const notifications = page.getByRole("switch", { name: "用量通知", exact: true });
+  await notifications.focus();
+  await page.keyboard.press("Space");
+  assert.equal(await notifications.isChecked(), true);
+  assert.equal(
+    (await snapshot()).config.value.notificationsEnabled,
+    false,
+    "Switch previews do not persist before save",
+  );
+  await capture(page, "preferences-light");
   await page.getByRole("tab", { name: "总览", exact: true }).click();
   await page.getByRole("tab", { name: "用量设置", exact: true }).click();
   assert.equal(await interval.inputValue(), "60", "Changing tabs preserves an unsaved draft");
   assert.equal((await snapshot()).config.value.refreshIntervalSeconds, 0);
   await page.getByRole("button", { name: "取消修改", exact: true }).click();
+  assert.equal(await notifications.isChecked(), false);
   await page.getByRole("tab", { name: "总览", exact: true }).focus();
   await page.keyboard.press("ArrowRight");
   assert.equal(
@@ -202,6 +213,7 @@ try {
       })),
     };
   });
+  await capture(popup, "glance-light");
   assert(
     summariesVisible.items.every((item) => item.bottom <= summariesVisible.bottom),
     `Ordinary summaries fit below the core quota overview: ${JSON.stringify(summariesVisible)}`,
@@ -213,7 +225,6 @@ try {
     window.codexCoco.runModuleOperation({ moduleId: "usage", operation: "refresh", input: {} }),
   );
   assert.equal(denied.error.code, "FORBIDDEN");
-  await capture(popup, "glance-light");
   await popup.emulateMedia({ reducedMotion: "reduce" });
   assert.equal(
     await popup
@@ -230,13 +241,22 @@ try {
   await page.waitForFunction(() => innerWidth === 720);
   await assertFits(page);
   await capture(page, "main-compact");
+  await page.getByRole("tab", { name: "用量设置", exact: true }).click();
+  await assertFits(page);
+  await capture(page, "preferences-compact");
+  await page.getByRole("tab", { name: "总览", exact: true }).click();
   await window.evaluate((window) => window.setSize(980, 800));
   await nav.getByRole("button", { name: "设置", exact: true }).click();
+  await assertFits(page);
+  await capture(page, "settings-light");
   await page.getByRole("button", { name: "深色", exact: true }).click();
   await page.getByRole("button", { name: "保存主题", exact: true }).click();
   await nav.getByRole("button", { name: "用量", exact: true }).click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
   await capture(page, "main-dark");
+  await page.getByRole("tab", { name: "用量设置", exact: true }).click();
+  await capture(page, "preferences-dark");
+  await page.getByRole("tab", { name: "总览", exact: true }).click();
   await toggle();
   await popup.waitForFunction(
     () =>
@@ -252,6 +272,18 @@ try {
   await nav.getByRole("button", { name: "用量", exact: true }).click();
   await assertFits(page);
   await capture(page, "main-custom-color");
+  await writeFile(mode, "multi-quota");
+  await refresh();
+  assert.equal(await page.getByRole("meter").count(), 4);
+  await toggle();
+  await popup.getByRole("meter").nth(3).waitFor({ state: "attached" });
+  assert.equal(await popup.locator(".glance-capacity-groups > section").count(), 2);
+  await popup.getByText("恢复时间未知", { exact: true }).waitFor();
+  await popup.getByText("等待刷新确认", { exact: true }).waitFor();
+  await assertFits(popup);
+  await capture(popup, "glance-multiple");
+  await popup.keyboard.press("Escape");
+  await page.bringToFront();
   await writeFile(mode, "exhausted");
   await refresh();
   assert.equal(await page.getByRole("meter").first().getAttribute("value"), "0");

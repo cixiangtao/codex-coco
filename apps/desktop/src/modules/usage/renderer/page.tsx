@@ -1,7 +1,7 @@
 import { UsageToolsPanel } from "./tools-panel";
 import { UsageResetCards } from "./reset-cards";
 import { UsageTrend } from "./trend";
-import { QuotaData, UsageAccount, dateTime } from "./quota-data";
+import { QuotaData, dateTime } from "./quota-data";
 import { Box } from "@codex-coco/ui/components/box";
 import { Card, CardHeader, CardTitle, CardContent } from "@codex-coco/ui/components/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@codex-coco/ui/components/tabs";
@@ -22,6 +22,7 @@ import {
 import type { ModuleSnapshot } from "../../../contracts/modules";
 import { acceptModuleSnapshot } from "../../../renderer/client/modules";
 import { usageFailures, usageState, usageConfigSchema } from "../contract";
+import { freshnessLabel } from "../../../renderer/lib/presentation-time";
 
 /** Main-window reads are opt-in; operation results contain only validated public quota fields. */
 export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
@@ -34,7 +35,6 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
   const running = operation?.phase === "running" || operation?.phase === "cancelling";
   const result = usageState(snapshot);
   const current = result?.status === "ready" ? result.data : null;
-  const displayed = current ?? (result?.status === "cached" ? result.data : null);
   const capturedAt = current?.capturedAt;
   const failed = result?.status === "error" ? result : null;
   const unavailable =
@@ -92,11 +92,17 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
   return (
     <div className="usage-page">
       <header className="desktop-page-heading">
-        <h2>用量</h2>
-        {displayed ? <UsageAccount data={displayed} /> : <p>订阅额度与本机用量统计</p>}
+        <div>
+          <h2>用量</h2>
+          <p>订阅额度与本机用量统计</p>
+        </div>
         {snapshot.phase === "running" && (
-          <div className="usage-toolbar">
+          <div
+            className="usage-toolbar"
+            data-state={failed ? "error" : running ? "busy" : current ? "ready" : "idle"}
+          >
             <Button
+              variant="outline"
               disabled={busy || unavailable}
               onClick={() => {
                 void refresh();
@@ -116,7 +122,14 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
                 {operation?.name === "refresh" ? "取消读取" : "取消任务"}
               </Button>
             )}
-            <output aria-live="polite">
+            <output
+              aria-live="polite"
+              title={
+                automatic > 0
+                  ? `已开启自动刷新，间隔 ${automatic} 秒；失败时会延长。`
+                  : "启动时刷新一次，之后按需刷新。"
+              }
+            >
               {running
                 ? operation?.phase === "cancelling"
                   ? "正在取消读取…"
@@ -125,9 +138,9 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
                     : "正在处理辅助任务…"
                 : operation?.phase === "cancelled"
                   ? "任务已取消，已读取的数据已保留。"
-                  : automatic > 0
-                    ? `已开启自动刷新，间隔 ${automatic} 秒；失败时会延长。`
-                    : "启动时刷新一次，之后按需刷新。"}
+                  : current
+                    ? freshnessLabel(current.capturedAt, now)
+                    : "等待读取"}
             </output>
           </div>
         )}
@@ -230,7 +243,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
                     {running ? "正在更新当前额度…" : "请刷新确认当前额度。"}
                   </AlertDescription>
                 </Alert>
-                <QuotaData data={result.data} historical showAccount={false} />
+                <QuotaData data={result.data} historical />
               </>
             ) : current ? (
               <>
@@ -247,7 +260,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
                     </AlertDescription>
                   </Alert>
                 )}
-                <QuotaData data={current} showAccount={false} />
+                <QuotaData data={current} now={now} />
               </>
             ) : (
               <Empty className="desktop-module-empty">

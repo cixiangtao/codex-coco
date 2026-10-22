@@ -3,6 +3,7 @@ import { Badge } from "@codex-coco/ui/components/badge";
 import { Box } from "@codex-coco/ui/components/box";
 import { Card, CardHeader, CardTitle, CardContent } from "@codex-coco/ui/components/card";
 import { ProgressRing } from "@codex-coco/ui/components/progress-ring";
+import { recoveryLabel, shortDateTime } from "../../../renderer/lib/presentation-time";
 import {
   remainingPercent,
   usageBucketTitle,
@@ -11,13 +12,7 @@ import {
   type UsageSnapshot,
 } from "../contract";
 
-export const dateTime = (time: number) =>
-  new Date(time).toLocaleString("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+export const dateTime = shortDateTime;
 
 export function UsageAccount({ data }: { data: UsageSnapshot }) {
   return (
@@ -33,14 +28,19 @@ export function QuotaData({
   data,
   historical = false,
   showAccount = true,
+  now = data.capturedAt,
 }: {
   data: UsageSnapshot;
   historical?: boolean;
   showAccount?: boolean;
+  now?: number;
 }) {
   return (
     <Box className="usage-data" gap="md">
-      {showAccount && <UsageAccount data={data} />}
+      <div className="usage-quota-heading">
+        <h3>{historical ? "历史额度记录" : "订阅额度"}</h3>
+        {showAccount && <UsageAccount data={data} />}
+      </div>
       {data.credits && (
         <p aria-label="额外额度" className="usage-source">
           额外额度：
@@ -79,7 +79,9 @@ export function QuotaData({
                 >
                   <CardHeader>
                     <CardTitle>{usageWindowTitle(window)}</CardTitle>
-                    {historical && <Badge>历史记录</Badge>}
+                    <Badge>
+                      {historical ? "历史记录" : `已用 ${Number(window.usedPercent.toFixed(1))}%`}
+                    </Badge>
                   </CardHeader>
                   <CardContent className="usage-quota-content">
                     <ProgressRing
@@ -91,7 +93,15 @@ export function QuotaData({
                       animated={!historical}
                     />
                     <Box gap="sm" className="usage-quota-detail">
-                      <span>已用 {Number(window.usedPercent.toFixed(1))}%</span>
+                      <span>额度恢复</span>
+                      <strong>
+                        {historical
+                          ? "以当前读取为准"
+                          : recoveryLabel(
+                              window.resetsAt === null ? null : window.resetsAt * 1000,
+                              now,
+                            )}
+                      </strong>
                       <div>
                         <Clock3 aria-hidden="true" />
                         {window.resetsAt === null ? (
@@ -101,7 +111,6 @@ export function QuotaData({
                             <time dateTime={new Date(window.resetsAt * 1000).toISOString()}>
                               {dateTime(window.resetsAt * 1000)}
                             </time>{" "}
-                            恢复
                           </span>
                         )}
                       </div>

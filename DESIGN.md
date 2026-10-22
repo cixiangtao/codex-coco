@@ -59,6 +59,13 @@ typography:
     fontSize: "21px"
   instrument-compact:
     fontSize: "23px"
+  settings-label:
+    fontSize: "13px"
+    fontWeight: 500
+    lineHeight: 1.5
+  settings-legend:
+    fontSize: "12px"
+    fontWeight: 550
 rounded:
   sm: "6px"
   md: "8px"
@@ -69,6 +76,8 @@ rounded:
   tabs: "12px"
   segment: "7px"
   plot: "5px"
+  pill: "999px"
+  circle: "50%"
 spacing:
   unit: "4px"
   small: "8px"
@@ -114,6 +123,24 @@ components:
     backgroundColor: "{colors.muted}"
     rounded: "{rounded.tabs}"
     padding: "4px"
+  settings-group:
+    backgroundColor: "{colors.card}"
+    rounded: "{rounded.card}"
+    padding: "0 16px"
+  settings-row:
+    padding: "14px 0"
+  switch:
+    backgroundColor: "{colors.input}"
+    rounded: "{rounded.pill}"
+    width: "42px"
+    height: "26px"
+    padding: "3px"
+  switch-checked:
+    backgroundColor: "{colors.data-primary}"
+  switch-thumb:
+    backgroundColor: "{colors.card}"
+    rounded: "{rounded.circle}"
+    size: "20px"
 ---
 
 # Design System: Codex Coco
@@ -124,7 +151,7 @@ components:
 
 Codex Coco 用安静的中性外壳承托柔彩数据表面，以圆环、圆润卡片和紧凑分组建立清楚的操作层级。颜色帮助辨认真实状态，文字说明来源、时间与恢复路径；界面保持桌面工具应有的准确和克制。
 
-用户已选择 A 柔彩仪表台方向，并明确要求保留圆环、圆润圆角、进一步压紧布局和先封装组件。本规范将该方向记录为新的视觉基线；当前完整落点为用量页面、菜单栏速览与外观布景工作台，设置等页面尚未全部迁移。具体页面策略见 [用量与速览 surface brief](docs/surfaces/usage-and-glance.md) 和 [外观 surface brief](docs/surfaces/appearance.md)，批准参考见 [样稿](docs/design/instruments-approved.png) 与 [批准记录](docs/design/instruments-approved.json)。样稿中的示例账号、数值、色板和冗余进度条不进入运行时。
+用户已选择 A 柔彩仪表台方向，并明确要求保留圆环、圆润圆角、进一步压紧布局和先封装组件。本规范将该方向记录为新的视觉基线；当前覆盖用量页面、菜单栏速览、外观布景工作台，以及窗口主题、应用更新、系统与菜单栏等已接入的分组设置表单。设置行沿用用户明确指定的 iOS Field Group 组织方式：圆润列表、组外说明和组内细分隔，与柔彩仪表共用现有主题身份。具体页面策略见 [用量与速览 surface brief](docs/surfaces/usage-and-glance.md)、[外观 surface brief](docs/surfaces/appearance.md) 和 [设置 surface brief](docs/surfaces/settings.md)，批准参考见 [样稿](docs/design/instruments-approved.png) 与 [批准记录](docs/design/instruments-approved.json)。样稿中的示例账号、数值、色板和冗余进度条不进入运行时。
 
 **Key Characteristics:**
 
@@ -167,9 +194,9 @@ Codex Coco 用安静的中性外壳承托柔彩数据表面，以圆环、圆润
 
 ### Hierarchy
 
-- **Title**：前置 `title` 用于普通页面标题；主窗口用量页保留可见标题，局部压缩为（23px）。菜单栏速览中的用量分区标题仅保留可访问语义，与账号信息和跳转入口共用紧凑行。
+- **Title**：前置 `title` 用于普通页面标题；主窗口用量页保留可见标题，局部压缩为（23px）。菜单栏监视表面以公开账号标签作为可见身份标题，套餐和跳转入口收在同一身份条。
 - **Body**：前置 `body` 为基础正文；页面说明通常（13px），卡片说明（12px）。
-- **Label**：前置 `label` 用于卡片标题；设置分区标题（15px / 550），标题栏名称（12px / 550）。
+- **Label**：前置 `label` 用于卡片标题；设置行使用 `settings-label`，组外 legend 使用 `settings-legend`。页面分区标题（15px / 550），标题栏名称（12px / 550）。
 - **Instrument**：前置 `instrument` 用于默认圆环读数；小圆环使用 `instrument-small`，窄窗口额度环使用 `instrument-compact`，速览计数使用 `summary`。
 - **Metadata**：主窗口来源和更新时间使用 `caption`，速览来源、时间及单位使用 `metadata`；说明采用 `description`，设置分区采用 `section`，输入框在较小断点使用 `input-base`，均保持可读对比。
 
@@ -179,20 +206,21 @@ Codex Coco 用安静的中性外壳承托柔彩数据表面，以圆环、圆润
 
 内容表面上接标题栏、左接侧栏，右侧和底部留（8px）外壳间距，使用 `background`；四角沿用卡片圆角。内容内距为（22px 28px 28px），最大正文宽度（860px）。仅内容区滚动，侧栏保持可达。窗口默认（980×800），最小（720×640）；宽度不超过（800px）时内距调整为（24px）。
 
-间距以基础单位为底，常用小、紧凑、常规与分区级间距；柔彩组件允许独立的仪表内距与两列间距，避免机械拉大空白。主窗口用量页头保留标题、账号与读取工具行，菜单栏用量分区将账号与跳转入口放在同一排；计数与单位按基线同行。紧凑双列额度、计数摘要、每日图表与三组标签页属于该 surface 的信息组织，不要求其他模块复制相同组成。
+间距以基础单位为底，常用小、紧凑、常规与分区级间距；柔彩组件允许独立的仪表内距与两列间距，避免机械拉大空白。主窗口用量页头保留标题、刷新动作和贴近动作的读取状态，账号与套餐归入订阅额度区。额度以圆环为主、已用比例为短标识，恢复信息同时呈现相对时间与准确时间；今日、7 天、30 天计数与每日柱图归入同一活动表面，计数与单位按基线同行。紧凑双列额度、活动表面与三组标签页属于该 surface 的信息组织，不要求其他模块复制相同组成。
 
 外观布景工作台默认将比例预览与当前图层参数并排，参数列宽（292px），列间距（16px）；宽度不超过（900px）时改为上下排列，图库同时由四列缩为三列。底部保存栏粘附于内容滚动区，使用内容底色与顶部分隔线，动作可换行，任务状态保持可见；其底部偏移随主内容内距在（−28px / −24px）之间适配。这是外观页的编辑布局，不改变其他模块的布局合同。
 
-菜单栏速览上限（360×520），按屏幕可用工作区收缩。外壳内距（14px），分区间距（8px），滚动区与用量组内部间距（6px），正文独立滚动，底部“打开主窗口”始终可达。额度与计数优先，其他模块是紧凑摘要行，普通停用模块仅保留一行；异常先于普通摘要，不把完整设置页面塞进速览。
+菜单栏速览上限（360×520），按屏幕可用工作区收缩。外壳内距（14px），模块间距（8px），正文独立滚动，底部“打开主窗口”始终可达。同一紧凑监视表面承载公开账号与套餐身份条、分组额度、恢复时间、本机计数及新鲜度；额度为两列，身份图标容器（32px），分组间距（12px）。统计区统一标注 tokens，重置卡等非 tokens 指标另列；核心仪表使用紧凑数字保持单行，普通模块的长统计值允许换行。其他模块合并为一组带细分隔的紧凑列表，普通停用模块仅保留一行；错误独立突出并先于普通摘要，不把完整设置页面塞进速览。
 
 ## Elevation & Depth
 
-深度由中性外壳、内容底面和柔彩卡片的色阶建立。Card 默认使用很轻的环境阴影（`--shadow-card`）；用量额度卡、计数卡及速览额度卡明确去掉阴影，避免两列数据互相争夺注意。主内容容器不加额外边框或阴影，字段、分隔线和 Tooltip 按各自组件语义处理。
+深度由中性外壳、内容底面和柔彩卡片的色阶建立。Card 默认使用很轻的环境阴影（`--shadow-card`）；用量额度卡与速览监视表面明确去掉阴影，避免两列数据互相争夺注意。SettingsGroup 默认以底色与细分隔分组，主设置页的分组表面复用卡片轻阴影。主内容容器不加额外边框或阴影，字段、分隔线和 Tooltip 按各自组件语义处理。
 
 ### Shadow Vocabulary
 
 - **卡片轻托起**：`0 2px 12px color-mix(in srgb, var(--foreground) 4%, transparent)`，用于默认 Card。
 - **选中页签**：`0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent)`，仅帮助识别浮在灰轨道上的当前页签。
+- **开关滑块**：`0 1px 3px color-mix(in srgb, var(--foreground) 18%, transparent)`，帮助识别轨道内的独立滑块。
 
 ## Shapes
 
@@ -220,6 +248,18 @@ Box 只负责 `stack / row / grid` 排列、间距与可选内距，默认无底
 
 输入框透明底、单层轮廓和共享中等圆角，高度见前置 token；焦点使用主题环，无效状态使用错误轮廓和文字，禁用有明确视觉反馈。Label、描述与错误信息保持关联，不用 placeholder 替代标签。
 
+### Settings Groups / Rows / Switches
+
+SettingsGroup 提供原生 `fieldset` 分组，公开 `data-slot="settings-group"`；标题用组外 `legend`，辅助说明在表面下方。圆角组体使用 `card` 底色与前置 token 的左右内距，组标题内距（0 14px 8px），组尾说明外距（8px 14px 0）。它只持有分组表面和语义，不负责保存或系统副作用。
+
+SettingsRow 继续复用 Field，公开 `data-slot="settings-row"` 和 `data-layout="inline|stacked"`，保留 FieldLabel / FieldDescription 与控件的关联。默认最小行高（64px），垂直内距见前置 token；左侧标签与说明、右侧简单控件跨两行居中，列间距（24px），行间距（4px），组内（1px）分隔线末行取消。数字输入宽（100px）且右对齐，普通范围输入宽（180px）；复杂内容通过 stacked 在下方展开，stacked 范围输入占满宽度。
+
+宽度不超过（800px）时列间距收为（12px），分段选择和明确的 text/url/无 type 文本输入可以改成上下排列；Switch 保留右列，在（720px）窗口仍右对齐。隐藏 checkbox 不按文本输入处理。外观参数区局部行高（56px）、组体左右内距（14px），不改变其他设置行默认值。
+
+Switch 的公开 slot 为 `switch`，尺寸与滑块见前置 token；关闭使用 `input` 轨道，选中使用 `data-primary`，滑块使用 `card`。`data-checked` 使滑块水平位移（16px），共享（220ms）过渡并尊重减少动态偏好；`:focus-visible` 使用（2px）主题焦点环与（3px）外偏移，`data-disabled` 降至（0.45）不透明度并停止可操作提示。二选一用 Switch，多选项保留分段选择，不将所有行都做成按钮组。
+
+当前分组列表接入窗口主题、应用更新、系统与菜单栏、用量偏好、外观连接及图层参数。分组与开关继续服从宿主草稿、保存、取消、冲突及权限边界；切换偏好不直接修改系统登录项、共享文件、外部布景或应用安装，原有需确认操作仍单独确认。
+
 ### Badges
 
 Badge 为短状态或类别提供紧凑淡色底，内距（3px 8px）、字号（11px / 550）。颜色来自 tone，正文仍用可读的语义前景。长错误应使用带恢复路径的提示，不挤进 Badge。
@@ -246,6 +286,8 @@ Tabs 使用淡灰轨道与清晰的当前页签，支持键盘操作、窄窗口
 
 ### Data / Recovery
 
+速览的相对恢复时间和新鲜度由仅显示用途的时钟更新：窗口可见时每（30 秒）更新显示，隐藏时清理计时器，再显示时立即校准。该时钟不触发模块读取或网络请求。主窗口用量在有当前记录时以同一显示间隔更新文案；源读取仍由明确操作或已保存定时策略控制。到达恢复时间只显示“等待刷新确认”，不能据时钟确认额度已恢复；超过（10 分钟）或已到恢复时间的速览记录提示刷新确认。
+
 用量图形读取校验后的真实合同；缺失值、真实零值、缓存来源及范围完整性明确区分。失败先显示原因和恢复入口，旧记录默认折叠并标为历史，菜单栏不将旧数据作为当前额度。计数保留 tokens 单位，每日图表提供可展开明细。
 
 未接入能力显示真实空状态，配置异常的恢复入口跨页面可达。菜单栏只读，只同步已保存主题并展示公开摘要；写入、应用、兑换与其他业务动作留在主窗口。Codex Coco 自身主题与外部 Codex 布景分别管理。
@@ -254,7 +296,7 @@ Tabs 使用淡灰轨道与清晰的当前页签，支持键盘操作、窄窗口
 
 ### Do:
 
-- **Do** 先复用 Card、Box、Tabs、Badge 和 ProgressRing，再组合业务页面。
+- **Do** 先复用 Card、Box、Tabs、Badge、ProgressRing 和分组设置组件，再组合业务页面。
 - **Do** 通过主题语义 token 同时适配浅色、深色和极端自定义主色。
 - **Do** 使用等宽数字、真实单位、来源与恢复时间帮助判断状态。
 - **Do** 保留键盘焦点、图标名称、未知值语义和减少动态偏好。
@@ -266,4 +308,4 @@ Tabs 使用淡灰轨道与清晰的当前页签，支持键盘操作、窄窗口
 - **Don't** 用零代替未知值，用当前额度样式冒充历史记录，或让历史圆环播放更新动画。
 - **Don't** 在 Box 中建立第二套表面、圆角和阴影规范。
 - **Don't** 将用量页的双仪表与三组页签强制套用到其他模块。
-- **Don't** 把当前用量、速览与外观页面的迁移描述为所有业务页面的视觉迁移已经完成。
+- **Don't** 将显示时钟、分组容器或偏好开关变成源读取与系统副作用的隐式入口。

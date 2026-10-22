@@ -18,6 +18,7 @@ export interface GlanceItem {
   metrics?: GlanceMetric[];
   capturedAt?: number;
   statusText?: string;
+  identity?: { label: string; plan: string };
 }
 /** Explicitly public presentation fields, never an arbitrary module result. */
 export interface GlanceMetric {
@@ -28,6 +29,8 @@ export interface GlanceMetric {
   progress?: number | undefined;
   numericValue?: number | undefined;
   unit?: string | undefined;
+  resetsAt?: number | null | undefined;
+  group?: string | undefined;
 }
 export const glanceDetailSchema = z.strictObject({
   page: z.enum(["usage", "appearance", "modules", "settings"]).optional(),
@@ -43,12 +46,15 @@ export const glanceDetailSchema = z.strictObject({
         progress: z.number().min(0).max(100).optional(),
         numericValue: z.number().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
         unit: z.string().max(24).optional(),
+        resetsAt: z.number().int().min(0).max(8_640_000_000_000_000).nullable().optional(),
+        group: z.string().max(120).optional(),
       }),
     )
     .max(40)
     .optional(),
   statusText: z.string().max(120).optional(),
   capturedAt: z.number().int().nonnegative().optional(),
+  identity: z.strictObject({ label: z.string().max(120), plan: z.string().max(80) }).optional(),
 });
 export type GlanceDetail = z.infer<typeof glanceDetailSchema>;
 export interface GlanceSnapshot {
