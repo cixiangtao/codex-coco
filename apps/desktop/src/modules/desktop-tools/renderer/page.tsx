@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
-import { Field, FieldLabel, FieldDescription, FieldGroup } from "@codex-coco/ui/components/field";
+import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
+import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
+import { Switch } from "@codex-coco/ui/components/switch";
 import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
 import {
   Dialog,
@@ -189,8 +191,8 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
           <AlertDescription>请取消当前修改后重新编辑。</AlertDescription>
         </Alert>
       )}
-      <FieldGroup>
-        <Field>
+      <SettingsGroup title="图标与行为">
+        <SettingsRow layout="stacked">
           <FieldLabel>菜单栏图标</FieldLabel>
           <ToggleGroup
             className="flex-wrap"
@@ -214,49 +216,53 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
           <FieldDescription>
             保留完整 Codex Coco 名称；彩色 GIF 与自定义图片不会强制转换为黑白。
           </FieldDescription>
-        </Field>
-        <Button
-          variant="outline"
-          disabled={!enabled || busy || value.customIcons.length >= 40}
-          onClick={() => {
-            void run("import-tray-icon");
-          }}
-        >
-          导入自定义菜单栏图标
-        </Button>
-        {value.customIcons.length > 0 && (
-          <details>
-            <summary>管理自定义图标</summary>
-            <ul className="flex flex-col gap-3">
-              {value.customIcons.map((icon) => (
-                <li key={icon.id} className="flex items-center gap-3">
-                  <span>{icon.title}</span>
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => {
-                      const speeds = { ...value.iconSpeeds };
-                      delete speeds[icon.id];
-                      update({
-                        customIcons: value.customIcons.filter((current) => current.id !== icon.id),
-                        iconId: value.iconId === icon.id ? "grid" : value.iconId,
-                        iconSpeeds: speeds,
-                      });
-                    }}
-                  >
-                    从列表移除
-                  </Button>
-                </li>
-              ))}
-            </ul>
-            <p className="text-muted-foreground">
-              保存偏好后删除 Codex Coco 中的图标副本，原文件不变。
-            </p>
-          </details>
-        )}
-        {preview && (
-          <img src={preview} alt="自定义菜单栏图标预览" className="size-12 object-contain" />
-        )}
+        </SettingsRow>
+        <SettingsRow layout="stacked">
+          <Button
+            variant="outline"
+            disabled={!enabled || busy || value.customIcons.length >= 40}
+            onClick={() => {
+              void run("import-tray-icon");
+            }}
+          >
+            导入自定义菜单栏图标
+          </Button>
+          {value.customIcons.length > 0 && (
+            <details>
+              <summary>管理自定义图标</summary>
+              <ul className="flex flex-col gap-3">
+                {value.customIcons.map((icon) => (
+                  <li key={icon.id} className="flex items-center gap-3">
+                    <span>{icon.title}</span>
+                    <Button
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        const speeds = { ...value.iconSpeeds };
+                        delete speeds[icon.id];
+                        update({
+                          customIcons: value.customIcons.filter(
+                            (current) => current.id !== icon.id,
+                          ),
+                          iconId: value.iconId === icon.id ? "grid" : value.iconId,
+                          iconSpeeds: speeds,
+                        });
+                      }}
+                    >
+                      从列表移除
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-muted-foreground">
+                保存偏好后删除 Codex Coco 中的图标副本，原文件不变。
+              </p>
+            </details>
+          )}
+          {preview && (
+            <img src={preview} alt="自定义菜单栏图标预览" className="size-12 object-contain" />
+          )}
+        </SettingsRow>
         {(
           [
             { key: "animate", title: "播放图标动画" },
@@ -265,22 +271,17 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
             { key: "shareWidgetSnapshot", title: "写入 Widget 共享快照" },
           ] as const
         ).map(({ key, title }) => (
-          <Field key={key}>
-            <FieldLabel>{title}</FieldLabel>
-            <ToggleGroup
+          <SettingsRow key={key}>
+            <FieldLabel htmlFor={`desktop-${key}`}>{title}</FieldLabel>
+            <Switch
+              id={`desktop-${key}`}
               aria-label={title}
-              variant="outline"
-              value={[value[key] ? "on" : "off"]}
-              onValueChange={(values) => {
-                if (values.length) update({ [key]: values[0] === "on" });
-              }}
-            >
-              <ToggleGroupItem value="off">关闭</ToggleGroupItem>
-              <ToggleGroupItem value="on">开启</ToggleGroupItem>
-            </ToggleGroup>
-          </Field>
+              checked={value[key]}
+              onCheckedChange={(checked) => update({ [key]: checked })}
+            />
+          </SettingsRow>
         ))}
-        <Field>
+        <SettingsRow>
           <FieldLabel htmlFor="tray-animation-speed">
             基础动画速度 {value.speed.toFixed(1)}×
           </FieldLabel>
@@ -301,8 +302,8 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
           <FieldDescription>
             静态图标或关闭动画时，不启动 CPU 采样；动画关闭、停用或退出会清理计时器。
           </FieldDescription>
-        </Field>
-      </FieldGroup>
+        </SettingsRow>
+      </SettingsGroup>
       <div className="flex flex-wrap gap-3">
         <Button
           disabled={!draft || busy || conflict}

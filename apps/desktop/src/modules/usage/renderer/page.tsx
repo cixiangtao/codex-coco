@@ -289,14 +289,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
           </Box>
         </TabsContent>
         <TabsContent value="preferences">
-          <Card>
-            <CardHeader>
-              <CardTitle>刷新、通知与菜单栏设置</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <UsagePreferences snapshot={snapshot} />
-            </CardContent>
-          </Card>
+          <UsagePreferences snapshot={snapshot} />
         </TabsContent>
       </Tabs>
     </div>

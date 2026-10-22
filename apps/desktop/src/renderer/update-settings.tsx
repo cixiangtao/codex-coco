@@ -1,7 +1,8 @@
+import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
 import { useEffect, useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
-import { Field, FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
+import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
 import { Alert, AlertTitle, AlertDescription } from "@codex-coco/ui/components/alert";
 import {
   Dialog,
@@ -129,34 +130,36 @@ export function UpdateSettings() {
         </Alert>
       )}
       {conflict && <p role="alert">其他窗口已更新设置，请取消本地修改后重新编辑。</p>}
-      <Field>
-        <FieldLabel htmlFor="update-source">发布源目录</FieldLabel>
-        <Input
-          id="update-source"
-          value={value.source}
-          placeholder="https://updates.example.com/codex-coco/"
-          onChange={(event) => edit({ source: event.target.value })}
-          disabled={busy || state.phase === "downloaded"}
-        />
-        <FieldDescription>
-          使用可信发布者提供的 HTTPS 目录及 latest-mac.yml。默认留空，不会请求网络。
-        </FieldDescription>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="update-interval">后台检查间隔（小时）</FieldLabel>
-        <Input
-          id="update-interval"
-          type="number"
-          min={0}
-          max={168}
-          value={Number.isNaN(value.intervalHours) ? "" : value.intervalHours}
-          onChange={(event) => edit({ intervalHours: event.target.valueAsNumber })}
-          disabled={busy}
-        />
-        <FieldDescription>
-          0 为手动；自动检查支持 4–168 小时，只查版本，不自动下载或安装。
-        </FieldDescription>
-      </Field>
+      <SettingsGroup>
+        <SettingsRow layout="stacked">
+          <FieldLabel htmlFor="update-source">发布源目录</FieldLabel>
+          <Input
+            id="update-source"
+            value={value.source}
+            placeholder="https://updates.example.com/codex-coco/"
+            onChange={(event) => edit({ source: event.target.value })}
+            disabled={busy || state.phase === "downloaded"}
+          />
+          <FieldDescription>
+            使用可信发布者提供的 HTTPS 目录及 latest-mac.yml。默认留空，不会请求网络。
+          </FieldDescription>
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel htmlFor="update-interval">后台检查间隔（小时）</FieldLabel>
+          <Input
+            id="update-interval"
+            type="number"
+            min={0}
+            max={168}
+            value={Number.isNaN(value.intervalHours) ? "" : value.intervalHours}
+            onChange={(event) => edit({ intervalHours: event.target.valueAsNumber })}
+            disabled={busy}
+          />
+          <FieldDescription>
+            0 为手动；自动检查支持 4–168 小时，只查版本，不自动下载或安装。
+          </FieldDescription>
+        </SettingsRow>
+      </SettingsGroup>
       <div className="flex flex-wrap gap-3">
         <Button
           disabled={

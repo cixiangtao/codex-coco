@@ -7,6 +7,11 @@ import { createDesktopSession } from "./verify-desktop.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const directory = await mkdtemp(join(tmpdir(), "codex-coco-update-ui-"));
 const packaged = process.argv.includes("--packaged");
+const settingsOutput = join(
+  root,
+  packaged ? "work/settings-groups-packaged" : "work/settings-groups",
+);
+await mkdir(settingsOutput, { recursive: true });
 let session;
 async function launch() {
   session = await createDesktopSession(
@@ -26,6 +31,12 @@ try {
   let { application, page } = await launch();
   const section = page.getByRole("region", { name: "应用更新", exact: true });
   await section.getByText("尚未配置发布源", { exact: true }).first().waitFor();
+  await section.getByLabel("发布源目录", { exact: true }).focus();
+  await page.screenshot({
+    path: join(settingsOutput, "update-settings-light.png"),
+    scale: "css",
+    animations: "disabled",
+  });
   await application.evaluate(({ net }) => {
     globalThis.updateQaRequests = 0;
     const original = net.request;

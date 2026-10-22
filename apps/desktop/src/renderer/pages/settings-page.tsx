@@ -1,14 +1,9 @@
+import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
 import { UpdateSettings } from "../update-settings";
 import { RegisteredModulePage } from "../modules-panel";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldTitle,
-} from "@codex-coco/ui/components/field";
+import { FieldDescription, FieldLabel, FieldTitle } from "@codex-coco/ui/components/field";
 import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
 import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
 import {
@@ -19,7 +14,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@codex-coco/ui/components/dialog";
-import { Separator } from "@codex-coco/ui/components/separator";
 import { themeModes, themePresetIds } from "@codex-coco/ui/theme/contract";
 import type { ThemeEditor } from "../client/theme-editor";
 const modeLabels = { light: "浅色", dark: "深色", system: "跟随系统" };
@@ -56,8 +50,8 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
         </div>
         <fieldset disabled={busy || unavailable} className="min-w-0">
           <legend className="sr-only">主题设置</legend>
-          <FieldGroup>
-            <Field>
+          <SettingsGroup>
+            <SettingsRow>
               <FieldTitle id="mode-label">显示模式</FieldTitle>
               <ToggleGroup
                 aria-labelledby="mode-label"
@@ -74,8 +68,8 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
-            </Field>
-            <Field>
+            </SettingsRow>
+            <SettingsRow>
               <FieldTitle id="preset-label">配色预设</FieldTitle>
               <ToggleGroup
                 aria-labelledby="preset-label"
@@ -92,8 +86,8 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
-            </Field>
-            <Field data-invalid={invalid}>
+            </SettingsRow>
+            <SettingsRow layout="stacked" data-invalid={invalid}>
               <FieldLabel htmlFor="primary-color">自定义主色</FieldLabel>
               <div className="flex flex-wrap gap-3">
                 <Input
@@ -121,8 +115,8 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
                   ? "请输入 #RGB 或 #RRGGBB 格式的颜色。"
                   : "留空使用预设主色；文字与焦点颜色自动适配。"}
               </FieldDescription>
-            </Field>
-          </FieldGroup>
+            </SettingsRow>
+          </SettingsGroup>
         </fieldset>
         {conflict && (
           <Alert>
@@ -148,7 +142,6 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
         </div>
       </section>
 
-      <Separator />
       <section className="about-section" aria-labelledby="about-title">
         <div>
           <h3 id="about-title">关于</h3>

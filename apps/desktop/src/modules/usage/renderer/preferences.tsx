@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
-import { Field, FieldGroup, FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
-import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
+import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
+import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
+import { Switch } from "@codex-coco/ui/components/switch";
 import type { ModuleSnapshot } from "../../../contracts/modules";
 import { acceptModuleSnapshot } from "../../../renderer/client/modules";
 import { usageConfigSchema, usageDefaults, type UsageConfig } from "../contract";
@@ -45,8 +46,11 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
   }
   return (
     <div className="usage-preferences">
-      <FieldGroup className="py-5">
-        <Field>
+      <SettingsGroup
+        title="刷新与本地记录"
+        description="启动时仍读取一次；关闭主窗口不停止后台刷新，停用模块即停止。"
+      >
+        <SettingsRow>
           <FieldLabel htmlFor="usage-interval">自动刷新间隔（秒）</FieldLabel>
           <Input
             id="usage-interval"
@@ -57,28 +61,36 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
             onChange={(e) => update({ refreshIntervalSeconds: e.target.valueAsNumber })}
           />
           <FieldDescription>
-            0 表示不定时刷新，启动时仍读取一次；自动刷新允许 30–3600
-            秒。保存后按间隔读取，失败逐步延长间隔；关闭窗口后仍会运行。停用模块即停止。
+            0 表示按需刷新；自动刷新允许 30–3600 秒，失败时自动延后。
           </FieldDescription>
-        </Field>
-        <Field>
-          <FieldLabel>系统通知</FieldLabel>
-          <ToggleGroup
-            aria-label="用量通知"
-            value={[value.notificationsEnabled ? "on" : "off"]}
-            onValueChange={(values) => {
-              if (values.length) update({ notificationsEnabled: values[0] === "on" });
-            }}
-            variant="outline"
-          >
-            <ToggleGroupItem value="off">关闭</ToggleGroupItem>
-            <ToggleGroupItem value="on">开启</ToggleGroupItem>
-          </ToggleGroup>
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel htmlFor="usage-local-fallback">服务失败时使用本地额度记录</FieldLabel>
+          <Switch
+            id="usage-local-fallback"
+            aria-label="本地额度回退"
+            checked={value.localFallbackEnabled}
+            disabled={pending}
+            onCheckedChange={(checked) => update({ localFallbackEnabled: checked })}
+          />
           <FieldDescription>
-            剩余额度进入提醒/严重区间、恢复或刷新失败时提醒。由系统控制通知权限，不影响读取结果。
+            服务读取失败时扫描本机记录。历史额度单独标记，不作为当前额度。
           </FieldDescription>
-        </Field>
-        <Field>
+        </SettingsRow>
+      </SettingsGroup>
+      <SettingsGroup title="额度通知">
+        <SettingsRow>
+          <FieldLabel htmlFor="usage-notifications">系统通知</FieldLabel>
+          <Switch
+            id="usage-notifications"
+            aria-label="用量通知"
+            checked={value.notificationsEnabled}
+            disabled={pending}
+            onCheckedChange={(checked) => update({ notificationsEnabled: checked })}
+          />
+          <FieldDescription>额度偏低、恢复或刷新失败时提醒；通知权限由系统管理。</FieldDescription>
+        </SettingsRow>
+        <SettingsRow>
           <FieldLabel htmlFor="usage-warning">剩余额度提醒阈值（%）</FieldLabel>
           <Input
             id="usage-warning"
@@ -88,8 +100,8 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
             value={Number.isNaN(value.warningThreshold) ? "" : value.warningThreshold}
             onChange={(e) => update({ warningThreshold: e.target.valueAsNumber })}
           />
-        </Field>
-        <Field>
+        </SettingsRow>
+        <SettingsRow>
           <FieldLabel htmlFor="usage-critical">严重阈值（%）</FieldLabel>
           <Input
             id="usage-critical"
@@ -100,7 +112,9 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
             onChange={(e) => update({ criticalThreshold: e.target.valueAsNumber })}
           />
           <FieldDescription>严重阈值必须小于提醒阈值。</FieldDescription>
-        </Field>
+        </SettingsRow>
+      </SettingsGroup>
+      <SettingsGroup title="菜单栏显示">
         {(
           [
             { key: "showPrimaryInMenuBar", label: "菜单栏显示主要额度窗口" },
@@ -108,62 +122,41 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
             { key: "showMenuBarLabels", label: "菜单栏显示窗口名称" },
           ] as const
         ).map(({ key, label }) => (
-          <Field key={key}>
-            <FieldLabel>{label}</FieldLabel>
-            <ToggleGroup
+          <SettingsRow key={key}>
+            <FieldLabel htmlFor={`usage-${key}`}>{label}</FieldLabel>
+            <Switch
+              id={`usage-${key}`}
               aria-label={label}
-              value={[value[key] ? "on" : "off"]}
-              onValueChange={(values) => {
-                if (values.length) update({ [key]: values[0] === "on" });
-              }}
-              variant="outline"
-            >
-              <ToggleGroupItem value="off">关闭</ToggleGroupItem>
-              <ToggleGroupItem value="on">开启</ToggleGroupItem>
-            </ToggleGroup>
-          </Field>
+              checked={value[key]}
+              disabled={pending}
+              onCheckedChange={(checked) => update({ [key]: checked })}
+            />
+          </SettingsRow>
         ))}
-        <Field>
-          <FieldLabel>服务失败时使用本地额度记录</FieldLabel>
-          <ToggleGroup
-            aria-label="本地额度回退"
-            value={[value.localFallbackEnabled ? "on" : "off"]}
-            onValueChange={(values) => {
-              if (values.length) update({ localFallbackEnabled: values[0] === "on" });
-            }}
-            variant="outline"
-          >
-            <ToggleGroupItem value="off">关闭</ToggleGroupItem>
-            <ToggleGroupItem value="on">开启</ToggleGroupItem>
-          </ToggleGroup>
-          <FieldDescription>
-            默认关闭。开启后服务读取失败时扫描本机记录，历史额度仍默认收起，不进入菜单栏当前额度。
-          </FieldDescription>
-        </Field>
-        {!valid && <p role="alert">请检查刷新间隔和阈值，严重阈值需要低于提醒阈值。</p>}
-        {conflict && <p role="alert">偏好已在其他窗口更新，请取消当前修改后重新编辑。</p>}
-        <div className="flex flex-wrap gap-3">
-          <Button
-            disabled={!edit || !valid || conflict || pending}
-            onClick={() => {
-              void save();
-            }}
-          >
-            保存用量设置
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!edit || pending}
-            onClick={() => {
-              setEdit(null);
-              setMessage("");
-            }}
-          >
-            取消修改
-          </Button>
-        </div>
-        <output aria-live="polite">{message}</output>
-      </FieldGroup>
+      </SettingsGroup>
+      {!valid && <p role="alert">请检查刷新间隔和阈值，严重阈值需要低于提醒阈值。</p>}
+      {conflict && <p role="alert">偏好已在其他窗口更新，请取消当前修改后重新编辑。</p>}
+      <div className="flex flex-wrap gap-3">
+        <Button
+          disabled={!edit || !valid || conflict || pending}
+          onClick={() => {
+            void save();
+          }}
+        >
+          保存用量设置
+        </Button>
+        <Button
+          variant="outline"
+          disabled={!edit || pending}
+          onClick={() => {
+            setEdit(null);
+            setMessage("");
+          }}
+        >
+          取消修改
+        </Button>
+      </div>
+      <output aria-live="polite">{message}</output>
     </div>
   );
 }

@@ -310,3 +310,153 @@
     opacity: 0.45;
   }
 }
+
+.coco-settings-group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.coco-settings-group > legend {
+  width: 100%;
+  padding: 0 14px 8px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--muted-foreground);
+}
+.coco-settings-group-body {
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 0 16px;
+}
+.coco-settings-group-note {
+  margin: 8px 14px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}
+.coco-settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 24px;
+  row-gap: 4px;
+  min-height: 64px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.coco-settings-row:last-child {
+  border-bottom: 0;
+}
+.coco-settings-row > * {
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: auto;
+  max-width: 100%;
+}
+.coco-settings-row > [data-slot="field-label"],
+.coco-settings-row > [data-slot="field-title"] {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  align-self: end;
+}
+.coco-settings-row:not(:has(> [data-slot="field-description"])) > [data-slot="field-label"],
+.coco-settings-row:not(:has(> [data-slot="field-description"])) > [data-slot="field-title"] {
+  align-self: center;
+  grid-row: 1 / span 2;
+}
+.coco-settings-row > [data-slot="field-description"] {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+  align-self: start;
+}
+.coco-settings-row > input[type="number"] {
+  width: 100px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.coco-settings-row > input[type="range"] {
+  width: 180px;
+  accent-color: var(--data-primary);
+  padding: 0;
+  border: 0;
+}
+.coco-settings-row[data-layout="stacked"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.coco-settings-row[data-layout="stacked"] > * {
+  grid-column: 1;
+  grid-row: auto;
+  width: 100%;
+}
+.coco-settings-row[data-layout="stacked"] > [data-slot="field-label"],
+.coco-settings-row[data-layout="stacked"] > [data-slot="field-title"] {
+  grid-row: auto;
+}
+.coco-settings-row[data-layout="stacked"] > [data-slot="field-description"] {
+  grid-row: auto;
+}
+.coco-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 42px;
+  height: 26px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--input);
+  cursor: pointer;
+  transition: background var(--motion-standard) var(--ease-out);
+  flex-shrink: 0;
+}
+.coco-switch[data-checked] {
+  background: var(--data-primary);
+}
+.coco-switch:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.coco-switch[data-disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.coco-switch-thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--foreground) 18%, transparent);
+  transform: translateX(0);
+  transition: transform var(--motion-standard) var(--ease-out);
+}
+.coco-switch-thumb[data-checked] {
+  transform: translateX(16px);
+}
+@media (max-width: 800px) {
+  .coco-settings-row {
+    column-gap: 12px;
+  }
+  .coco-settings-row:has(> [data-slot="toggle-group"]),
+  .coco-settings-row:has(> input[type="text"], > input[type="url"], > input:not([type])) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .coco-settings-row:has(> [data-slot="toggle-group"]) > *,
+  .coco-settings-row:has(> input[type="text"], > input[type="url"], > input:not([type])) > * {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+.coco-settings-row[data-layout="stacked"] > input[type="range"] {
+  width: 100%;
+}
+.coco-settings-row[data-layout="stacked"] > input[type="number"] {
+  width: 100px;
+}

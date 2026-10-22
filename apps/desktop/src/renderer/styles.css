@@ -398,8 +398,7 @@ body {
   gap: 16px;
   align-items: start;
 }
-.appearance-preview-content,
-.appearance-connection-fields {
+.appearance-preview-content {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -413,7 +412,6 @@ body {
 }
 .appearance-preview-note,
 .appearance-library-empty,
-.appearance-connection-fields > p,
 .appearance-save-bar output {
   font-size: 12px;
   line-height: 1.6;
@@ -422,12 +420,6 @@ body {
 .appearance-layer-editor [data-slot="field-label"] {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-.appearance-layer-editor [data-slot="card-content"] > [data-slot="field"] {
-  gap: 14px;
-}
-.appearance-layer-editor [data-slot="field"] > div > span {
-  font-size: 11px;
 }
 .appearance-layer-fields {
   display: grid;
@@ -791,4 +783,27 @@ body {
   .glance-shell {
     transform: none;
   }
+}
+.usage-preferences {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.appearance-layer-editor .coco-settings-row {
+  min-height: 56px;
+}
+.appearance-layer-editor .appearance-layer-fields {
+  gap: 0 12px;
+}
+.appearance-layer-editor [data-slot="settings-row"] > [data-slot="field-label"] {
+  font-size: 12px;
+}
+.appearance-layer-editor .coco-settings-group-body {
+  padding-inline: 14px;
+}
+.settings-page .coco-settings-group-note {
+  max-width: none;
+}
+.settings-page .coco-settings-group-body {
+  box-shadow: var(--shadow-card);
 }

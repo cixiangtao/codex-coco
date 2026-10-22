@@ -8,6 +8,11 @@ import { createDesktopSession } from "./verify-desktop.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const directory = await mkdtemp(join(tmpdir(), "codex-coco-desktop-preferences-"));
 const packaged = process.argv.includes("--packaged");
+const settingsOutput = join(
+  root,
+  packaged ? "work/settings-groups-packaged" : "work/settings-groups",
+);
+await mkdir(settingsOutput, { recursive: true });
 let session;
 async function task(page, name, input = {}) {
   const response = await page.evaluate(
@@ -80,6 +85,43 @@ try {
   await page.getByRole("navigation").getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("button", { name: "启用系统与菜单栏", exact: true }).click();
   await delay(800);
+  assert.equal((await native(application)).loginCalls, 0);
+  const animationSwitch = page.getByRole("switch", { name: "播放图标动画", exact: true });
+  const originalAnimation = await animationSwitch.isChecked();
+  await animationSwitch.focus();
+  await page.keyboard.press("Space");
+  assert.equal(await animationSwitch.isChecked(), !originalAnimation);
+  assert.equal(
+    (
+      await page.evaluate(async () =>
+        (await window.codexCoco.modules()).value.find((m) => m.id === "desktop-tools"),
+      )
+    ).config.value.animate,
+    originalAnimation,
+  );
+  await page.screenshot({
+    path: join(settingsOutput, "system-behavior-light.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  const mainWindow = await application.browserWindow(page);
+  await mainWindow.evaluate((window) => window.setSize(720, 640));
+  const row = page.locator('[data-slot="settings-row"]').filter({ has: animationSwitch });
+  const labelBox = await row.locator('[data-slot="field-label"]').boundingBox();
+  const switchBox = await animationSwitch.boundingBox();
+  assert(
+    switchBox.x > labelBox.x + labelBox.width,
+    "Compact settings retain the switch in the right column",
+  );
+  await animationSwitch.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: join(settingsOutput, "system-behavior-compact.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  await mainWindow.evaluate((window) => window.setSize(980, 800));
+  await page.getByRole("button", { name: "取消偏好修改", exact: true }).click();
+  assert.equal(await animationSwitch.isChecked(), originalAnimation);
   assert.equal((await native(application)).loginCalls, 0);
   await config(page, { iconId: "builtin:everonecat0", animate: false, followsCpu: true });
   const initial = await task(page, "apply-menu-bar");

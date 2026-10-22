@@ -1,16 +1,12 @@
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
-import { Field, FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
+import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
 import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@codex-coco/ui/components/card";
+import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
+import { Switch } from "@codex-coco/ui/components/switch";
+import { Box } from "@codex-coco/ui/components/box";
 import type { AppearanceConfig, AppearanceResult } from "../contract";
-import { type AppearanceRun } from "./editor-types";
+import type { AppearanceRun } from "./editor-types";
 
 export function AppearanceConnectionPanel({
   draft,
@@ -32,34 +28,13 @@ export function AppearanceConnectionPanel({
   onRestart(): void;
 }) {
   return (
-    <Card aria-label="Codex 启动与恢复">
-      <CardHeader>
-        <div>
-          <CardTitle>Codex 启动与恢复</CardTitle>
-          <CardDescription>连接本机目标，管理启动和恢复策略。</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="appearance-connection-fields">
-          <p className="text-muted-foreground">
-            {result?.appSelected ? "已选择应用" : "尚未选择应用"} ·{" "}
-            {result?.connectedPort ? `本机端口 ${result.connectedPort}` : "尚未连接"}
-          </p>
-          <Field>
-            <FieldLabel htmlFor="appearance-port">Codex 本机调试端口</FieldLabel>
-            <Input
-              id="appearance-port"
-              type="number"
-              min={1024}
-              max={65535}
-              value={Number.isNaN(draft.port) ? "" : draft.port}
-              onChange={(e) => update({ ...draft, port: e.target.valueAsNumber })}
-            />
-            <FieldDescription>
-              仅连接
-              127.0.0.1。启动参数示例：--remote-debugging-port=9229。修改端口前需撤销原端口的布景。
-            </FieldDescription>
-          </Field>
+    <Box gap="lg" aria-label="Codex 启动与恢复">
+      <SettingsGroup
+        title="本机连接"
+        description="仅连接本机 127.0.0.1。更换端口或目标前，请先撤销旧布景。"
+      >
+        <SettingsRow>
+          <FieldLabel>调试端口方式</FieldLabel>
           <ToggleGroup
             aria-label="调试端口方式"
             variant="outline"
@@ -72,30 +47,51 @@ export function AppearanceConnectionPanel({
             <ToggleGroupItem value="fixed">固定端口</ToggleGroupItem>
             <ToggleGroupItem value="auto">自动分配</ToggleGroupItem>
           </ToggleGroup>
-          <ToggleGroup
-            aria-label="启动后恢复已保存布景"
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel htmlFor="appearance-port">Codex 本机调试端口</FieldLabel>
+          <Input
+            id="appearance-port"
+            type="number"
+            min={1024}
+            max={65535}
+            value={Number.isNaN(draft.port) ? "" : draft.port}
+            onChange={(e) => update({ ...draft, port: e.target.valueAsNumber })}
+          />
+          <FieldDescription>启动参数示例：--remote-debugging-port=9229。</FieldDescription>
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel htmlFor="appearance-restore">启动后恢复已保存布景</FieldLabel>
+          <Switch
+            id="appearance-restore"
+            checked={draft.restoreOnEnable}
+            onCheckedChange={(checked) => update({ ...draft, restoreOnEnable: checked })}
+          />
+          <FieldDescription>
+            只重新连接已运行的目标；失败会退避，不自动启动或重启。
+          </FieldDescription>
+        </SettingsRow>
+      </SettingsGroup>
+      <SettingsGroup title="目标应用">
+        <SettingsRow>
+          <FieldLabel>Codex 应用</FieldLabel>
+          <Button
             variant="outline"
-            value={[draft.restoreOnEnable ? "on" : "off"]}
-            onValueChange={(items) => {
-              if (items.length) update({ ...draft, restoreOnEnable: items[0] === "on" });
+            disabled={!enabled || busy}
+            onClick={() => {
+              void run("choose-application");
             }}
           >
-            <ToggleGroupItem value="off">手动应用</ToggleGroupItem>
-            <ToggleGroupItem value="on">启动后恢复已保存布景</ToggleGroupItem>
-          </ToggleGroup>
-          <p className="text-muted-foreground">
-            恢复只尝试连接已运行的目标，连接失败会退避；不会自动启动或重启应用。更换目标前请先撤销旧布景。
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="outline"
-              disabled={!enabled || busy}
-              onClick={() => {
-                void run("choose-application");
-              }}
-            >
-              选择 Codex 应用
-            </Button>
+            选择 Codex 应用
+          </Button>
+          <FieldDescription>
+            {result?.appSelected ? "已选择应用" : "尚未选择应用"} ·{" "}
+            {result?.connectedPort ? `本机端口 ${result.connectedPort}` : "尚未连接"}
+          </FieldDescription>
+        </SettingsRow>
+        <SettingsRow layout="stacked">
+          <FieldLabel>启动与重启</FieldLabel>
+          <div className="appearance-connection-actions">
             <Button
               variant="outline"
               disabled={!enabled || busy || dirty}
@@ -105,14 +101,14 @@ export function AppearanceConnectionPanel({
             >
               启动所选应用
             </Button>
-            <Button
-              variant="outline"
-              disabled={!enabled || busy || dirty}
-              onClick={() => onRestart()}
-            >
+            <Button variant="outline" disabled={!enabled || busy || dirty} onClick={onRestart}>
               明确重启所选应用
             </Button>
           </div>
+          <FieldDescription>先保存配置。重启会提示确认，并等待目标正常退出。</FieldDescription>
+        </SettingsRow>
+        <SettingsRow layout="stacked">
+          <FieldLabel>布景检查与恢复</FieldLabel>
           <div className="appearance-connection-actions">
             <Button
               variant="outline"
@@ -142,8 +138,8 @@ export function AppearanceConnectionPanel({
               撤销布景
             </Button>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </SettingsRow>
+      </SettingsGroup>
+    </Box>
   );
 }
