@@ -138,6 +138,7 @@ export function createAppearanceLauncher(options: {
       await run(
         "/usr/bin/open",
         [
+          "-n",
           "-a",
           chosen.path,
           "--args",

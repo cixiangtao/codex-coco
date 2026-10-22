@@ -6,7 +6,9 @@ import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-g
 import { Switch } from "@codex-coco/ui/components/switch";
 import { Box } from "@codex-coco/ui/components/box";
 import type { AppearanceConfig, AppearanceResult } from "../contract";
-import type { AppearanceRun } from "./editor-types";
+import type { AppearanceRun, AppearanceLaunchFeedback } from "./editor-types";
+import { appearanceFailures } from "../contract";
+import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
 
 export function AppearanceConnectionPanel({
   draft,
@@ -17,6 +19,7 @@ export function AppearanceConnectionPanel({
   result,
   run,
   onRestart,
+  launchFeedback,
 }: {
   draft: AppearanceConfig;
   update(value: AppearanceConfig): void;
@@ -26,6 +29,7 @@ export function AppearanceConnectionPanel({
   result: AppearanceResult | null;
   run: AppearanceRun;
   onRestart(): void;
+  launchFeedback: AppearanceLaunchFeedback | null;
 }) {
   return (
     <Box gap="lg" aria-label="Codex 启动与恢复">
@@ -105,7 +109,46 @@ export function AppearanceConnectionPanel({
               明确重启所选应用
             </Button>
           </div>
-          <FieldDescription>先保存配置。重启会提示确认，并等待目标正常退出。</FieldDescription>
+          <FieldDescription>
+            {dirty
+              ? "有未保存修改，请先点击底部的“仅保存配置”，再启动或重启。"
+              : "重启会提示确认，并等待目标正常退出。"}
+          </FieldDescription>
+          {launchFeedback && (
+            <Alert
+              variant={launchFeedback.phase === "error" ? "destructive" : "default"}
+              aria-label="Codex 启动状态"
+            >
+              <AlertTitle>
+                {launchFeedback.phase === "pending"
+                  ? launchFeedback.operation === "restart-application"
+                    ? "正在重启 Codex"
+                    : "正在启动 Codex"
+                  : launchFeedback.phase === "ready"
+                    ? "Codex 已启动并连接"
+                    : "Codex 启动未完成"}
+              </AlertTitle>
+              <AlertDescription>
+                <p>
+                  {launchFeedback.phase === "pending"
+                    ? "正在等待 Codex 主窗口与本机调试端口就绪，请稍候。"
+                    : launchFeedback.phase === "ready"
+                      ? "已识别 Codex 主窗口。需要修改布景时，请点击“保存并应用布景”。"
+                      : appearanceFailures[launchFeedback.reason ?? "LAUNCH_FAILED"]}
+                </p>
+                {launchFeedback.phase === "error" && launchFeedback.reason === "APP_RUNNING" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy || dirty || !enabled}
+                    onClick={onRestart}
+                  >
+                    保存工作后重启 Codex
+                  </Button>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
         </SettingsRow>
         <SettingsRow layout="stacked">
           <FieldLabel>布景检查与恢复</FieldLabel>

@@ -66,7 +66,11 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             ? assetInputSchema
             : emptyAppearanceInput,
           output: appearanceResultSchema,
-          timeoutMs: ["choose-application", "import-image"].includes(name) ? 300_000 : 30_000,
+          timeoutMs: ["choose-application", "import-image"].includes(name)
+            ? 300_000
+            : ["launch-application", "restart-application"].includes(name)
+              ? 60_000
+              : 30_000,
         },
       ]),
     ),
@@ -157,6 +161,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
               : appearanceConfigSchema.parse(context.config);
           let imported: string | null = null;
           const previousPort = port;
+          const launching = name === "launch-application" || name === "restart-application";
           try {
             if (dependencies.launcher) selected = await dependencies.launcher.selected();
             if (name === "list-gallery") {
@@ -182,15 +187,22 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
               selected = await dependencies.launcher.selected();
               return result();
             }
-            if (name === "launch-application" || name === "restart-application") {
+            if (launching) {
               if (!dependencies.launcher) throw new Error("LAUNCH_FAILED");
-              if (port !== null) await remove(context.signal);
               const launched = await dependencies.launcher.launch(
                 config,
                 name === "restart-application",
                 context.signal,
               );
-              const until = Date.now() + 12_000;
+              // Only a successful native launch supersedes the old process and its styles.
+              // A refused launch or quit must leave an existing applied scene intact.
+              active = false;
+              syncing = false;
+              clearTimeout(timer);
+              port = null;
+              appliedConfig = null;
+              count = 0;
+              const until = Date.now() + 30_000;
               while (true) {
                 try {
                   count = await connection.inspect(launched, context.signal);
@@ -273,7 +285,8 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             failures++;
             if (["apply", "sync", "verify"].includes(name)) active = false;
             if (error instanceof AppearanceDiscoveryError && previousPort === null) port = null;
-            if (context.signal.aborted && port !== null) await remove(AbortSignal.timeout(2000));
+            if (context.signal.aborted && port !== null && !launching)
+              await remove(AbortSignal.timeout(2000));
             context.signal.throwIfAborted();
             const code = appearanceFailureSchema.safeParse(
               error instanceof Error ? error.message : "",
@@ -287,7 +300,9 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
                     ? "IMAGE_INVALID"
                     : code.success
                       ? code.data
-                      : "APPLY_FAILED",
+                      : launching
+                        ? "LAUNCH_FAILED"
+                        : "APPLY_FAILED",
             });
           } finally {
             schedule();

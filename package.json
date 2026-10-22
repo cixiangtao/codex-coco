@@ -38,7 +38,7 @@
     "verify:desktop-preferences": "pnpm run build && node scripts/verify-desktop-preferences.mjs",
     "verify:widget": "node scripts/verify-widget.mjs",
     "verify:updates": "pnpm run build && node scripts/verify-updates.mjs",
-    "verify:appearance-launcher": "node scripts/verify-appearance-launcher.mjs",
+    "verify:appearance-launcher": "pnpm run build && node scripts/verify-appearance-launcher.mjs",
     "verify:tray-colors": "pnpm run build && node scripts/verify-tray-colors.mjs",
     "verify:glance-layout": "pnpm run build && node scripts/verify-glance-layout.mjs",
     "verify:ui": "pnpm run build && node scripts/verify-ui-instruments.mjs"

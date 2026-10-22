@@ -54,6 +54,7 @@ it("private app selection validates a bundle, allocates loopback ports and never
   expect(port).toBeGreaterThan(1023);
   expect(await launcher.port(config)).toBe(port);
   expect(calls.find((c) => c[0] === "/usr/bin/open")).toContain(`--remote-debugging-port=${port}`);
+  expect(calls.find((c) => c[0] === "/usr/bin/open")).toContain("-n");
   running = true;
   await expect(launcher.launch(config, false, AbortSignal.timeout(1000))).rejects.toThrow(
     "APP_RUNNING",
@@ -133,4 +134,101 @@ it("migrates legacy configuration to manual restoration and validates named pres
       presets: [{ id: "bad", title: "", look: legacy }],
     }).success,
   ).toBe(false);
+});
+
+it("keeps an applied scene when launch or a confirmed quit is refused, and waits for a slow new window", async () => {
+  const dir = await directory();
+  const { AppearanceAssets } = await import("../apps/desktop/src/modules/appearance/assets");
+  const { writeFile } = await import("node:fs/promises");
+  const source = join(dir, "source.png");
+  await writeFile(
+    source,
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jGv8AAAAASUVORK5CYII=",
+      "base64",
+    ),
+  );
+  const image = await new AppearanceAssets(join(dir, "assets")).import(source);
+  const connection = {
+    apply: vi.fn(async () => 1),
+    verify: vi.fn(async () => 1),
+    inspect: vi.fn(async () => 1),
+    remove: vi.fn(async () => 1),
+  };
+  const launcher = {
+    selected: async () => true,
+    choose: async () => true,
+    port: async () => 9229,
+    launch: vi.fn<() => Promise<number>>(async () => {
+      throw new Error("APP_RUNNING");
+    }),
+  };
+  const module = createAppearanceModule({
+    directory: join(dir, "assets"),
+    pickImage: async () => null,
+    launcher,
+    connection,
+  });
+  expect(module.operations["launch-application"]?.timeoutMs).toBe(60_000);
+  const config = {
+    ...appearanceDefaults,
+    main: { ...appearanceDefaults.main, enabled: true, image },
+  };
+  const controller = new AbortController();
+  const runtime = await module.start(controller.signal, {
+    configuration: () => config,
+    requestOperation: () => true,
+  });
+  const context = { signal: controller.signal, config, report: () => undefined };
+  try {
+    expect(await runtime.execute("apply", {}, context)).toMatchObject({
+      status: "ready",
+      active: true,
+    });
+    for (const operation of ["launch-application", "restart-application"]) {
+      expect(await runtime.execute(operation, {}, context)).toMatchObject({
+        status: "error",
+        reason: "APP_RUNNING",
+        active: true,
+      });
+      expect(connection.remove).not.toHaveBeenCalled();
+    }
+    launcher.launch.mockRejectedValueOnce(new Error("PRIVATE_NATIVE_ERROR_PATH"));
+    const rejected = await runtime.execute("restart-application", {}, context);
+    expect(rejected).toMatchObject({ status: "error", reason: "LAUNCH_FAILED", active: true });
+    expect(JSON.stringify(rejected)).not.toContain("PRIVATE_NATIVE");
+    expect(connection.remove).not.toHaveBeenCalled();
+
+    const cancellation = new AbortController();
+    launcher.launch.mockImplementationOnce(async () => {
+      cancellation.abort(new Error("CONTROLLED_CANCEL"));
+      throw cancellation.signal.reason;
+    });
+    await expect(
+      runtime.execute("restart-application", {}, { ...context, signal: cancellation.signal }),
+    ).rejects.toThrow("CONTROLLED_CANCEL");
+    expect(connection.remove).not.toHaveBeenCalled();
+    expect(runtime.state?.()).toMatchObject({ active: true });
+
+    vi.useFakeTimers();
+    launcher.launch.mockImplementationOnce(async () => 9330);
+    const start = Date.now();
+    connection.inspect.mockImplementation(async () => {
+      if (Date.now() - start < 15_000) throw new AppearanceDiscoveryError("NOT_CONNECTED");
+      return 1;
+    });
+    const launching = runtime.execute("restart-application", {}, context);
+    await vi.advanceTimersByTimeAsync(15_200);
+    expect(await launching).toMatchObject({
+      status: "ready",
+      connectedPort: 9330,
+      active: false,
+      targets: 1,
+    });
+    expect(connection.remove).not.toHaveBeenCalled();
+    expect(await runtime.execute("list-gallery", {}, context)).toMatchObject({ active: false });
+  } finally {
+    await runtime.stop();
+    controller.abort();
+  }
 });

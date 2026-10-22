@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { setTimeout as delay } from "node:timers/promises";
+import { createDesktopSession } from "./verify-desktop.mjs";
 import { createAppearanceLauncher } from "../apps/desktop/src/modules/appearance/launcher.ts";
 const exec = promisify(execFile);
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -16,6 +17,8 @@ const bundle = join(directory, "Codex Coco Controlled Target.app");
 const bundleId = "dev.codex-coco.launcher-test";
 const marker = join(directory, "processes.json");
 const pids = new Set();
+const packaged = process.argv.includes("--packaged");
+let session;
 const canonicalDirectory = await realpath(directory);
 async function signalTarget(pid, signal) {
   try {
@@ -120,11 +123,118 @@ try {
   assert.equal(interceptedQuits, 1);
   assert.equal(await launcher.port(config), second);
   assert((await readFile(privateState, "utf8")).includes("Codex Coco Controlled Target.app"));
+  // The production UI selects this temporary bundle. No production restart is confirmed.
+  // Changing its identifier here exercises the real selection guard without touching an installed app.
+  const infoPath = join(bundle, "Contents/Info.plist");
+  await writeFile(
+    infoPath,
+    (await readFile(infoPath, "utf8")).replace(bundleId, "com.openai.codex"),
+  );
+  session = await createDesktopSession(
+    join(directory, "desktop-data"),
+    { ...process.env, CODEX_COCO_FIXTURES: "0" },
+    packaged
+      ? join(root, "apps/desktop/release/mac-arm64/Codex Coco.app/Contents/MacOS/Codex Coco")
+      : undefined,
+  );
+  const { page, application, errors } = session;
+  await page.getByRole("button", { name: "启用外观模块", exact: true }).click();
+  await page.getByRole("tab", { name: "连接设置", exact: true }).click();
+  const launchButton = page.getByRole("button", { name: "启动所选应用", exact: true });
+  const feedback = page.getByRole("alert", { name: "Codex 启动状态", exact: true });
+  await launchButton.click();
+  await feedback.getByText("请先选择 Codex 应用。", { exact: true }).waitFor();
+  const refreshProjection = async () => {
+    const response = await page.evaluate(() =>
+      window.codexCoco.runModuleOperation({
+        moduleId: "appearance",
+        operation: "list-gallery",
+        input: {},
+      }),
+    );
+    assert.equal(response.ok, true);
+    await page.waitForFunction(async (id) => {
+      const module = (await window.codexCoco.modules()).value.find(
+        (entry) => entry.id === "appearance",
+      );
+      return (
+        module.operation?.id === id &&
+        module.operation.phase === "succeeded" &&
+        module.state?.status === "ready"
+      );
+    }, response.value.operation.id);
+  };
+  await refreshProjection();
+  await feedback.getByText("请先选择 Codex 应用。", { exact: true }).waitFor();
+  await application.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+  }, bundle);
+  await page.getByRole("button", { name: "选择 Codex 应用", exact: true }).click();
+  await page.waitForFunction(
+    async () =>
+      (await window.codexCoco.modules()).value.find((entry) => entry.id === "appearance").state
+        ?.appSelected === true,
+  );
+  const runningTarget = await markerValue();
+  await launchButton.click();
+  const confirmation = page.getByRole("dialog");
+  await confirmation.getByRole("heading", { name: "重启所选应用？", exact: true }).waitFor();
+  await confirmation.getByRole("button", { name: "取消", exact: true }).click();
+  await confirmation.waitFor({ state: "hidden" });
+  await feedback
+    .getByText("所选应用仍在运行。请保存工作后使用明确重启，或手动关闭后再启动。", { exact: true })
+    .waitFor();
+  await refreshProjection();
+  assert.equal(
+    await confirmation.count(),
+    0,
+    "Background projection updates do not reopen restart consent",
+  );
+  await feedback.getByRole("button", { name: "保存工作后重启 Codex", exact: true }).waitFor();
+  assert.deepEqual(
+    await markerValue(),
+    runningTarget,
+    "Declining restart does not quit or relaunch the selected target",
+  );
+  const output = join(
+    root,
+    packaged ? "work/appearance-launcher-packaged" : "work/appearance-launcher",
+  );
+  await mkdir(output, { recursive: true });
+  await feedback.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: join(output, "launch-running-feedback.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+  await stopTarget();
+  await delay(500);
+  await rm(marker, { force: true });
+  await launchButton.click();
+  await feedback.getByText("Codex 已启动并连接", { exact: true }).waitFor({ timeout: 40_000 });
+  const launchedState = (await page.evaluate(() => window.codexCoco.modules())).value.find(
+    (entry) => entry.id === "appearance",
+  ).state;
+  assert.equal(launchedState.targets, 1);
+  assert.equal(launchedState.active, false);
+  await feedback.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: join(output, "launch-ready-feedback.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+  assert.deepEqual(errors, []);
+  await session.application.close();
+  session = null;
   console.log(
     JSON.stringify(
       {
         ok: true,
+        packaged,
         nativeBundleSelection: true,
+        productionLaunchUi: true,
+        persistentLaunchFeedback: true,
+        runningAppConsentAndCancel: true,
         nativeOpenAndRealCdpPort: true,
         runningAppGuard: true,
         controlledRestart: true,
@@ -136,6 +246,7 @@ try {
     ),
   );
 } finally {
+  await session?.application.close();
   await stopTarget();
   await delay(250);
   for (const pid of pids) {

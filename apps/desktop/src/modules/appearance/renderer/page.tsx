@@ -20,7 +20,7 @@ import {
   type AppearanceConfig,
 } from "../contract";
 
-import { type Layer } from "./editor-types";
+import { type Layer, type AppearanceLaunchFeedback } from "./editor-types";
 import { AppearanceLayerEditor } from "./layer-editor";
 import { AppearanceLibraryPanel } from "./library-panel";
 import { AppearanceConnectionPanel } from "./connection-panel";
@@ -40,6 +40,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
   const [message, setMessage] = useState("");
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [confirmRestart, setConfirmRestart] = useState(false);
+  const [launchFeedback, setLaunchFeedback] = useState<AppearanceLaunchFeedback | null>(null);
   const [selectedLayer, setSelectedLayer] = useState<Layer>("main");
   const [activeTab, setActiveTab] = useState("editor");
   const task = snapshot.operation;
@@ -96,6 +97,9 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
   async function run(operation: string, layer?: Layer, input: Record<string, string> = {}) {
     setPending(true);
     setMessage("");
+    const launching = operation === "launch-application" || operation === "restart-application";
+    if (launching) setLaunchFeedback({ operation, phase: "pending", reason: null });
+    else if (operation === "choose-application") setLaunchFeedback(null);
     try {
       const response = await window.codexCoco.runModuleOperation({
         moduleId: "appearance",
@@ -104,9 +108,27 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
       });
       if (!response.ok) {
         setMessage(response.error.message);
+        if (launching) setLaunchFeedback({ operation, phase: "error", reason: "LAUNCH_FAILED" });
         return;
       }
       acceptModuleSnapshot(response.value);
+      if (launching) {
+        if (!response.value.operation) throw new Error("LAUNCH_FAILED");
+        const completed = await waitForModuleOperation(
+          "appearance",
+          response.value.operation.id,
+          65_000,
+        );
+        const parsed = appearanceResultSchema.safeParse(completed.result);
+        const reason =
+          completed.phase === "succeeded" && parsed.success && parsed.data.status === "ready"
+            ? null
+            : parsed.success
+              ? (parsed.data.reason ?? "LAUNCH_FAILED")
+              : "LAUNCH_FAILED";
+        setLaunchFeedback({ operation, phase: reason ? "error" : "ready", reason });
+        if (operation === "launch-application" && reason === "APP_RUNNING") setConfirmRestart(true);
+      }
       if (layer && response.value.operation) {
         const completed = await waitForModuleOperation(
           "appearance",
@@ -125,7 +147,8 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
         }
       }
     } catch {
-      setMessage("外观服务连接失败，请重新打开窗口后重试。");
+      if (launching) setLaunchFeedback({ operation, phase: "error", reason: "LAUNCH_FAILED" });
+      else setMessage("外观服务连接失败，请重新打开窗口后重试。");
     } finally {
       setPending(false);
     }
@@ -287,6 +310,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
         </TabsContent>
         <TabsContent value="connection">
           <AppearanceConnectionPanel
+            launchFeedback={launchFeedback}
             draft={draft}
             update={update}
             enabled={enabled}

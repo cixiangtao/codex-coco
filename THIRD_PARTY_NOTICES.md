@@ -28,6 +28,10 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 
 新实现使用 Codex Coco 自己的配置、内容寻址图片库、模块任务和 CDP 连接。未复制旧守护进程、HTTP 设置服务器或配置目录，不操作旧服务；新增菜单栏素材记录如下。样式节点和观察器使用独立标识，撤销仅删除 Codex Coco 自己的布景。`appearance/contract.ts` 的插画靠边锚点语义同样参考上述 MIT 来源的 `background-position.ts`；独立背景节点、缩略图与预览坐标处理由 Codex Coco 重写。新版数据属性与颜色变量另经本机已安装 webview 资源只读核对，没有复制客户端打包业务代码。
 
+## 外观启动流程技术参考
+
+2026-10-22 对照 [Codex Dream Skin](https://github.com/Fei-Away/Codex-Dream-Skin/tree/6fc42df48a6a5365011f55cc349e20c038e56d1d) 提交 `6fc42df48a6a5365011f55cc349e20c038e56d1d` 的 `macos/scripts/common-macos.sh`、`start-dream-skin-macos.sh` 与 `macos/tests/restart-cancellation.test.mjs`，核对新进程启动参数、已运行时先确认重启、拒绝退出不强制结束及确认前不改变现有状态的行为。其 macOS 代码采用 MIT，Copyright (c) 2026 Codex Dream Skin Studio contributors，[许可全文](https://github.com/Fei-Away/Codex-Dream-Skin/blob/6fc42df48a6a5365011f55cc349e20c038e56d1d/macos/LICENSE)。Codex Coco 仅采用 `open -n -a` 的启动方式并独立实现 TypeScript 生命周期、公开结果反馈和受控测试，没有复制上游脚本、启动服务、状态目录或素材，也不接管其他工具的守护进程。
+
 ## 本地用量计数语义参考
 
 `modules/usage/local-index.ts` 的累计差值、初次 last_token_usage、fork 继承前缀与归档去重语义参考 codex-usage 同一来源提交（`b33578383a35b0f9d5d67fc67fbf98309b7702f5`，MIT，Copyright (c) 2026 cixiangtao）。实现为新的 TypeScript worker、独立有界索引和公开结果合同，没有复制 Swift 索引文件或读取旧应用配置。MIT 许可全文见根 LICENSE。
