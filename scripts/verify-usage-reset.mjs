@@ -43,6 +43,7 @@ async function open() {
 try {
   let page = await open();
   await page.getByRole("button", { name: "启用并读取用量", exact: true }).click();
+  await page.getByRole("tab", { name: "辅助工具", exact: true }).click();
   await page.getByText("服务可用重置卡：1 次", { exact: true }).waitFor();
   await page.getByRole("button", { name: "兑换这张重置卡", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "取消", exact: true }).click();
@@ -66,10 +67,12 @@ try {
   session = undefined;
   await writeFile(mode, "reset-ready");
   page = await open();
+  await page.getByRole("tab", { name: "辅助工具", exact: true }).click();
   await page.getByRole("button", { name: "检查上次兑换", exact: true }).click();
   await page.getByText("兑换结果尚未确认", { exact: true }).waitFor();
   await page.getByRole("button", { name: "重试同一次兑换", exact: true }).click();
   await page.getByText("此兑换此前已完成", { exact: true }).waitFor();
+  await page.getByRole("tab", { name: "总览", exact: true }).click();
   await page.getByText("剩余 75%", { exact: true }).waitFor();
   assert.deepEqual(JSON.parse(await readFile(ledger, "utf8")), before);
   assert(

@@ -406,18 +406,24 @@ export function createUsageModule(
               id: "tokens:today",
               label: "今日估算",
               value: `${totals.today.toLocaleString("zh-CN")} tokens`,
+              numericValue: totals.today,
+              unit: "tokens",
               detail: "本机记录，包含无归属计数",
             },
             {
               id: "tokens:week",
               label: "近 7 天",
               value: `${totals.week.toLocaleString("zh-CN")} tokens`,
+              numericValue: totals.week,
+              unit: "tokens",
               detail: "本机记录，包含无归属计数",
             },
             {
               id: "tokens:month",
               label: "近 30 天",
               value: `${totals.month.toLocaleString("zh-CN")} tokens`,
+              numericValue: totals.month,
+              unit: "tokens",
               detail: "本机记录，包含无归属计数",
             },
           ]
@@ -475,6 +481,7 @@ export function createUsageModule(
                 id: `${bucket.id}:${window.kind}`,
                 label: `${usageBucketTitle(bucket.id, index)} · ${usageWindowTitle(window)}`,
                 value: `剩余 ${Number(remainingPercent(window.usedPercent).toFixed(1))}%`,
+                progress: remainingPercent(window.usedPercent),
                 detail:
                   window.resetsAt === null
                     ? "恢复时间未知"

@@ -1,0 +1,286 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-22T03:54:01.673844+00:00",
+  "title": "Design System: Codex Coco",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "交互墨色 / 主题主色"
+      },
+      "primary-foreground": {
+        "role": "neutral",
+        "displayName": "主色上的正文"
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "浅底 / 深底"
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "正文墨色"
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "卡片表面"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "外壳灰"
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "次级灰字"
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "轻分隔"
+      },
+      "input": {
+        "role": "neutral",
+        "displayName": "输入轮廓"
+      },
+      "destructive": {
+        "role": "error",
+        "displayName": "错误色"
+      },
+      "data-primary": {
+        "role": "primary",
+        "displayName": "柔紫仪表色"
+      },
+      "data-success": {
+        "role": "secondary",
+        "displayName": "薄荷绿"
+      },
+      "data-warning": {
+        "role": "tertiary",
+        "displayName": "柔金色"
+      },
+      "data-primary-surface": {
+        "role": "primary",
+        "displayName": "柔紫底面"
+      },
+      "data-success-surface": {
+        "role": "secondary",
+        "displayName": "薄荷底面"
+      },
+      "data-warning-surface": {
+        "role": "tertiary",
+        "displayName": "柔金底面"
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "页面标题",
+        "purpose": "普通页面标题；主窗口用量标题可见且为 23px，速览用量分区标题仅保留可访问语义。"
+      },
+      "body": {
+        "displayName": "系统正文",
+        "purpose": "中文正文和工具界面基础字级。"
+      },
+      "label": {
+        "displayName": "卡片标题",
+        "purpose": "功能分区与简短字段标签。"
+      },
+      "instrument": {
+        "displayName": "仪表读数",
+        "purpose": "默认圆环的真实百分比读数，使用等宽数字。"
+      },
+      "metadata": {
+        "displayName": "微型元数据",
+        "purpose": "速览时间、单位和图表坐标。"
+      },
+      "caption": {
+        "displayName": "次级标注",
+        "purpose": "主窗口来源、Badge 和小圆环说明。"
+      },
+      "description": {
+        "displayName": "紧凑说明",
+        "purpose": "卡片说明、额度详情与标签页。"
+      },
+      "section": {
+        "displayName": "设置分区标题",
+        "purpose": "设置与模块列表分区标题。"
+      },
+      "input-base": {
+        "displayName": "输入框基础字级",
+        "purpose": "Input 小断点基础字级，md 后回到正文。"
+      },
+      "summary": {
+        "displayName": "速览计数",
+        "purpose": "速览内与单位按基线对齐的计数。"
+      },
+      "instrument-small": {
+        "displayName": "小圆环读数",
+        "purpose": "92px 圆环中心读数。"
+      },
+      "instrument-compact": {
+        "displayName": "窄窗口圆环读数",
+        "purpose": "用量页紧凑额度圆环的局部字级。"
+      }
+    },
+    "shadows": [
+      {
+        "name": "card",
+        "value": "0 2px 12px color-mix(in srgb, var(--foreground) 4%, transparent)",
+        "purpose": "默认 Card 的轻环境阴影；用量和速览额度卡明确去掉。"
+      },
+      {
+        "name": "active-tab",
+        "value": "0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent)",
+        "purpose": "当前页签在灰轨道上形成轻层级。"
+      }
+    ],
+    "motion": [
+      {
+        "name": "standard",
+        "value": "220ms",
+        "purpose": "共享状态与速览开合过渡。"
+      },
+      {
+        "name": "ring",
+        "value": "450ms",
+        "purpose": "当前额度弧线变化；历史记录禁用。"
+      },
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "克制的减速过渡；减少动态偏好优先。"
+      },
+      {
+        "name": "glance-offset",
+        "value": "translateY(-5px)",
+        "purpose": "速览隐藏状态的短距离位移。"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "desktop-compact",
+        "value": "800px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "主要按钮",
+      "kind": "button",
+      "description": "共享 Button 变体；焦点、悬停、按下与禁用状态保持主题一致。",
+      "html": "<button class=\"ds-btn\">保存设置</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius-control,10px);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif;font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background 220ms cubic-bezier(.16,1,.3,1),color 220ms cubic-bezier(.16,1,.3,1)}.ds-btn:focus-visible{outline:3px solid var(--ring,#343434);outline-offset:2px}.ds-btn:active{transform:translateY(1px)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-btn{background:var(--primary,#343434);color:var(--primary-foreground,#fff)}.ds-btn:hover{background:var(--primary-hover,#2e2e2e)}.ds-btn:active{background:var(--primary-pressed,#292929)}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "轮廓按钮",
+      "kind": "button",
+      "description": "共享 Button 变体；焦点、悬停、按下与禁用状态保持主题一致。",
+      "html": "<button class=\"ds-btn\">重新读取</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius-control,10px);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif;font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background 220ms cubic-bezier(.16,1,.3,1),color 220ms cubic-bezier(.16,1,.3,1)}.ds-btn:focus-visible{outline:3px solid var(--ring,#343434);outline-offset:2px}.ds-btn:active{transform:translateY(1px)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-btn{border-color:var(--border,#d8d8d8);background:var(--background,#fafafa);color:var(--foreground,#202020)}.ds-btn:hover{background:var(--muted,#f0f0f0)}",
+      "refersTo": "button-outline"
+    },
+    {
+      "name": "次要按钮",
+      "kind": "button",
+      "description": "共享 Button 变体；焦点、悬停、按下与禁用状态保持主题一致。",
+      "html": "<button class=\"ds-btn\">取消</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius-control,10px);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif;font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background 220ms cubic-bezier(.16,1,.3,1),color 220ms cubic-bezier(.16,1,.3,1)}.ds-btn:focus-visible{outline:3px solid var(--ring,#343434);outline-offset:2px}.ds-btn:active{transform:translateY(1px)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-btn{background:var(--secondary,#eee);color:var(--secondary-foreground,#202020)}.ds-btn:hover{background:color-mix(in oklch,var(--secondary,#eee),var(--foreground,#202020) 5%)}"
+    },
+    {
+      "name": "轻量按钮",
+      "kind": "button",
+      "description": "共享 Button 变体；焦点、悬停、按下与禁用状态保持主题一致。",
+      "html": "<button class=\"ds-btn\">打开设置</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius-control,10px);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif;font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background 220ms cubic-bezier(.16,1,.3,1),color 220ms cubic-bezier(.16,1,.3,1)}.ds-btn:focus-visible{outline:3px solid var(--ring,#343434);outline-offset:2px}.ds-btn:active{transform:translateY(1px)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-btn{background:transparent;color:var(--foreground,#202020)}.ds-btn:hover{background:var(--muted,#f0f0f0)}"
+    },
+    {
+      "name": "危险操作按钮",
+      "kind": "button",
+      "description": "共享 Button 变体；焦点、悬停、按下与禁用状态保持主题一致。",
+      "html": "<button class=\"ds-btn\">清除历史</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius-control,10px);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif;font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background 220ms cubic-bezier(.16,1,.3,1),color 220ms cubic-bezier(.16,1,.3,1)}.ds-btn:focus-visible{outline:3px solid var(--ring,#343434);outline-offset:2px}.ds-btn:active{transform:translateY(1px)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-btn{background:color-mix(in srgb,var(--destructive,#b42318) 10%,transparent);color:var(--destructive,#b42318)}.ds-btn:hover{background:color-mix(in srgb,var(--destructive,#b42318) 20%,transparent)}.ds-btn:focus-visible{outline-color:var(--destructive,#b42318)}"
+    },
+    {
+      "name": "文本链接按钮",
+      "kind": "button",
+      "description": "共享 Button 变体；焦点、悬停、按下与禁用状态保持主题一致。",
+      "html": "<button class=\"ds-btn\">查看明细</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius-control,10px);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif;font-size:14px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background 220ms cubic-bezier(.16,1,.3,1),color 220ms cubic-bezier(.16,1,.3,1)}.ds-btn:focus-visible{outline:3px solid var(--ring,#343434);outline-offset:2px}.ds-btn:active{transform:translateY(1px)}.ds-btn:disabled{opacity:.5;pointer-events:none}.ds-btn{background:transparent;color:var(--primary,#343434);text-underline-offset:4px}.ds-btn:hover{text-decoration:underline}"
+    },
+    {
+      "name": "输入框",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "32px 字段，标签独立可读；透明底和可见焦点环。",
+      "html": "<label class=\"ds-field\">刷新间隔（秒）<input class=\"ds-input\" inputmode=\"numeric\" value=\"300\" /></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:6px;color:var(--foreground,#202020);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif;font-size:13px}.ds-input{height:32px;min-width:0;padding:4px 10px;border:1px solid var(--input,#8a8a8a);border-radius:8px;background:transparent;color:var(--foreground,#202020);font-family:inherit;font-size:14px;transition:border-color 220ms}.ds-input:hover{border-color:var(--foreground,#202020)}.ds-input:focus-visible{outline:3px solid var(--ring,#343434);outline-offset:2px}.ds-input:disabled{opacity:.5;cursor:not-allowed}.ds-input[aria-invalid=true]{border-color:var(--destructive,#b42318)}"
+    },
+    {
+      "name": "固定图标导航",
+      "kind": "nav",
+      "description": "56px 图标栏；当前页、键盘焦点与可访问名称保留。",
+      "html": "<nav class=\"ds-nav\" aria-label=\"主导航\"><button class=\"ds-nav-item\" aria-label=\"用量\" aria-current=\"page\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M21.21 15.89A10 10 0 1 1 8 2.83\"/><path d=\"M22 12A10 10 0 0 0 12 2v10z\"/></svg></button><button class=\"ds-nav-item\" aria-label=\"设置\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2\"/></svg></button></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:4px;width:36px;padding:12px 10px;background:var(--muted,#f0f0f0)}.ds-nav-item{display:flex;align-items:center;justify-content:center;width:36px;height:32px;padding:0;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--foreground,#202020);cursor:pointer}.ds-nav-item[aria-current=page]{background:var(--secondary,#eee);color:var(--secondary-foreground,#202020)}.ds-nav-item:hover{background:var(--accent,#e6e6e6)}.ds-nav-item:focus-visible{outline:3px solid var(--ring,#343434);outline-offset:2px}.ds-nav-item:active{transform:translateY(1px)}"
+    },
+    {
+      "name": "状态徽章",
+      "kind": "chip",
+      "description": "短标签使用淡色 tone，不能替代完整错误说明。",
+      "html": "<span class=\"ds-badge\">已连接</span>",
+      "css": ".ds-badge{display:inline-flex;align-items:center;gap:4px;width:fit-content;padding:3px 8px;border-radius:7px;background:var(--data-success-surface,#eaf5f0);color:var(--foreground,#202020);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif;font-size:11px;font-weight:550;line-height:1.5}"
+    },
+    {
+      "name": "功能卡片",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "18px 圆角和默认内距；compact 内距 12px。Box 不承担表面。",
+      "html": "<section class=\"ds-card\"><header class=\"ds-card-header\"><h3 class=\"ds-card-title\">每日用量</h3></header><p class=\"ds-card-description\">按日查看本机计数与来源</p><div class=\"ds-card-body\">来源与完整性由真实数据提供。</div></section>",
+      "css": ".ds-card{display:flex;flex-direction:column;gap:12px;min-width:0;padding:var(--surface-inset,18px);border-radius:var(--radius-card,18px);background:var(--card,#fff);color:var(--foreground,#202020);box-shadow:var(--shadow-card,0 2px 12px color-mix(in srgb,var(--foreground,#202020) 4%,transparent));font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif}.ds-card-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.ds-card-title{margin:0;font-size:13px;font-weight:600;line-height:1.5}.ds-card-description{margin:0;color:var(--muted-foreground,#626262);font-size:12px}.ds-card-body{font-size:12px}"
+    },
+    {
+      "name": "剩余额度圆环",
+      "kind": "custom",
+      "refersTo": "progress-ring",
+      "description": "112px 默认、92px 小尺寸；示例仅演示几何，未知值不输出 meter。",
+      "html": "<div class=\"ds-ring\"><meter class=\"ds-sr\" min=\"0\" max=\"100\" value=\"75\" aria-label=\"示例剩余额度\">75%</meter><svg viewBox=\"0 0 100 100\" aria-hidden=\"true\"><circle class=\"ds-track\" cx=\"50\" cy=\"50\" r=\"42\"/><circle class=\"ds-value\" cx=\"50\" cy=\"50\" r=\"42\" pathLength=\"100\" stroke-dasharray=\"100 100\" stroke-dashoffset=\"25\"/></svg><div class=\"ds-ring-label\" aria-hidden=\"true\"><strong>75%</strong><span>示例剩余</span></div></div>",
+      "css": ".ds-ring{position:relative;width:112px;height:112px;color:var(--foreground,#202020);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif}.ds-ring svg{width:100%;height:100%;transform:rotate(-90deg);overflow:visible}.ds-ring circle{fill:none;stroke-width:7}.ds-track{stroke:color-mix(in srgb,var(--data-primary,#7464df) 16%,transparent)}.ds-value{stroke:var(--data-primary,#7464df);stroke-linecap:round}.ds-ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-variant-numeric:tabular-nums;line-height:1.3}.ds-ring-label strong{font-size:25px;font-weight:650;letter-spacing:-.035em}.ds-ring-label span{font-size:11px;opacity:.8}.ds-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}"
+    },
+    {
+      "name": "功能标签页",
+      "kind": "nav",
+      "refersTo": "tabs-list",
+      "description": "淡灰轨道、当前页签与键盘焦点；业务使用 Base UI，面板保持挂载。",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"用量功能\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">总览</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">辅助工具</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">用量设置</button></div>",
+      "css": ".ds-tabs{display:flex;align-items:center;flex-wrap:wrap;width:fit-content;max-width:100%;padding:4px;gap:2px;border-radius:12px;background:var(--muted,#f0f0f0);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif}.ds-tab{padding:6px 14px;border:0;border-radius:9px;background:transparent;color:var(--muted-foreground,#626262);font-family:inherit;font-size:12px;font-weight:550;cursor:pointer;transition:background 220ms cubic-bezier(.16,1,.3,1),color 220ms cubic-bezier(.16,1,.3,1)}.ds-tab:hover{color:var(--foreground,#202020)}.ds-tab[aria-selected=true]{color:var(--data-primary,#7464df);background:var(--card,#fff);box-shadow:0 1px 3px color-mix(in srgb,var(--foreground,#202020) 8%,transparent)}.ds-tab:focus-visible{outline:2px solid var(--ring,#343434);outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "柔彩仪表台",
+    "overview": "Codex Coco 用安静的中性外壳承托柔彩数据表面，以圆环、圆润卡片和紧凑分组建立清楚的操作层级。颜色帮助辨认真实状态，文字说明来源、时间与恢复路径；界面保持桌面工具应有的准确和克制。\n\n用户已选择 A 柔彩仪表台方向，并明确要求保留圆环、圆润圆角、进一步压紧布局和先封装组件。本规范将该方向记录为新的视觉基线；当前完整落点为用量页面与菜单栏速览，其他模块保留已有业务界面，不能据此宣称全部页面已迁移。具体页面策略见 [用量与速览 surface brief](docs/surfaces/usage-and-glance.md)，批准参考见 [样稿](docs/design/instruments-approved.png) 与 [批准记录](docs/design/instruments-approved.json)。样稿中的示例账号、数值、色板和冗余进度条不进入运行时。",
+    "keyCharacteristics": [
+      "中性外壳、柔彩数据、圆润而紧凑的表面。",
+      "系统字体与等宽数字，主次信息一眼可分。",
+      "共享组件先行，主题和状态由语义合同驱动。",
+      "真实值、未知值、失败与历史记录有明确差别。"
+    ],
+    "rules": [
+      {
+        "name": "The Theme-Owned Color Rule",
+        "body": "主色、数据色和数据底面统一由主题解析器生成；数据底面按模式混合卡片色，页面和弹层通过共享语义变量消费。",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "**Do** 先复用 Card、Box、Tabs、Badge 和 ProgressRing，再组合业务页面。",
+      "**Do** 通过主题语义 token 同时适配浅色、深色和极端自定义主色。",
+      "**Do** 使用等宽数字、真实单位、来源与恢复时间帮助判断状态。",
+      "**Do** 保留键盘焦点、图标名称、未知值语义和减少动态偏好。",
+      "**Do** 在默认窗口、最小窗口和菜单栏真实尺寸下检查密度、滚动与底部入口。"
+    ],
+    "donts": [
+      "**Don't** 把批准样稿的示例账号、读数、色板或固定浅色色值复制到运行时。",
+      "**Don't** 用零代替未知值，用当前额度样式冒充历史记录，或让历史圆环播放更新动画。",
+      "**Don't** 在 Box 中建立第二套表面、圆角和阴影规范。",
+      "**Don't** 将用量页的双仪表与三组页签强制套用到其他模块。",
+      "**Don't** 把本轮用量和速览迁移描述为所有业务模块的视觉迁移已经完成。"
+    ]
+  }
+}

@@ -52,7 +52,6 @@ export function UsageResetCards({ snapshot }: { snapshot: ModuleSnapshot }) {
   }
   return (
     <section className="flex flex-col gap-3" aria-label="重置卡">
-      <h3>重置卡</h3>
       {credits ? (
         <>
           <p>服务可用重置卡：{credits.availableCount} 次</p>

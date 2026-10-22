@@ -12,7 +12,7 @@ web
 
 Electron、React、TypeScript；Tailwind CSS + shadcn/ui 构建自有组件；pnpm workspace 管理依赖；Oxc 的 Oxfmt 格式化，Oxlint 代码检查，Oxc parser 检查依赖边界。
 
-桌面应用位于 `apps/desktop`，私有 UI 包位于 `packages/ui`。当前已接入可运行 Electron、白名单桌面桥、模块/配置基础、工作线程执行器、共享组件与受控主题；正式主窗口采用用户认可的固定图标侧栏。用量已提供 CLI App Server 手动读取，主窗口与菜单栏共享额度快照；外观已接入三层布景、自定义图片与显式可撤销的本机 CDP 应用；完整二期目标见 docs/phase-two.md。
+桌面应用位于 `apps/desktop`，私有 UI 包位于 `packages/ui`。当前已接入可运行 Electron、白名单桌面桥、模块/配置基础、工作线程执行器、共享组件与受控主题；正式主窗口采用用户认可的固定图标侧栏。用量通过 CLI App Server 在启用与重启时读取，并提供手动刷新及独立定时策略，主窗口与菜单栏共享额度快照；外观已接入三层布景、自定义图片与显式可撤销的本机 CDP 应用；完整二期目标见 docs/phase-two.md。
 
 ## Users
 

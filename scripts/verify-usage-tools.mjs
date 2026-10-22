@@ -55,7 +55,7 @@ try {
   } while (Date.now() < startupDeadline);
   assert.equal(startup?.name, "refresh");
   assert.equal(startup?.phase, "succeeded");
-  await page.getByText("样本检测与 CLI 维护", { exact: true }).click();
+  await page.getByRole("tab", { name: "辅助工具", exact: true }).click();
   await page.getByRole("button", { name: "读取可用模型", exact: true }).click();
   await page.getByRole("button", { name: "受控模型", exact: true }).waitFor();
   await page.getByRole("button", { name: "受控模型", exact: true }).click();

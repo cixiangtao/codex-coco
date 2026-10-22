@@ -8,7 +8,7 @@ export interface Bounds {
 export function glanceBounds(anchor: Bounds, workArea: Bounds): Bounds {
   const margin = Math.min(8, Math.floor(Math.min(workArea.width, workArea.height) / 4));
   const width = Math.min(360, workArea.width - margin * 2);
-  const height = Math.min(420, workArea.height - margin * 2);
+  const height = Math.min(520, workArea.height - margin * 2);
   const minX = workArea.x + margin;
   const maxX = workArea.x + workArea.width - width - margin;
   const minY = workArea.y + margin;

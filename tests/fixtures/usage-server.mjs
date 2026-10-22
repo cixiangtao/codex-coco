@@ -74,7 +74,7 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
       rateLimitsByLimitId: {
         codex: {
           primary: {
-            usedPercent: mode() === "invalid-quota" ? "invalid" : 25,
+            usedPercent: mode() === "invalid-quota" ? "invalid" : mode() === "exhausted" ? 100 : 25,
             windowDurationMins: 300,
             resetsAt: Math.floor(Date.now() / 1000) + 3600,
           },

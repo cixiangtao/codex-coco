@@ -60,8 +60,7 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
   const completed = tools?.samples.filter((value) => value.correct !== null) ?? [];
   const correct = completed.filter((value) => value.correct).length;
   return (
-    <details>
-      <summary>样本检测与 CLI 维护</summary>
+    <div>
       <div className="flex flex-col gap-5 py-5">
         <p className="text-muted-foreground">
           固定糖果题的重复样本检测会消耗模型额度，仅由你明确开始。结果用于对比本次样本，不能代表模型整体能力；少量错误不等于降智。
@@ -282,6 +281,6 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
           </div>
         </DialogContent>
       </Dialog>
-    </details>
+    </div>
   );
 }

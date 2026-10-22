@@ -25,6 +25,9 @@ export interface GlanceMetric {
   label: string;
   value: string;
   detail: string;
+  progress?: number | undefined;
+  numericValue?: number | undefined;
+  unit?: string | undefined;
 }
 export const glanceDetailSchema = z.strictObject({
   page: z.enum(["usage", "appearance", "modules", "settings"]).optional(),
@@ -37,6 +40,9 @@ export const glanceDetailSchema = z.strictObject({
         label: z.string().max(120),
         value: z.string().max(120),
         detail: z.string().max(120),
+        progress: z.number().min(0).max(100).optional(),
+        numericValue: z.number().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+        unit: z.string().max(24).optional(),
       }),
     )
     .max(40)

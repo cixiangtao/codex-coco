@@ -39,7 +39,8 @@
     "verify:widget": "node scripts/verify-widget.mjs",
     "verify:updates": "pnpm run build && node scripts/verify-updates.mjs",
     "verify:appearance-launcher": "node scripts/verify-appearance-launcher.mjs",
-    "verify:tray-colors": "pnpm run build && node scripts/verify-tray-colors.mjs"
+    "verify:tray-colors": "pnpm run build && node scripts/verify-tray-colors.mjs",
+    "verify:ui": "pnpm run build && node scripts/verify-ui-instruments.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

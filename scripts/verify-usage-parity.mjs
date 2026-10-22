@@ -139,9 +139,10 @@ try {
   await page.getByText("14 天 · 300 tokens", { exact: true }).waitFor();
   await page.getByText("查看每日计数", { exact: true }).click();
   assert.equal(await page.getByRole("table").getByRole("row").count(), 15);
-  await page.getByText("样本检测与 CLI 维护", { exact: true }).click();
+  await page.getByRole("tab", { name: "辅助工具", exact: true }).click();
   await page.getByRole("button", { name: "读取可用模型", exact: true }).click();
   await page.getByRole("button", { name: "受控模型", exact: true }).waitFor();
+  await page.getByRole("tab", { name: "总览", exact: true }).click();
   await page.getByText("剩余 75%", { exact: true }).waitFor();
   await page.getByText("14 天 · 300 tokens", { exact: true }).waitFor();
   await task(page, "check-cli");

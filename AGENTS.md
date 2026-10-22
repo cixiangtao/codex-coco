@@ -40,6 +40,7 @@
 - pnpm run verify:modules：生产入口的真实模块链路回归，仅注册合成模块并使用临时数据，结束后清理。
 - pnpm run verify:workers：验证真实 Electron 中独立 worker 构建入口、进度、结果与实际退出；打包回归包含同一资源验证。
 - pnpm run verify:usage：临时 PATH 中的受控 stdio 服务验证读取、失败恢复、取消、重启与只读摘要；不得使用真实账号代替测试数据。
+- pnpm run verify:ui：受控 CLI 与临时数据验证圆环数值、720px 布局、标签页草稿、只读速览、明暗/自定义主色与减少动态效果；支持脚本 --packaged 验证本地包。
 - pnpm run verify:desktop：生产入口的真实 Electron 回归，使用临时数据，结束后清理。
 - pnpm run pack：本机未签名的 macOS 应用目录；必须写 run，避免调用 pnpm 内置 pack。
 - pnpm run verify:packaged：生成并验证 macOS arm64 本地应用本身。
@@ -49,6 +50,8 @@
 改变生命周期、数据解析或 IPC 时，增加针对合同的测试；界面实现后通过真实 Electron 验证。修改后执行对应检查；干净安装和构建在工具链变更时验证，不因纯文档修改重复整套桌面回归。
 
 正式主窗口采用已认可的固定图标侧栏与菜单提示，布局基线见 DESIGN.md；base-nova 和工程配色预设不代表最终品牌视觉。按任务工作线程、本地有界诊断与可复现性能采样已接入；独立局部主题作用域仍是后续基建目标；不要把本轮基线描述为 F01–F15 全部完成。
+
+2026-10-22 用户认可 A 柔彩仪表台，要求圆润、紧凑并先组件化。Card 统一表面、18px 圆角与 default/compact 内距，Box 只处理排列与间距；Badge、Tabs、ProgressRing、Skeleton 放在 UI 包。额度与账号等业务组合留在模块 renderer。用量页分总览/辅助工具/用量设置，速览使用同一圆环和紧凑模块行；不把样稿示例数据或色板写入正式页面。其他页面尚未全部迁移该视觉。
 
 模块接入使用 application/module-host.ts 的 BuiltinModule 合同。后台在 modules/registry.ts 注册，页面在 renderer/module-pages.ts 注册；模块自己的纯 contract.ts 与 renderer/ 分别接受合同和浏览器边界检查。配置仅包含可公开的偏好，不保存凭据或私有数据；配置变化供下一次操作使用。CODEX_COCO_FIXTURES=1 仅允许未打包验证环境额外加载合成模块，打包应用始终禁用示例。业务注册表目前包含默认停用的用量、外观、系统与菜单栏三个模块。
 

@@ -184,7 +184,7 @@ function createWindow(context: WindowContext = { kind: "main", page: "appearance
         }
       : {
           width: 360,
-          height: 420,
+          height: 520,
           frame: false,
           resizable: false,
           minimizable: false,

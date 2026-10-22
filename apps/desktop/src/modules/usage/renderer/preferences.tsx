@@ -44,8 +44,7 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
     }
   }
   return (
-    <details className="usage-preferences">
-      <summary>刷新、通知与菜单栏设置</summary>
+    <div className="usage-preferences">
       <FieldGroup className="py-5">
         <Field>
           <FieldLabel htmlFor="usage-interval">自动刷新间隔（秒）</FieldLabel>
@@ -165,6 +164,6 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
         </div>
         <output aria-live="polite">{message}</output>
       </FieldGroup>
-    </details>
+    </div>
   );
 }

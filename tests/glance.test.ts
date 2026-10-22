@@ -99,7 +99,7 @@ describe("glance placement in screen DIP coordinates", () => {
   const work = { x: -1600, y: -900, width: 1600, height: 900 };
   it("places a menu-bar popover below the anchor on a negative-origin display", () => {
     const result = glanceBounds({ x: -1200, y: -924, width: 100, height: 24 }, work);
-    expect(result).toEqual({ x: -1330, y: -892, width: 360, height: 420 });
+    expect(result).toEqual({ x: -1330, y: -892, width: 360, height: 520 });
   });
   it("opens above a bottom taskbar and clamps both horizontal edges", () => {
     const result = glanceBounds({ x: -30, y: 0, width: 30, height: 30 }, work);
