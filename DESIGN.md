@@ -151,7 +151,7 @@ components:
 
 Codex Coco 用安静的中性外壳承托柔彩数据表面，以圆环、圆润卡片和紧凑分组建立清楚的操作层级。颜色帮助辨认真实状态，文字说明来源、时间与恢复路径；界面保持桌面工具应有的准确和克制。
 
-用户已选择 A 柔彩仪表台方向，并明确要求保留圆环、圆润圆角、进一步压紧布局和先封装组件。本规范将该方向记录为新的视觉基线；当前覆盖用量页面、菜单栏速览、外观布景工作台，以及窗口主题、应用更新、系统与菜单栏等已接入的分组设置表单。设置行沿用用户明确指定的 iOS Field Group 组织方式：圆润列表、组外说明和组内细分隔，与柔彩仪表共用现有主题身份。具体页面策略见 [用量与速览 surface brief](docs/surfaces/usage-and-glance.md)、[外观 surface brief](docs/surfaces/appearance.md) 和 [设置 surface brief](docs/surfaces/settings.md)，批准参考见 [样稿](docs/design/instruments-approved.png) 与 [批准记录](docs/design/instruments-approved.json)。样稿中的示例账号、数值、色板和冗余进度条不进入运行时。
+用户已选择 A 柔彩仪表台方向，并明确要求保留圆环、圆润圆角、进一步压紧布局和先封装组件。本规范将该方向记录为新的视觉基线；当前覆盖用量页面、菜单栏速览、外观布景工作台，以及窗口主题、关于、应用更新、系统与菜单栏、模块管理、辅助工具、重置卡、图库与预设等分组设置表单。设置行沿用用户明确指定的 iOS Field Group 组织方式：圆润列表、组外说明和组内细分隔，与柔彩仪表共用现有主题身份。具体页面策略见 [用量与速览 surface brief](docs/surfaces/usage-and-glance.md)、[外观 surface brief](docs/surfaces/appearance.md) 和 [设置 surface brief](docs/surfaces/settings.md)，批准参考见 [样稿](docs/design/instruments-approved.png) 与 [批准记录](docs/design/instruments-approved.json)。样稿中的示例账号、数值、色板和冗余进度条不进入运行时。
 
 **Key Characteristics:**
 
@@ -258,7 +258,7 @@ SettingsRow 继续复用 Field，公开 `data-slot="settings-row"` 和 `data-lay
 
 Switch 的公开 slot 为 `switch`，尺寸与滑块见前置 token；关闭使用 `input` 轨道，选中使用 `data-primary`，滑块使用 `card`。`data-checked` 使滑块水平位移（16px），共享（220ms）过渡并尊重减少动态偏好；`:focus-visible` 使用（2px）主题焦点环与（3px）外偏移，`data-disabled` 降至（0.45）不透明度并停止可操作提示。二选一用 Switch，多选项保留分段选择，不将所有行都做成按钮组。
 
-当前分组列表接入窗口主题、应用更新、系统与菜单栏、用量偏好、外观连接及图层参数。分组与开关继续服从宿主草稿、保存、取消、冲突及权限边界；切换偏好不直接修改系统登录项、共享文件、外部布景或应用安装，原有需确认操作仍单独确认。
+当前分组列表接入窗口主题与关于、应用更新、系统与菜单栏、模块管理、用量偏好及辅助工具/重置卡、外观连接、图层参数、图库及预设。系统设置按图标、动画与性能、系统集成分组，图标选项区最大高度（180px）且可滚动；保存按钮位于完整偏好之后。模块启停保持明确按钮，名称、状态与操作同列，异常恢复路径仍可见。分组与开关继续服从宿主草稿、保存、取消、冲突及权限边界；切换偏好不直接修改系统登录项、共享文件、外部布景或应用安装，原有需确认操作仍单独确认。
 
 ### Badges
 

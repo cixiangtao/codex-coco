@@ -80,6 +80,25 @@ try {
     scale: "css",
     animations: "disabled",
   });
+  await page
+    .getByRole("group", { name: "样本检测", exact: true })
+    .evaluate((node) => node.scrollIntoView({ block: "start" }));
+  await page.screenshot({
+    path: join(output, "sample-settings.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  const mainWindow = await application.browserWindow(page);
+  await mainWindow.evaluate((window) => window.setSize(720, 640));
+  assert(
+    await page.locator(".desktop-content").evaluate((node) => node.scrollWidth <= node.clientWidth),
+  );
+  await page.screenshot({
+    path: join(output, "sample-settings-compact.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  await mainWindow.evaluate((window) => window.setSize(980, 800));
   await page.getByRole("button", { name: "检查 CLI 版本", exact: true }).click();
   await page.getByText("Codex CLI：1.2.3 · 最新稳定版：1.2.4", { exact: true }).waitFor();
   await page.getByRole("button", { name: "更新 Codex CLI", exact: true }).click();

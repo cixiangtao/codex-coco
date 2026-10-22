@@ -246,6 +246,13 @@ try {
   await capture(page, "preferences-compact");
   await page.getByRole("tab", { name: "总览", exact: true }).click();
   await window.evaluate((window) => window.setSize(980, 800));
+  await nav.getByRole("button", { name: "模块管理", exact: true }).click();
+  await assertFits(page);
+  await capture(page, "modules-light");
+  await window.evaluate((window) => window.setSize(720, 640));
+  await assertFits(page);
+  await capture(page, "modules-compact");
+  await window.evaluate((window) => window.setSize(980, 800));
   await nav.getByRole("button", { name: "设置", exact: true }).click();
   await assertFits(page);
   await capture(page, "settings-light");
@@ -254,6 +261,9 @@ try {
   await nav.getByRole("button", { name: "用量", exact: true }).click();
   await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
   await capture(page, "main-dark");
+  await nav.getByRole("button", { name: "设置", exact: true }).click();
+  await capture(page, "settings-dark");
+  await nav.getByRole("button", { name: "用量", exact: true }).click();
   await page.getByRole("tab", { name: "用量设置", exact: true }).click();
   await capture(page, "preferences-dark");
   await page.getByRole("tab", { name: "总览", exact: true }).click();

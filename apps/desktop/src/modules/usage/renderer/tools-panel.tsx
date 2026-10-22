@@ -1,7 +1,8 @@
+import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
 import { useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
-import { Field, FieldGroup, FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
+import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
 import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
 import {
   Dialog,
@@ -60,27 +61,101 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
   const completed = tools?.samples.filter((value) => value.correct !== null) ?? [];
   const correct = completed.filter((value) => value.correct).length;
   return (
-    <div>
-      <div className="flex flex-col gap-5 py-5">
-        <p className="text-muted-foreground">
-          固定糖果题的重复样本检测会消耗模型额度，仅由你明确开始。结果用于对比本次样本，不能代表模型整体能力；少量错误不等于降智。
-        </p>
+    <div className="settings-sections">
+      <SettingsGroup
+        title="样本检测"
+        description="固定糖果题的重复样本检测会消耗模型额度，仅由你明确开始。结果用于对比本次样本，不能代表模型整体能力；少量错误不等于降智。"
+      >
+        <SettingsRow layout="stacked">
+          <FieldLabel>模型目录</FieldLabel>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                void run("list-models");
+              }}
+            >
+              读取可用模型
+            </Button>
+          </div>
+        </SettingsRow>
         {tools?.error && (
           <Alert variant="destructive">
             <AlertTitle>辅助工具需要检查</AlertTitle>
             <AlertDescription>{failures[tools.error]}</AlertDescription>
           </Alert>
         )}
-        <div className="flex flex-wrap gap-3">
-          <Button
-            variant="outline"
-            disabled={busy}
-            onClick={() => {
-              void run("list-models");
+
+        <SettingsRow layout="stacked">
+          <FieldLabel>检测模型</FieldLabel>
+          <ToggleGroup
+            className="flex-wrap"
+            aria-label="检测模型"
+            value={[model ?? "default"]}
+            onValueChange={(values) => {
+              if (values.length) {
+                setModel(values[0] === "default" ? null : values[0]!);
+                setEffort(null);
+              }
             }}
+            variant="outline"
           >
-            读取可用模型
+            <ToggleGroupItem value="default">CLI 默认</ToggleGroupItem>
+            {tools?.models.map((value) => (
+              <ToggleGroupItem key={value.id} value={value.id}>
+                {value.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <FieldDescription>
+            检测忽略用户配置，使用所选模型或 CLI 内置默认模型；不会接入用户的
+            MCP、应用或项目上下文。
+          </FieldDescription>
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel>推理强度</FieldLabel>
+          <ToggleGroup
+            aria-label="检测推理强度"
+            value={[effort ?? "default"]}
+            onValueChange={(values) => {
+              if (values.length) setEffort(values[0] === "default" ? null : values[0]!);
+            }}
+            variant="outline"
+          >
+            <ToggleGroupItem value="default">默认</ToggleGroupItem>
+            {selected?.efforts.map((value) => (
+              <ToggleGroupItem key={value} value={value}>
+                {value}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel htmlFor="intelligence-runs">样本次数（1–5）</FieldLabel>
+          <Input
+            id="intelligence-runs"
+            type="number"
+            min={1}
+            max={5}
+            value={Number.isNaN(runs) ? "" : runs}
+            onChange={(event) => setRuns(event.target.valueAsNumber)}
+          />
+        </SettingsRow>
+
+        <SettingsRow>
+          <FieldLabel>执行样本检测</FieldLabel>
+          <Button
+            disabled={busy || !Number.isInteger(runs) || runs < 1 || runs > 5}
+            onClick={() => setConfirm("run-intelligence")}
+          >
+            开始样本检测
           </Button>
+        </SettingsRow>
+      </SettingsGroup>
+      <SettingsGroup title="检测结果与历史">
+        <SettingsRow>
+          <FieldLabel>本机检测历史</FieldLabel>
           <Button
             variant="outline"
             disabled={busy}
@@ -90,6 +165,75 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
           >
             读取检测历史
           </Button>
+        </SettingsRow>
+        <SettingsRow layout="stacked">
+          <FieldLabel>最近检测结果</FieldLabel>
+          {snapshot.operation?.name === "run-intelligence" &&
+            snapshot.operation.phase === "running" && (
+              <output aria-live="polite">
+                检测进度 {Math.round(snapshot.operation.progress)}%，每个样本最多等待 120 秒。
+              </output>
+            )}
+          {!tools?.samples.length && (
+            <FieldDescription>尚无检测结果，请明确开始样本检测或读取历史。</FieldDescription>
+          )}
+          {tools && tools.samples.length > 0 && (
+            <>
+              <p>
+                已完成 {completed.length}/{tools.requestedRuns ?? tools.samples.length} 个样本，正确{" "}
+                {correct} 个，正确率{" "}
+                {completed.length ? Math.round((correct / completed.length) * 100) : 0}%。
+              </p>
+              {tools.samples.map((sample) => (
+                <details key={sample.index}>
+                  <summary>
+                    样本 {sample.index} ·{" "}
+                    {sample.correct === null ? "未完成" : sample.correct ? "通过" : "未通过"} ·{" "}
+                    {(sample.elapsedMs / 1000).toFixed(1)} 秒
+                  </summary>
+                  <p>
+                    答案：{sample.answer ?? "未知"} · 输入 {sample.inputTokens ?? "未知"} / 输出{" "}
+                    {sample.outputTokens ?? "未知"} / 推理 {sample.reasoningTokens ?? "未知"} tokens
+                  </p>
+                  <p className="whitespace-pre-wrap">{sample.explanation}</p>
+                </details>
+              ))}
+            </>
+          )}
+          {tools && tools.history.length > 0 && (
+            <details>
+              <summary>最近 {tools.history.length} 条检测历史</summary>
+              <ul className="flex flex-col gap-3">
+                {tools.history.map((entry) => (
+                  <li key={entry.id}>
+                    {new Date(entry.capturedAt).toLocaleString("zh-CN")} · {entry.model} ·{" "}
+                    {entry.effort ?? "默认"} · {entry.correct}/{entry.completed} 通过 ·{" "}
+                    {entry.averageTokensPerSecond === null
+                      ? "速度未知"
+                      : `${entry.averageTokensPerSecond.toFixed(1)} tokens/s`}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel>历史维护</FieldLabel>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => setConfirm("clear-intelligence-history")}
+          >
+            备份并清空检测历史
+          </Button>
+        </SettingsRow>
+      </SettingsGroup>
+      <SettingsGroup
+        title="Codex CLI 维护"
+        description="更新使用 CLI 自带命令，不调用任意 shell 脚本。"
+      >
+        <SettingsRow>
+          <FieldLabel>版本信息</FieldLabel>
           <Button
             variant="outline"
             disabled={busy}
@@ -99,148 +243,36 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
           >
             检查 CLI 版本
           </Button>
-        </div>
-        <FieldGroup>
-          <Field>
-            <FieldLabel>检测模型</FieldLabel>
-            <ToggleGroup
-              aria-label="检测模型"
-              value={[model ?? "default"]}
-              onValueChange={(values) => {
-                if (values.length) {
-                  setModel(values[0] === "default" ? null : values[0]!);
-                  setEffort(null);
-                }
-              }}
-              variant="outline"
-            >
-              <ToggleGroupItem value="default">CLI 默认</ToggleGroupItem>
-              {tools?.models.map((value) => (
-                <ToggleGroupItem key={value.id} value={value.id}>
-                  {value.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-            <FieldDescription>
-              检测忽略用户配置，使用所选模型或 CLI 内置默认模型；不会接入用户的
-              MCP、应用或项目上下文。
-            </FieldDescription>
-          </Field>
-          <Field>
-            <FieldLabel>推理强度</FieldLabel>
-            <ToggleGroup
-              aria-label="检测推理强度"
-              value={[effort ?? "default"]}
-              onValueChange={(values) => {
-                if (values.length) setEffort(values[0] === "default" ? null : values[0]!);
-              }}
-              variant="outline"
-            >
-              <ToggleGroupItem value="default">默认</ToggleGroupItem>
-              {selected?.efforts.map((value) => (
-                <ToggleGroupItem key={value} value={value}>
-                  {value}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="intelligence-runs">样本次数（1–5）</FieldLabel>
-            <Input
-              id="intelligence-runs"
-              type="number"
-              min={1}
-              max={5}
-              value={Number.isNaN(runs) ? "" : runs}
-              onChange={(event) => setRuns(event.target.valueAsNumber)}
-            />
-          </Field>
-        </FieldGroup>
-        <Button
-          disabled={busy || !Number.isInteger(runs) || runs < 1 || runs > 5}
-          onClick={() => setConfirm("run-intelligence")}
-        >
-          开始样本检测
-        </Button>
-        {snapshot.operation?.name === "run-intelligence" &&
-          snapshot.operation.phase === "running" && (
-            <output aria-live="polite">
-              检测进度 {Math.round(snapshot.operation.progress)}%，每个样本最多等待 120 秒。
-            </output>
-          )}
-        {tools && tools.samples.length > 0 && (
-          <>
-            <p>
-              已完成 {completed.length}/{tools.requestedRuns ?? tools.samples.length} 个样本，正确{" "}
-              {correct} 个，正确率{" "}
-              {completed.length ? Math.round((correct / completed.length) * 100) : 0}%。
-            </p>
-            {tools.samples.map((sample) => (
-              <details key={sample.index}>
-                <summary>
-                  样本 {sample.index} ·{" "}
-                  {sample.correct === null ? "未完成" : sample.correct ? "通过" : "未通过"} ·{" "}
-                  {(sample.elapsedMs / 1000).toFixed(1)} 秒
-                </summary>
-                <p>
-                  答案：{sample.answer ?? "未知"} · 输入 {sample.inputTokens ?? "未知"} / 输出{" "}
-                  {sample.outputTokens ?? "未知"} / 推理 {sample.reasoningTokens ?? "未知"} tokens
-                </p>
-                <p className="whitespace-pre-wrap">{sample.explanation}</p>
-              </details>
-            ))}
-          </>
-        )}
-        {tools && tools.history.length > 0 && (
-          <details>
-            <summary>最近 {tools.history.length} 条检测历史</summary>
-            <ul className="flex flex-col gap-3">
-              {tools.history.map((entry) => (
-                <li key={entry.id}>
-                  {new Date(entry.capturedAt).toLocaleString("zh-CN")} · {entry.model} ·{" "}
-                  {entry.effort ?? "默认"} · {entry.correct}/{entry.completed} 通过 ·{" "}
-                  {entry.averageTokensPerSecond === null
-                    ? "速度未知"
-                    : `${entry.averageTokensPerSecond.toFixed(1)} tokens/s`}
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-        <Button
-          variant="ghost"
-          disabled={busy}
-          onClick={() => setConfirm("clear-intelligence-history")}
-        >
-          备份并清空检测历史
-        </Button>
-        <p>
-          Codex CLI：{tools?.cliVersion ?? "尚未检查"} · 最新稳定版：
-          {tools?.latestCliVersion ?? "尚未获取"}
-        </p>
-        <p className="text-muted-foreground">
-          安装方式：
-          {
-            (
-              {
-                unknown: "未识别",
-                standalone: "独立安装",
-                "package-manager": "包管理器",
-                homebrew: "Homebrew",
-              } as const
-            )[tools?.installation ?? "unknown"]
-          }
-          。更新使用 CLI 自带命令，不调用任意 shell 脚本。
-        </p>
-        <Button
-          variant="outline"
-          disabled={busy || !tools?.cliVersion}
-          onClick={() => setConfirm("update-cli")}
-        >
-          更新 Codex CLI
-        </Button>
-        {message && <output aria-live="polite">{message}</output>}
-      </div>
+          <FieldDescription>
+            Codex CLI：{tools?.cliVersion ?? "尚未检查"} · 最新稳定版：
+            {tools?.latestCliVersion ?? "尚未获取"}
+          </FieldDescription>
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel>安装与更新</FieldLabel>
+          <FieldDescription>
+            安装方式：
+            {
+              (
+                {
+                  unknown: "未识别",
+                  standalone: "独立安装",
+                  "package-manager": "包管理器",
+                  homebrew: "Homebrew",
+                } as const
+              )[tools?.installation ?? "unknown"]
+            }
+          </FieldDescription>
+          <Button
+            variant="outline"
+            disabled={busy || !tools?.cliVersion}
+            onClick={() => setConfirm("update-cli")}
+          >
+            更新 Codex CLI
+          </Button>
+        </SettingsRow>
+      </SettingsGroup>
+      {message && <output aria-live="polite">{message}</output>}
       <Dialog
         open={confirm !== null}
         onOpenChange={(open) => {

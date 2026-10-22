@@ -546,19 +546,6 @@ body {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-.appearance-preset-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding-block: 8px;
-  border-bottom: 1px solid var(--border);
-}
-.appearance-preset-row > span {
-  flex: 1;
-  min-width: 120px;
-  overflow-wrap: anywhere;
-}
 @media (max-width: 900px) {
   .appearance-workspace {
     grid-template-columns: minmax(0, 1fr);
@@ -592,24 +579,36 @@ body {
 .settings-page [data-slot="toggle-group"] {
   flex-wrap: wrap;
 }
-.settings-page fieldset [data-slot="field-group"] {
-  gap: 24px;
-}
-.settings-page > section > div > p,
-.about-section p {
-  color: var(--muted-foreground);
-}
-.about-section {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-.about-section > div {
+.settings-sections {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 24px;
+}
+.settings-icon-options {
+  flex-wrap: wrap;
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.settings-action-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.module-settings-section {
+  border-bottom: 1px solid var(--border);
+}
+.module-settings-section:last-child {
+  border-bottom: 0;
+}
+.module-settings-section > .coco-settings-row {
+  border-bottom: 0;
+}
+.module-settings-section > output:not(:empty) {
+  display: block;
+  padding-bottom: 14px;
 }
 .desktop-recovery,
 .desktop-recovery-message {

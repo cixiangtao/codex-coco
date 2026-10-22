@@ -3,7 +3,6 @@ import { UsageResetCards } from "./reset-cards";
 import { UsageTrend } from "./trend";
 import { QuotaData, dateTime } from "./quota-data";
 import { Box } from "@codex-coco/ui/components/box";
-import { Card, CardHeader, CardTitle, CardContent } from "@codex-coco/ui/components/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@codex-coco/ui/components/tabs";
 import { Skeleton } from "@codex-coco/ui/components/skeleton";
 import { UsagePreferences } from "./preferences";
@@ -283,22 +282,8 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
         </TabsContent>
         <TabsContent value="tools">
           <Box gap="lg">
-            <Card>
-              <CardHeader>
-                <CardTitle>样本检测与 CLI 维护</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <UsageToolsPanel snapshot={snapshot} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>重置卡</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <UsageResetCards snapshot={snapshot} />
-              </CardContent>
-            </Card>
+            <UsageToolsPanel snapshot={snapshot} />
+            <UsageResetCards snapshot={snapshot} />
           </Box>
         </TabsContent>
         <TabsContent value="preferences">

@@ -1,5 +1,15 @@
 # 基建开发验证
 
+## 其他页面分组设置补齐（2026-10-22）
+
+用户指出不能只改用量页后，继续将正式界面的模块管理、窗口主题与关于、更新操作、系统集成、外观图库/预设、样本检测/历史/CLI 维护及重置卡统一接入分组设置。复用已有 SettingsGroup / SettingsRow，未增加组件依赖、配置版本、IPC 或后台能力。系统偏好保存按钮移到完整偏好之后，系统应用仍需单独确认。
+
+- 最终 `pnpm run check` 通过：112 个源码边界、22 个文件的 168 项测试、Oxfmt、Oxlint、类型检查和生产构建。`pnpm run pack` 生成本地未签名 macOS arm64 应用。
+- 打包应用通过 UI 专项、appearance、desktop-preferences、updates、usage-tools、usage-reset、desktop 七组回归；最后两处整理后重新构建打包，定向确认 UI 专项、desktop-preferences 和 updates。模块管理另通过生产入口的合成模块完整生命周期回归。
+- 扩展现有 UI 脚本采集模块管理的 980×800 / 720×640、设置深色、系统集成明色/小窗，以及样本设置明色/小窗。检查小窗横向溢出；原有键盘、草稿、取消、故障恢复、系统确认、外观像素与预设、受控样本/CLI 更新、重置卡幂等断言保留。
+- 已批量查看模块管理、主题、图库、系统动画与集成、更新、辅助工具等实际页面，收尾保存位置和重复说明后做一次确认。截图在 ignored `work/ui-instruments-packaged/`、`work/settings-groups-packaged/`、`work/appearance-verification-packaged/`、`work/usage-tools-verification-packaged/`。本轮为主线程直接检查，不沿用上一轮独立 reviewer 的结论。
+- 所有测试使用临时数据及受控服务，系统登录项调用被截获；未操作真实 Codex、真实模型、账号兑换或真实 CLI 更新。未执行完整 `verify:packaged` 总汇、性能采样、签名、公证或发布。
+
 ## 分组设置与用量速览精修（2026-10-22）
 
 按用户要求，将主题、用量偏好、系统与菜单栏、应用更新、外观连接及图层参数迁移到共享 SettingsGroup / SettingsRow / Switch；保留草稿、保存、取消、冲突与显式系统确认。用量页调整账号、额度恢复时间与趋势统计层级；速览改为单仪表与紧凑模块列表，增加严格校验的公开身份、额度分组及恢复时间字段，显示时钟只在窗口可见时运行，不请求业务数据。

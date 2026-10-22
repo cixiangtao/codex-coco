@@ -70,7 +70,7 @@ Tailwind 构建必须显式覆盖共享组件包的源码。正式构建验证�
 
 设置表单另使用 `SettingsGroup / SettingsRow / Switch`，响应用户提出的 iOS 分组列表方向。SettingsGroup 是原生 fieldset 与 legend，组内采用共享 18px 圆角和逐行分隔；说明可以放在组外。SettingsRow 保留原 FieldLabel / FieldDescription 与输入关联，默认标签/说明在左、控件在右，`layout="stacked"` 承载图库选择、颜色输入等复杂内容。简单开关在 720px 下仍靠右，多选项或文本输入可上下排列。不要将开关内部的隐藏 checkbox 识别为需展开的文本输入。
 
-Switch 基于已安装的 Base UI，受控接收 checked / onCheckedChange，支持键盘、焦点、禁用和主题；42×26px 轨道、20px 拇指，状态过渡使用共享动效并服从减少动态偏好。不增加依赖。组件不自行保存配置，切换仍由应用草稿管理；系统登录项、共享、外部布景与安装继续使用各自明确操作。已接入窗口主题、更新、系统与菜单栏、用量偏好、外观图层与连接设置，页面策略见 [设置分组](surfaces/settings.md)。
+Switch 基于已安装的 Base UI，受控接收 checked / onCheckedChange，支持键盘、焦点、禁用和主题；42×26px 轨道、20px 拇指，状态过渡使用共享动效并服从减少动态偏好。不增加依赖。组件不自行保存配置，切换仍由应用草稿管理；系统登录项、共享、外部布景与安装继续使用各自明确操作。已接入窗口主题与关于、更新、系统与菜单栏、模块管理、用量偏好与辅助工具/重置卡、外观图层/连接/图库/预设，页面策略见 [设置分组](surfaces/settings.md)。
 
 导入示例：`@codex-coco/ui/components/card`、`@codex-coco/ui/components/box`、`@codex-coco/ui/components/progress-ring`。共享组件不接收业务快照，额度、脱敏账号、来源与恢复时间的组合留在 usage renderer。
 

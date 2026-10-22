@@ -123,6 +123,23 @@ try {
   await page.getByRole("button", { name: "取消偏好修改", exact: true }).click();
   assert.equal(await animationSwitch.isChecked(), originalAnimation);
   assert.equal((await native(application)).loginCalls, 0);
+  const integrationGroup = page.getByRole("group", { name: "系统集成", exact: true });
+  await integrationGroup.evaluate((node) => node.scrollIntoView({ block: "start" }));
+  await page.screenshot({
+    path: join(settingsOutput, "system-integration-light.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  await mainWindow.evaluate((window) => window.setSize(720, 640));
+  assert(
+    await page.locator(".desktop-content").evaluate((node) => node.scrollWidth <= node.clientWidth),
+  );
+  await page.screenshot({
+    path: join(settingsOutput, "system-integration-compact.png"),
+    scale: "css",
+    animations: "disabled",
+  });
+  await mainWindow.evaluate((window) => window.setSize(980, 800));
   await config(page, { iconId: "builtin:everonecat0", animate: false, followsCpu: true });
   const initial = await task(page, "apply-menu-bar");
   assert.equal(initial.status, "ready");

@@ -119,10 +119,6 @@ export function UpdateSettings() {
   return (
     <section className="flex flex-col gap-4" aria-label="应用更新">
       <h3>应用更新</h3>
-      <p>
-        当前版本 {state.currentVersion} · <output>{labels[state.phase]}</output>
-        {state.availableVersion ? ` · ${state.availableVersion}` : ""}
-      </p>
       {state.reason && (
         <Alert variant={state.phase === "error" ? "destructive" : "default"}>
           <AlertTitle>{labels[state.phase]}</AlertTitle>
@@ -130,7 +126,14 @@ export function UpdateSettings() {
         </Alert>
       )}
       {conflict && <p role="alert">其他窗口已更新设置，请取消本地修改后重新编辑。</p>}
-      <SettingsGroup>
+      <SettingsGroup title="版本与发布源">
+        <SettingsRow>
+          <FieldLabel>当前版本 {state.currentVersion}</FieldLabel>
+          <output>{labels[state.phase]}</output>
+          <FieldDescription>
+            {state.availableVersion ? `可用版本 ${state.availableVersion}` : "Codex Coco"}
+          </FieldDescription>
+        </SettingsRow>
         <SettingsRow layout="stacked">
           <FieldLabel htmlFor="update-source">发布源目录</FieldLabel>
           <Input
@@ -178,54 +181,60 @@ export function UpdateSettings() {
         <Button variant="ghost" disabled={pending || !draft} onClick={() => setDraft(null)}>
           取消更新偏好修改
         </Button>
-        <Button
-          variant="outline"
-          disabled={busy || Boolean(draft) || state.phase === "downloaded"}
-          onClick={() => {
-            void run({ action: "check" });
-          }}
-        >
-          检查 Codex Coco 更新
-        </Button>
-        <Button
-          variant="outline"
-          disabled={
-            busy || !state.availableVersion || state.phase === "downloaded" || Boolean(draft)
-          }
-          onClick={() => setConfirm("download")}
-        >
-          下载更新包
-        </Button>
-        <Button
-          disabled={busy || state.phase !== "downloaded"}
-          onClick={() => setConfirm("install")}
-        >
-          安装并重启 Codex Coco
-        </Button>
-        <Button
-          variant="outline"
-          disabled={pending || !["checking", "downloading"].includes(state.phase)}
-          onClick={() => {
-            void run({ action: "cancel" });
-          }}
-        >
-          取消更新任务
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={busy || state.phase === "downloaded"}
-          onClick={() => setConfirm("reset")}
-        >
-          重置更新设置
-        </Button>
       </div>
+      <SettingsGroup
+        title="更新操作"
+        description="下载由更新引擎校验 SHA-512；安装阶段由 macOS 验证应用签名并替换。下载后普通退出不会自动安装。检查请求取消后会等待底层请求结束。"
+      >
+        <SettingsRow layout="stacked">
+          <FieldLabel>检查与安装</FieldLabel>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              disabled={busy || Boolean(draft) || state.phase === "downloaded"}
+              onClick={() => {
+                void run({ action: "check" });
+              }}
+            >
+              检查 Codex Coco 更新
+            </Button>
+            <Button
+              variant="outline"
+              disabled={
+                busy || !state.availableVersion || state.phase === "downloaded" || Boolean(draft)
+              }
+              onClick={() => setConfirm("download")}
+            >
+              下载更新包
+            </Button>
+            <Button
+              disabled={busy || state.phase !== "downloaded"}
+              onClick={() => setConfirm("install")}
+            >
+              安装并重启 Codex Coco
+            </Button>
+            <Button
+              variant="outline"
+              disabled={pending || !["checking", "downloading"].includes(state.phase)}
+              onClick={() => {
+                void run({ action: "cancel" });
+              }}
+            >
+              取消更新任务
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy || state.phase === "downloaded"}
+              onClick={() => setConfirm("reset")}
+            >
+              重置更新设置
+            </Button>
+          </div>
+        </SettingsRow>
+      </SettingsGroup>
       {state.progress !== null && (
         <progress aria-label="更新包下载进度" value={state.progress} max={100} />
       )}
-      <p className="text-muted-foreground">
-        下载由更新引擎校验 SHA-512；安装阶段由 macOS
-        验证应用签名并替换。下载后普通退出不会自动安装。检查请求取消后会等待底层请求结束。
-      </p>
       <output aria-live="polite">{message}</output>
       <Dialog
         open={confirm !== null}

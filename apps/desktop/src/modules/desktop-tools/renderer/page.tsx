@@ -191,11 +191,11 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
           <AlertDescription>请取消当前修改后重新编辑。</AlertDescription>
         </Alert>
       )}
-      <SettingsGroup title="图标与行为">
+      <SettingsGroup title="菜单栏图标">
         <SettingsRow layout="stacked">
           <FieldLabel>菜单栏图标</FieldLabel>
           <ToggleGroup
-            className="flex-wrap"
+            className="settings-icon-options"
             aria-label="菜单栏图标"
             value={[value.iconId]}
             variant="outline"
@@ -263,12 +263,12 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
             <img src={preview} alt="自定义菜单栏图标预览" className="size-12 object-contain" />
           )}
         </SettingsRow>
+      </SettingsGroup>
+      <SettingsGroup title="动画与性能">
         {(
           [
             { key: "animate", title: "播放图标动画" },
             { key: "followsCpu", title: "动画速度跟随系统 CPU" },
-            { key: "launchAtLogin", title: "期望随 macOS 登录启动" },
-            { key: "shareWidgetSnapshot", title: "写入 Widget 共享快照" },
           ] as const
         ).map(({ key, title }) => (
           <SettingsRow key={key}>
@@ -304,6 +304,82 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
           </FieldDescription>
         </SettingsRow>
       </SettingsGroup>
+      <SettingsGroup
+        title="系统集成"
+        description="先保存偏好，再单独应用到系统；停用模块不会撤销已保存的登录项。"
+      >
+        <SettingsRow>
+          <FieldLabel htmlFor="desktop-launchAtLogin">期望随 macOS 登录启动</FieldLabel>
+          <Switch
+            id="desktop-launchAtLogin"
+            checked={value.launchAtLogin}
+            onCheckedChange={(checked) => update({ launchAtLogin: checked })}
+          />
+        </SettingsRow>
+        <SettingsRow layout="stacked">
+          <FieldLabel>登录项状态与应用</FieldLabel>
+          <p className="text-muted-foreground">
+            系统登录项：
+            {state
+              ? state.loginSupported
+                ? state.openAtLogin
+                  ? "已开启"
+                  : "已关闭"
+                : "需要 macOS 安装版"
+              : "尚未检查"}{" "}
+            · 当前图标 {state?.frameCount ?? 0} 帧
+          </p>
+          <Button
+            variant="outline"
+            disabled={!enabled || busy || draft !== null || state?.loginSupported === false}
+            onClick={() => setConfirm("login")}
+          >
+            应用开机启动设置
+          </Button>
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel htmlFor="desktop-shareWidgetSnapshot">写入 Widget 共享快照</FieldLabel>
+          <Switch
+            id="desktop-shareWidgetSnapshot"
+            checked={value.shareWidgetSnapshot}
+            onCheckedChange={(checked) => update({ shareWidgetSnapshot: checked })}
+          />
+        </SettingsRow>
+        <SettingsRow layout="stacked">
+          <FieldLabel>Widget 共享目录</FieldLabel>
+          <p className="text-muted-foreground">
+            共享文件只含公开状态、额度摘要与时间，不含账号、配置或模型回答。默认写入 Codex Coco
+            的独立共享目录；系统 Widget 需要签名的原生扩展与 App Group 容器。
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              disabled={!enabled || busy || draft !== null}
+              onClick={() => setConfirm("sharing")}
+            >
+              应用共享快照设置
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!enabled || busy}
+              onClick={() => {
+                void run("choose-shared-directory");
+              }}
+            >
+              选择 Widget 共享目录
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={!enabled || busy}
+              onClick={() => {
+                void run("reveal-shared-snapshot");
+              }}
+            >
+              在 Finder 中显示快照
+            </Button>
+          </div>
+        </SettingsRow>
+      </SettingsGroup>
       <div className="flex flex-wrap gap-3">
         <Button
           disabled={!draft || busy || conflict}
@@ -331,55 +407,6 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
           }}
         >
           检查系统状态
-        </Button>
-      </div>
-      <p className="text-muted-foreground">
-        系统登录项：
-        {state
-          ? state.loginSupported
-            ? state.openAtLogin
-              ? "已开启"
-              : "已关闭"
-            : "需要 macOS 安装版"
-          : "尚未检查"}{" "}
-        · 当前图标 {state?.frameCount ?? 0} 帧
-      </p>
-      <Button
-        variant="outline"
-        disabled={!enabled || busy || draft !== null || state?.loginSupported === false}
-        onClick={() => setConfirm("login")}
-      >
-        应用开机启动设置
-      </Button>
-      <p className="text-muted-foreground">
-        共享文件只含公开状态、额度摘要与时间，不含账号、配置或模型回答。默认写入 Codex Coco
-        的独立共享目录；系统 Widget 需要签名的原生扩展与 App Group 容器。
-      </p>
-      <div className="flex flex-wrap gap-3">
-        <Button
-          variant="outline"
-          disabled={!enabled || busy || draft !== null}
-          onClick={() => setConfirm("sharing")}
-        >
-          应用共享快照设置
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!enabled || busy}
-          onClick={() => {
-            void run("choose-shared-directory");
-          }}
-        >
-          选择 Widget 共享目录
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={!enabled || busy}
-          onClick={() => {
-            void run("reveal-shared-snapshot");
-          }}
-        >
-          在 Finder 中显示快照
         </Button>
       </div>
       <output aria-live="polite">{message}</output>

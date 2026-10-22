@@ -1,3 +1,5 @@
+import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
+import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
 import { useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Alert, AlertTitle, AlertDescription } from "@codex-coco/ui/components/alert";
@@ -52,61 +54,70 @@ export function UsageResetCards({ snapshot }: { snapshot: ModuleSnapshot }) {
   }
   return (
     <section className="flex flex-col gap-3" aria-label="重置卡">
-      {credits ? (
-        <>
-          <p>服务可用重置卡：{credits.availableCount} 次</p>
-          {credits.credits === null ? (
-            <p className="text-muted-foreground">服务仅返回数量，兑换时由服务选择可用卡。</p>
+      <SettingsGroup title="重置卡">
+        <SettingsRow layout="stacked">
+          <FieldLabel>服务可用重置卡</FieldLabel>
+          {credits ? (
+            <>
+              <p>服务可用重置卡：{credits.availableCount} 次</p>
+              {credits.credits === null ? (
+                <p className="text-muted-foreground">服务仅返回数量，兑换时由服务选择可用卡。</p>
+              ) : (
+                credits.credits.map((credit, index) => (
+                  <div key={credit.reference} className="settings-action-line">
+                    <span>
+                      重置卡 {index + 1} ·{" "}
+                      {credit.expiresAt === null
+                        ? "到期时间未知"
+                        : new Date(credit.expiresAt * 1000).toLocaleString("zh-CN") + " 到期"}
+                    </span>
+                    <Button
+                      variant="outline"
+                      disabled={
+                        busy ||
+                        feedback?.outcome === "pending" ||
+                        (credit.expiresAt !== null &&
+                          credit.expiresAt * 1000 <=
+                            (state?.status === "ready" ? state.data.capturedAt : 0))
+                      }
+                      onClick={() => setSelected(credit.reference)}
+                    >
+                      兑换这张重置卡
+                    </Button>
+                  </div>
+                ))
+              )}
+              {credits.availableCount > 0 &&
+                (credits.credits === null || credits.credits.length === 0) && (
+                  <Button
+                    variant="outline"
+                    disabled={busy || feedback?.outcome === "pending"}
+                    onClick={() => setSelected(null)}
+                  >
+                    兑换一张可用重置卡
+                  </Button>
+                )}
+            </>
           ) : (
-            credits.credits.map((credit, index) => (
-              <div key={credit.reference} className="flex flex-wrap items-center gap-3">
-                <span>
-                  重置卡 {index + 1} ·{" "}
-                  {credit.expiresAt === null
-                    ? "到期时间未知"
-                    : new Date(credit.expiresAt * 1000).toLocaleString("zh-CN") + " 到期"}
-                </span>
-                <Button
-                  variant="outline"
-                  disabled={
-                    busy ||
-                    feedback?.outcome === "pending" ||
-                    (credit.expiresAt !== null &&
-                      credit.expiresAt * 1000 <=
-                        (state?.status === "ready" ? state.data.capturedAt : 0))
-                  }
-                  onClick={() => setSelected(credit.reference)}
-                >
-                  兑换这张重置卡
-                </Button>
-              </div>
-            ))
+            <p className="text-muted-foreground">
+              成功读取服务额度后显示可用数量；缺少数据不会显示为零。
+            </p>
           )}
-          {credits.availableCount > 0 &&
-            (credits.credits === null || credits.credits.length === 0) && (
-              <Button
-                variant="outline"
-                disabled={busy || feedback?.outcome === "pending"}
-                onClick={() => setSelected(null)}
-              >
-                兑换一张可用重置卡
-              </Button>
-            )}
-        </>
-      ) : (
-        <p className="text-muted-foreground">
-          成功读取服务额度后显示可用数量；缺少数据不会显示为零。
-        </p>
-      )}
-      <Button
-        variant="ghost"
-        disabled={busy}
-        onClick={() => {
-          void run("reset-status");
-        }}
-      >
-        检查上次兑换
-      </Button>
+        </SettingsRow>
+        <SettingsRow>
+          <FieldLabel>兑换状态</FieldLabel>
+          <FieldDescription>结果不明确时，先检查上次兑换。</FieldDescription>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => {
+              void run("reset-status");
+            }}
+          >
+            检查上次兑换
+          </Button>
+        </SettingsRow>
+      </SettingsGroup>
       {feedback && (
         <Alert
           variant={

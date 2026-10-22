@@ -41,83 +41,78 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
         <h2>设置</h2>
         <p>调整 Codex Coco 的使用体验。</p>
       </header>
-      <section aria-labelledby="theme-title" className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          <h3 id="theme-title">窗口外观</h3>
-          <p className="text-muted-foreground">
-            调整 Codex Coco 自身的主题，与外部 Codex 布景分别管理。
-          </p>
-        </div>
-        <fieldset disabled={busy || unavailable} className="min-w-0">
-          <legend className="sr-only">主题设置</legend>
-          <SettingsGroup>
-            <SettingsRow>
-              <FieldTitle id="mode-label">显示模式</FieldTitle>
-              <ToggleGroup
-                aria-labelledby="mode-label"
-                value={[theme.mode]}
-                onValueChange={(values) => {
-                  const mode = themeModes.find((item) => item === values[0]);
-                  if (mode) update({ mode });
+      <section aria-label="窗口外观" className="settings-sections">
+        <SettingsGroup
+          title="窗口外观"
+          description="调整 Codex Coco 自身的主题，与外部 Codex 布景分别管理。"
+          disabled={busy || unavailable}
+        >
+          <SettingsRow>
+            <FieldTitle id="mode-label">显示模式</FieldTitle>
+            <ToggleGroup
+              aria-labelledby="mode-label"
+              value={[theme.mode]}
+              onValueChange={(values) => {
+                const mode = themeModes.find((item) => item === values[0]);
+                if (mode) update({ mode });
+              }}
+              variant="outline"
+            >
+              {themeModes.map((mode) => (
+                <ToggleGroupItem key={mode} value={mode}>
+                  {modeLabels[mode]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </SettingsRow>
+          <SettingsRow>
+            <FieldTitle id="preset-label">配色预设</FieldTitle>
+            <ToggleGroup
+              aria-labelledby="preset-label"
+              value={[theme.presetId]}
+              onValueChange={(values) => {
+                const presetId = themePresetIds.find((item) => item === values[0]);
+                if (presetId) update({ presetId });
+              }}
+              variant="outline"
+            >
+              {themePresetIds.map((preset) => (
+                <ToggleGroupItem key={preset} value={preset}>
+                  {presetLabels[preset]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </SettingsRow>
+          <SettingsRow layout="stacked" data-invalid={invalid}>
+            <FieldLabel htmlFor="primary-color">自定义主色</FieldLabel>
+            <div className="flex flex-wrap gap-3">
+              <Input
+                id="primary-color"
+                className="w-52"
+                placeholder="例如 #245dd8"
+                value={color}
+                aria-invalid={invalid}
+                aria-describedby="color-help"
+                onChange={(event) => {
+                  changeColor(event.target.value);
                 }}
+              />
+              <Button
                 variant="outline"
-              >
-                {themeModes.map((mode) => (
-                  <ToggleGroupItem key={mode} value={mode}>
-                    {modeLabels[mode]}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </SettingsRow>
-            <SettingsRow>
-              <FieldTitle id="preset-label">配色预设</FieldTitle>
-              <ToggleGroup
-                aria-labelledby="preset-label"
-                value={[theme.presetId]}
-                onValueChange={(values) => {
-                  const presetId = themePresetIds.find((item) => item === values[0]);
-                  if (presetId) update({ presetId });
+                onClick={() => {
+                  changeColor("");
                 }}
-                variant="outline"
               >
-                {themePresetIds.map((preset) => (
-                  <ToggleGroupItem key={preset} value={preset}>
-                    {presetLabels[preset]}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </SettingsRow>
-            <SettingsRow layout="stacked" data-invalid={invalid}>
-              <FieldLabel htmlFor="primary-color">自定义主色</FieldLabel>
-              <div className="flex flex-wrap gap-3">
-                <Input
-                  id="primary-color"
-                  className="w-52"
-                  placeholder="例如 #245dd8"
-                  value={color}
-                  aria-invalid={invalid}
-                  aria-describedby="color-help"
-                  onChange={(event) => {
-                    changeColor(event.target.value);
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    changeColor("");
-                  }}
-                >
-                  使用预设主色
-                </Button>
-              </div>
-              <FieldDescription id="color-help">
-                {invalid
-                  ? "请输入 #RGB 或 #RRGGBB 格式的颜色。"
-                  : "留空使用预设主色；文字与焦点颜色自动适配。"}
-              </FieldDescription>
-            </SettingsRow>
-          </SettingsGroup>
-        </fieldset>
+                使用预设主色
+              </Button>
+            </div>
+            <FieldDescription id="color-help">
+              {invalid
+                ? "请输入 #RGB 或 #RRGGBB 格式的颜色。"
+                : "留空使用预设主色；文字与焦点颜色自动适配。"}
+            </FieldDescription>
+          </SettingsRow>
+        </SettingsGroup>
         {conflict && (
           <Alert>
             <AlertTitle>其他窗口已更新设置</AlertTitle>
@@ -143,24 +138,26 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
       </section>
 
       <section className="about-section" aria-labelledby="about-title">
-        <div>
-          <h3 id="about-title">关于</h3>
-          <p>一个按自己习惯打磨的 Codex 桌面伴侣。</p>
-        </div>
-        <Dialog>
-          <DialogTrigger render={<Button variant="outline" />}>关于 Codex Coco</DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Codex Coco</DialogTitle>
-              <DialogDescription>
-                本地开发版。用量与外观业务正在建设，菜单栏速览已提供模块状态与主窗口入口。
-              </DialogDescription>
-            </DialogHeader>
-            <p className="text-sm text-muted-foreground">
-              Codex Coco 是独立项目，与 OpenAI 没有隶属或官方支持关系。
-            </p>
-          </DialogContent>
-        </Dialog>
+        <SettingsGroup title={<span id="about-title">关于</span>}>
+          <SettingsRow>
+            <FieldTitle>Codex Coco</FieldTitle>
+            <FieldDescription>一个按自己习惯打磨的 Codex 桌面伴侣。</FieldDescription>
+            <Dialog>
+              <DialogTrigger render={<Button variant="outline" />}>关于 Codex Coco</DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Codex Coco</DialogTitle>
+                  <DialogDescription>
+                    本地开发版。用量与外观业务正在建设，菜单栏速览已提供模块状态与主窗口入口。
+                  </DialogDescription>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">
+                  Codex Coco 是独立项目，与 OpenAI 没有隶属或官方支持关系。
+                </p>
+              </DialogContent>
+            </Dialog>
+          </SettingsRow>
+        </SettingsGroup>
       </section>
       <UpdateSettings />
       <RegisteredModulePage moduleId="desktop-tools" />

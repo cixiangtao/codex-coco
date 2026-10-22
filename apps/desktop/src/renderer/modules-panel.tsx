@@ -1,3 +1,5 @@
+import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
+import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
 import { Suspense, useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
@@ -36,19 +38,29 @@ function ModulePanel({ snapshot }: { snapshot: ModuleSnapshot }) {
     }
   }
   return (
-    <section aria-label={snapshot.title} className="flex flex-col gap-4">
-      <h3>{snapshot.title}</h3>
-      <p className="text-muted-foreground">
-        {
+    <section aria-label={snapshot.title} className="module-settings-section">
+      <SettingsRow>
+        <FieldLabel>{snapshot.title}</FieldLabel>
+        <FieldDescription>
           {
-            disabled: "已停用",
-            starting: "启动中",
-            running: "已启用",
-            stopping: "停止中",
-            error: "需要处理",
-          }[snapshot.phase]
-        }
-      </p>
+            {
+              disabled: "已停用",
+              starting: "启动中",
+              running: "已启用",
+              stopping: "停止中",
+              error: "需要处理",
+            }[snapshot.phase]
+          }
+        </FieldDescription>
+        <Button
+          disabled={busy || unavailable}
+          onClick={() => {
+            void control(false);
+          }}
+        >
+          {snapshot.config.enabled ? "停用模块" : "启用模块"}
+        </Button>
+      </SettingsRow>
       {(unavailable || snapshot.error) && (
         <Alert variant="destructive">
           <AlertTitle>模块需要处理</AlertTitle>
@@ -62,14 +74,6 @@ function ModulePanel({ snapshot }: { snapshot: ModuleSnapshot }) {
         </Alert>
       )}
       <div className="flex flex-wrap gap-3">
-        <Button
-          disabled={busy || unavailable}
-          onClick={() => {
-            void control(false);
-          }}
-        >
-          {snapshot.config.enabled ? "停用模块" : "启用模块"}
-        </Button>
         {unavailable && (
           <Button
             variant="outline"
@@ -100,10 +104,11 @@ export function ModulesPanel() {
   if (!modules.length) return null;
   return (
     <section aria-labelledby="modules-title" className="flex flex-col gap-6">
-      <h2 id="modules-title">已接入的模块</h2>
-      {modules.map((snapshot) => (
-        <ModulePanel key={snapshot.id} snapshot={snapshot} />
-      ))}
+      <SettingsGroup title={<h2 id="modules-title">已接入的模块</h2>}>
+        {modules.map((snapshot) => (
+          <ModulePanel key={snapshot.id} snapshot={snapshot} />
+        ))}
+      </SettingsGroup>
     </section>
   );
 }
