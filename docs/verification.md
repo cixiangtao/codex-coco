@@ -436,3 +436,16 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - 在中性、蓝色、紫色基础上补齐红色、黄色、绿色，各自提供明暗主色；选项用实际色点展示，窄窗可换行。选择预设会清除自定义颜色草稿并预览，保存、取消与跨窗口边界沿用主题编辑器。
 - `pnpm run check` 通过：25 个测试文件、192 项测试、格式、Oxlint、124 个源文件依赖边界、类型检查和生产构建。对比度测试覆盖全部预设的文字、交互状态、焦点与仪表表面。
 - 生产入口 `verify-desktop` 通过六套预设明暗切换、自定义及无效输入切回预设、草稿不落盘、保存/取消、多窗口、重启与损坏恢复。已核对深色 `presets-1.png` 和 720px 窄窗 `compact.png`，无水平溢出。使用临时数据，本轮未重新打包。
+
+## 稳定性与二期补缺（2026-10-26）
+
+- 用量：目录切换后自动重读，取消不重读；扫描失败清除旧统计并保留成功额度，异常提示跨辅助任务保留，恢复后清除。重置卡 pending/失败同步更新持续状态。滚动总量按本地自然日计算，跨日今日标为待更新，速览不把旧扫描投影为当前统计。
+- 外观：手动应用尊重保存的固定端口，旧检测端口不覆盖配置；后台同步仍使用上次应用的端口和布景。真实 Electron 中延迟受控图片选择、同时继续修改位置，再完成导入，验证新位置仍保留；保存期间新增编辑仍待保存，导入失败/任务取消有反馈。
+- 共用交互：修正检查 CLI/扫描本机用量的旧任务名称，补齐目录、兑换、图库、共享任务反馈。用量、系统和更新偏好在保存或任务期间禁用表单；取消和停止入口保留。
+- 二期补缺：手动读取模型目录后识别并校验默认模型/强度，只向隔离样本显式传入这两项。新增平均推理消耗和同模型/同强度完整历史基线，旧历史缺失计数保持未知，部分完成/取消不作为基线。
+- `pnpm run check` 全部通过：25 个测试文件、199 项测试、Oxfmt、Oxlint、124 个源文件依赖边界、分进程类型检查和生产构建。新增合同覆盖目录切换重读、扫描失败与恢复、重置卡持续状态、跨日和未来日期排除、固定端口、默认设置白名单/不支持回退，以及兼容历史比较。
+- `pnpm run verify:packaged` 完整通过：生成 macOS arm64 未签名本地应用，并连续执行 desktop、menu-bar、glance-layout、workers、usage、appearance、usage-policy、local-usage、usage-reset、usage-tools、desktop-preferences、updates、usage-parity、tray-colors 共 14 组真实 Electron 回归。包括主题/多窗口/重启/损坏恢复、真实拖动、worker 退出、启动读取/通知、三层像素定位与重载、趋势去重/异常恢复、受控兑换/检测/CLI 更新、系统操作隔离及 19 图首帧/篮球 17 帧像素对照。
+- 源码生产入口的 usage-parity、usage-reset、appearance、appearance-launcher、usage-tools、ui-instruments、desktop-preferences、updates 也通过。启动专项两次停在已经隐藏的速览截图超时；脚本在主窗口权限探针后重新显示/聚焦速览并等待可见状态，再截图通过，未放宽业务与权限断言。
+- 已查看 `work/usage-tools-verification/samples.png`、`sample-settings-compact.png` 和 `work/appearance-verification/editor-light.png`。全部使用临时数据/受控 CLI 或临时目标，未读取真实账号用量、发起真实推理/兑换、升级真实 CLI、修改真实登录项、重启或注入正在聊天的 Codex。签名、公证、发布、真实更新安装与 Widget App Group 注册不在本地验收结果内。
+
+额外的打包版 `verify-ui-instruments --packaged` 与 `verify-appearance-launcher --packaged` 均通过，补齐界面、草稿与速览同步，以及原生启动/确认取消/快捷启动自动应用验证；本轮共完成 16 组打包版回归。

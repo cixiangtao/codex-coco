@@ -38,9 +38,11 @@ Electron、React、Base UI、Tailwind、Oxc 工具等按各自随包许可使用
 
 2026-10-22 另对照 [CodexBar](https://github.com/steipete/CodexBar) 提交 `932673aa68878faeee2847d5bf5767ca561fd8f0` 的 `docs/codex.md`、`CostUsageScanner.swift`、`CostUsageScanner+CodexFastJSON.swift` 及分页历史合同测试，参考其原生请求优先、镜像去重和分页续写的统计语义。来源采用 MIT，Copyright (c) 2026 Peter Steinberger。Codex Coco 独立实现 TypeScript 的文件分段合并、轮次关联、请求身份哈希、有界索引和测试；没有复制 Swift 代码、数据库或账户数据，没有添加 CodexBar 运行依赖。
 
+2026-10-26 继续核对上述 CodexBar 提交的 `Providers/Codex/UsageStore+CodexRefresh.swift` 与 `Tests/CodexBarTests/CodexUsageFetcherFallbackTests.swift`，用于复核账号作用域、失败恢复与旧快照边界；对照上述 Codex Dream Skin 提交的 `macos/tests/restart-cancellation.test.mjs` 核对取消不改变原布景。没有复制新增上游源码或引入运行依赖。
+
 ## 固定样本题
 
-用量工具中的糖果题数量与 21 基准参考 codex-usage 的 CodexIntelligenceCheck.swift（同上 MIT 来源提交与作者）。新实现重写问题提示、结构化输出、进程隔离与统计，并独立用动态规划核对期望值，没有迁回 Swift 运行时或界面代码。
+用量工具中的糖果题数量与 21 基准参考 codex-usage 的 CodexIntelligenceCheck.swift（同上 MIT 来源提交与作者）。新实现重写问题提示、结构化输出、进程隔离与统计，并独立用动态规划核对期望值，没有迁回 Swift 运行时或界面代码。2026-10-26 另核对同提交的 `CodexIntelligenceHistory.swift` 与 `CodexIntelligenceCheck.swift` 的摘要字段和平均推理消耗；TypeScript 统计与同模型历史基线比较独立实现，旧应用历史和用户配置不迁入。
 
 ## gifuct-js
 
