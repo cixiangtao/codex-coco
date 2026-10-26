@@ -190,6 +190,28 @@ describe("usage scheduling", () => {
     expect(request).toHaveBeenCalledTimes(1);
     await runtime.stop();
   });
+  it("requests one fresh read after changing source but does not reread after cancelling the picker", async () => {
+    vi.useFakeTimers();
+    let changed = true;
+    const request = vi.fn(() => true);
+    const signal = new AbortController().signal;
+    const runtime = await createUsageModule(async () => raw, undefined, {
+      chooseHome: async () => changed,
+      scan: async () => {
+        throw new Error("NO_SCAN");
+      },
+    }).start(signal, { configuration: () => usageDefaults, requestOperation: request });
+    const context = { signal, config: usageDefaults, report: () => undefined };
+    await runtime.execute("refresh", {}, context);
+    await runtime.execute("choose-local-home", {}, context);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(request).toHaveBeenCalledTimes(1);
+    changed = false;
+    await runtime.execute("choose-local-home", {}, context);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(request).toHaveBeenCalledTimes(1);
+    await runtime.stop();
+  });
   it("rejects invalid refresh intervals and threshold relationships", () => {
     for (const config of [
       { ...usageDefaults, refreshIntervalSeconds: 5 },

@@ -15,10 +15,17 @@ import { Alert, AlertTitle, AlertDescription } from "@codex-coco/ui/components/a
 import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
 import type { ModuleSnapshot } from "../../../contracts/modules";
 import { acceptModuleSnapshot } from "../../../renderer/client/modules";
-import { usageConfigSchema, usageState, trendTotals, type TrendSnapshot } from "../contract";
+import {
+  usageConfigSchema,
+  usageState,
+  trendTotals,
+  trendIsCurrentDay,
+  type TrendSnapshot,
+} from "../contract";
 
-export function UsageTokenSummary({ trend }: { trend: TrendSnapshot }) {
-  const totals = trendTotals(trend);
+export function UsageTokenSummary({ trend, now }: { trend: TrendSnapshot; now: number }) {
+  const totals = trendTotals(trend, now);
+  const currentDay = trendIsCurrentDay(trend, now);
   return (
     <div className="usage-token-card">
       <dl className="usage-token-summary" aria-label="用量统计摘要">
@@ -40,9 +47,21 @@ export function UsageTokenSummary({ trend }: { trend: TrendSnapshot }) {
                 id={index === 0 ? "usage.today" : index === 1 ? "usage.week" : "usage.month"}
               />
             </dt>
-            <dd title={`${formatExactTokens(value)} tokens`}>
-              <strong>{trend.source === "none" ? "暂无数据" : formatTokens(value)}</strong>
-              {trend.source !== "none" && <span>tokens</span>}
+            <dd
+              title={
+                index === 0 && !currentDay
+                  ? "统计已跨日，请重新扫描"
+                  : `${formatExactTokens(value)} tokens`
+              }
+            >
+              <strong>
+                {trend.source === "none"
+                  ? "暂无数据"
+                  : index === 0 && !currentDay
+                    ? "待更新"
+                    : formatTokens(value)}
+              </strong>
+              {trend.source !== "none" && (index !== 0 || currentDay) && <span>tokens</span>}
             </dd>
           </div>
         ))}
@@ -52,7 +71,7 @@ export function UsageTokenSummary({ trend }: { trend: TrendSnapshot }) {
 }
 
 /** Local activity is explicitly read and labeled; no messages or account identifiers enter this view. */
-export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
+export function UsageTrend({ snapshot, now }: { snapshot: ModuleSnapshot; now: number }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const config = usageConfigSchema.safeParse(snapshot.config.value);
@@ -127,14 +146,16 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
         </CardHeader>
         <CardContent>
           <Box gap="md">
-            {trend && <UsageTokenSummary trend={trend} />}
+            {trend && <UsageTokenSummary trend={trend} now={now} />}
             {message && <output aria-live="polite">{message}</output>}
             {snapshot.operation?.name === "scan-trend" && busy && (
               <output aria-live="polite">
                 正在扫描 {Math.round(snapshot.operation.progress)}%
               </output>
             )}
-            {snapshot.operation?.name === "scan-trend" && snapshot.operation.phase === "failed" && (
+            {(state?.trendFailed ||
+              (snapshot.operation?.name === "scan-trend" &&
+                snapshot.operation.phase === "failed")) && (
               <Alert variant="destructive">
                 <AlertTitle>本地统计未完成</AlertTitle>
                 <AlertDescription>
@@ -152,6 +173,14 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
                   </AlertDescription>
                 </Alert>
               )}
+            {trend && !trendIsCurrentDay(trend, now) && (
+              <Alert>
+                <AlertTitle>本机统计需要更新</AlertTitle>
+                <AlertDescription>
+                  统计记录来自此前日期，今日用量尚未确认，请重新扫描本机用量。
+                </AlertDescription>
+              </Alert>
+            )}
             {trend?.source === "thread-totals" && (
               <Alert>
                 <AlertTitle>当前展示线程累计量</AlertTitle>
@@ -226,7 +255,7 @@ export function UsageTrend({ snapshot }: { snapshot: ModuleSnapshot }) {
               </p>
             )}
             <p className="usage-source">
-              额度、模型与本地统计使用同一 Codex 数据目录。切换目录后请刷新用量；请选择包含
+              额度、模型与本地统计使用同一 Codex 数据目录。切换目录后会自动重新读取用量；请选择包含
               sessions、config.toml 或登录数据的目录。
             </p>
             <div className="flex flex-wrap gap-2">

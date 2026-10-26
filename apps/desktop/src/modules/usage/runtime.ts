@@ -20,6 +20,7 @@ import {
   usagePlanTitle,
   usageState,
   trendTotals,
+  trendIsCurrentDay,
   trendInputSchema,
   type UsageResult,
   type TrendSnapshot,
@@ -99,6 +100,7 @@ export function createUsageModule(
       let notifications = new UsageNotifications(notify);
       let accountScope: string | null = null;
       let trend: TrendSnapshot | null = null;
+      let trendFailed = false;
       let latest: UsageResult | null = null;
       let reset: ResetFeedback | null = null;
       const restored = await cache?.load().catch(() => null);
@@ -106,7 +108,14 @@ export function createUsageModule(
       if (restored) {
         previous = restored.data;
         accountScope = restored.scope;
-        latest = { status: "cached", data: restored.data, trend: null, reset: null, tools: null };
+        latest = {
+          trendFailed,
+          status: "cached",
+          data: restored.data,
+          trend: null,
+          reset: null,
+          tools: null,
+        };
       }
       const persist = async () => {
         if (previous) await cache?.save(previous, accountScope).catch(() => undefined);
@@ -126,12 +135,14 @@ export function createUsageModule(
         latest
           ? usageResultSchema.parse({
               ...latest,
+              trendFailed,
               trend,
               reset,
               tools: tools?.snapshot() ?? null,
             })
           : trend
             ? {
+                trendFailed,
                 status: "local",
                 data: null,
                 reason: null,
@@ -139,10 +150,11 @@ export function createUsageModule(
                 reset,
                 tools: tools?.snapshot() ?? null,
               }
-            : tools || reset
-              ? { status: "tools", trend, reset, tools: tools?.snapshot() ?? null }
+            : tools || reset || trendFailed
+              ? { trendFailed, status: "tools", trend, reset, tools: tools?.snapshot() ?? null }
               : null;
-      const result = () => current() ?? { status: "tools" as const, trend, reset, tools: null };
+      const result = () =>
+        current() ?? { trendFailed, status: "tools" as const, trend, reset, tools: null };
       const schedule = () => {
         clearTimeout(timer);
         if (
@@ -207,21 +219,35 @@ export function createUsageModule(
               if (!resetService) throw new Error("RESET_UNAVAILABLE");
               try {
                 const before = await reader(context.signal);
+                const beforeScope = usageAccountScope(before);
+                if (beforeScope !== accountScope) {
+                  tools?.reset?.();
+                  previous = null;
+                  trend = null;
+                  trendFailed = false;
+                  latest = null;
+                  notifications = new UsageNotifications(notify);
+                  accountScope = beforeScope;
+                }
                 reset = await resetService.consume(
                   redemption,
                   before,
                   usageAccountScope(before),
                   context.signal,
                 );
-                if (reset.outcome === "pending")
-                  return {
+                if (reset.outcome === "pending") {
+                  latest = {
+                    trendFailed,
                     status: "error",
                     reason: "READ_FAILED",
                     checkedAt: Date.now(),
                     previous,
                     trend,
                     reset,
+                    tools: null,
                   };
+                  return result();
+                }
                 const refreshed = await reader(context.signal);
                 const refreshedScope = usageAccountScope(refreshed);
                 if (refreshedScope !== accountScope) {
@@ -230,7 +256,14 @@ export function createUsageModule(
                   accountScope = refreshedScope;
                 }
                 previous = normalizeUsage(refreshed, Date.now());
-                latest = { status: "ready", data: previous, trend, reset, tools: null };
+                latest = {
+                  trendFailed,
+                  status: "ready",
+                  data: previous,
+                  trend,
+                  reset,
+                  tools: null,
+                };
                 await persist();
                 context.signal.throwIfAborted();
                 return latest;
@@ -242,14 +275,17 @@ export function createUsageModule(
                   (stored.attemptKey === redemption.attemptKey || stored.outcome === "pending")
                     ? stored
                     : { ...redemption, outcome: "rejected", updatedAt: Date.now() };
-                return {
+                latest = {
+                  trendFailed,
                   status: "error",
                   reason: "READ_FAILED",
                   checkedAt: Date.now(),
                   previous,
                   trend,
                   reset,
+                  tools: null,
                 };
+                return result();
               }
             }
             if (name === "choose-local-home") {
@@ -264,19 +300,31 @@ export function createUsageModule(
                 reset = null;
                 accountScope = null;
                 notifications = new UsageNotifications(notify);
+                trendFailed = false;
+                failures = 0;
+                startupPending = true;
                 await cache?.clear().catch(() => undefined);
               }
-              return current() ?? { status: "source", changed, trend };
+              return current() ?? { trendFailed, status: "source", changed, trend };
             }
             if (name === "scan-trend") {
               if (!local) throw new Error("LOCAL_UNAVAILABLE");
-              const scan = await local.scan(context.signal, context.report, {
-                days: 30,
-                scope: accountScope,
-                force: trendInputSchema.parse(input).force,
-                refresh: true,
-              });
+              let scan;
+              try {
+                scan = await local.scan(context.signal, context.report, {
+                  days: 30,
+                  scope: accountScope,
+                  force: trendInputSchema.parse(input).force,
+                  refresh: true,
+                });
+              } catch (error) {
+                context.signal.throwIfAborted();
+                trend = null;
+                trendFailed = true;
+                throw error;
+              }
               trend = scan.trend;
+              trendFailed = false;
               if (
                 !latest ||
                 latest.status === "local" ||
@@ -284,6 +332,7 @@ export function createUsageModule(
                 latest.status === "tools"
               )
                 latest = {
+                  trendFailed,
                   status: "local",
                   data: scan.fallback,
                   reason: null,
@@ -312,7 +361,7 @@ export function createUsageModule(
               ...settings,
               notificationsEnabled: settings.notificationsEnabled && config.notificationsEnabled,
             });
-            latest = { status: "ready", data, trend, reset, tools: null };
+            latest = { trendFailed, status: "ready", data, trend, reset, tools: null };
             await persist();
             context.signal.throwIfAborted();
             // Quota success remains usable even if independent local history is unavailable.
@@ -327,8 +376,11 @@ export function createUsageModule(
                     refresh: usageRefreshInputSchema.parse(input).forceTrend,
                   })
                 ).trend;
+                trendFailed = false;
               } catch {
                 context.signal.throwIfAborted();
+                trend = null;
+                trendFailed = true;
               }
             }
             return result();
@@ -349,8 +401,10 @@ export function createUsageModule(
                   force: false,
                 });
                 trend = scan.trend;
+                trendFailed = false;
                 if (scan.fallback) {
                   latest = {
+                    trendFailed,
                     status: "local",
                     data: scan.fallback,
                     reason,
@@ -365,6 +419,7 @@ export function createUsageModule(
               }
             }
             latest = {
+              trendFailed,
               status: "error",
               reason,
               checkedAt: Date.now(),
@@ -400,7 +455,11 @@ export function createUsageModule(
           description: "已恢复上次记录，当前额度尚未确认；请在主窗口查看更新进度。",
         };
       const parsed = { data: state };
-      const totals = state.trend && state.trend.source !== "none" ? trendTotals(state.trend) : null;
+      const currentTrend = state.trend && trendIsCurrentDay(state.trend) ? state.trend : null;
+      const totals =
+        currentTrend && currentTrend.source !== "none"
+          ? trendTotals(currentTrend, Date.now())
+          : null;
       const statistics = totals
         ? [
             {
@@ -430,11 +489,11 @@ export function createUsageModule(
           ]
         : [];
       const series =
-        state.trend && state.trend.source !== "none"
+        currentTrend && currentTrend.source !== "none"
           ? {
-              points: state.trend.points.slice(-7),
-              estimated: state.trend.source === "thread-totals",
-              limited: state.trend.limited,
+              points: currentTrend.points.slice(-7),
+              estimated: currentTrend.source === "thread-totals",
+              limited: currentTrend.limited,
             }
           : undefined;
       if (parsed.data.status === "error")

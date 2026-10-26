@@ -34,18 +34,17 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
   const running = operation?.phase === "running" || operation?.phase === "cancelling";
   const result = usageState(snapshot);
   const current = result?.status === "ready" ? result.data : null;
-  const capturedAt = current?.capturedAt;
   const failed = result?.status === "error" ? result : null;
   const unavailable =
     ["invalid", "future-version", "unavailable"].includes(snapshot.config.health) ||
     snapshot.phase === "error";
   const busy = pending || running || snapshot.phase === "starting" || snapshot.phase === "stopping";
   useEffect(() => {
-    if (capturedAt === undefined) return;
+    if (snapshot.phase !== "running") return;
     // Display freshness only; this timer never starts a source read or network request.
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
-  }, [capturedAt]);
+  }, [snapshot.phase]);
   async function refresh(enable = false) {
     setPending(true);
     setMessage("");
@@ -277,7 +276,7 @@ export default function UsagePage({ snapshot }: { snapshot: ModuleSnapshot }) {
                 </EmptyHeader>
               </Empty>
             )}
-            <UsageTrend snapshot={snapshot} />
+            <UsageTrend snapshot={snapshot} now={now} />
           </Box>
         </TabsContent>
         <TabsContent value="tools">

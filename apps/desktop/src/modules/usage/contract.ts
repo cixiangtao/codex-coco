@@ -150,9 +150,25 @@ export const trendSnapshotSchema = z.strictObject({
   reusedFiles: z.number().int().nonnegative(),
 });
 export type TrendSnapshot = z.infer<typeof trendSnapshotSchema>;
-export function trendTotals(trend: TrendSnapshot) {
-  const sum = (days: number) =>
-    trend.points.slice(-days).reduce((total, point) => total + point.tokens, 0);
+function localDay(time: number) {
+  const date = new Date(time);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+/** A previous calendar day's scan cannot claim to contain today's totals. */
+export function trendIsCurrentDay(trend: TrendSnapshot, now = Date.now()) {
+  return localDay(trend.capturedAt) === localDay(now);
+}
+/** Rolling totals are anchored to the requested local day; future and expired records are excluded. */
+export function trendTotals(trend: TrendSnapshot, now = trend.capturedAt) {
+  const today = localDay(now);
+  const sum = (days: number) => {
+    const beginning = new Date(now);
+    beginning.setDate(beginning.getDate() - days + 1);
+    const start = localDay(beginning.getTime());
+    return trend.points
+      .filter((point) => point.day >= start && point.day <= today)
+      .reduce((total, point) => total + point.tokens, 0);
+  };
   return { today: sum(1), week: sum(7), month: sum(30) };
 }
 export const localScanResultSchema = z.strictObject({
@@ -222,6 +238,7 @@ export const usageToolsSchema = z.strictObject({
 export type UsageTools = z.infer<typeof usageToolsSchema>;
 export const usageResultSchema = z.discriminatedUnion("status", [
   z.strictObject({
+    trendFailed: z.boolean().default(false),
     status: z.literal("cached"),
     data: usageSnapshotSchema,
     trend: trendSnapshotSchema.nullable(),
@@ -229,12 +246,14 @@ export const usageResultSchema = z.discriminatedUnion("status", [
     tools: usageToolsSchema.nullable().default(null),
   }),
   z.strictObject({
+    trendFailed: z.boolean().default(false),
     status: z.literal("tools"),
     tools: usageToolsSchema.nullable().default(null),
     trend: trendSnapshotSchema.nullable(),
     reset: resetFeedbackSchema.nullable().default(null),
   }),
   z.strictObject({
+    trendFailed: z.boolean().default(false),
     reset: resetFeedbackSchema.nullable().default(null),
     tools: usageToolsSchema.nullable().default(null),
     status: z.literal("source"),
@@ -242,6 +261,7 @@ export const usageResultSchema = z.discriminatedUnion("status", [
     trend: trendSnapshotSchema.nullable(),
   }),
   z.strictObject({
+    trendFailed: z.boolean().default(false),
     tools: usageToolsSchema.nullable().default(null),
     status: z.literal("ready"),
     data: usageSnapshotSchema,
@@ -249,6 +269,7 @@ export const usageResultSchema = z.discriminatedUnion("status", [
     reset: resetFeedbackSchema.nullable().default(null),
   }),
   z.strictObject({
+    trendFailed: z.boolean().default(false),
     tools: usageToolsSchema.nullable().default(null),
     status: z.literal("error"),
     reason: usageFailureSchema,
@@ -258,6 +279,7 @@ export const usageResultSchema = z.discriminatedUnion("status", [
     reset: resetFeedbackSchema.nullable().default(null),
   }),
   z.strictObject({
+    trendFailed: z.boolean().default(false),
     reset: resetFeedbackSchema.nullable().default(null),
     tools: usageToolsSchema.nullable().default(null),
     status: z.literal("local"),

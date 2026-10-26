@@ -195,11 +195,34 @@ try {
   assert(!JSON.stringify(glance).match(/private@example|private-token|account-a/));
   await popup.keyboard.press("Escape");
   await page.bringToFront();
+  // Break only local source metadata: quota remains ready, stale trend disappears everywhere.
+  const localSource = join(directory, "data/usage-local/source.json");
+  await writeFile(localSource, "invalid-source");
+  await page.evaluate(() =>
+    window.codexCoco.runModuleOperation({
+      moduleId: "usage",
+      operation: "scan-trend",
+      input: { force: false },
+    }),
+  );
+  await page.getByText("本地统计未完成", { exact: true }).waitFor();
+  await page.getByText("剩余 75%", { exact: true }).waitFor();
+  assert.equal((await state(page)).state.trend, null);
+  await task(page, "check-cli");
+  await page.getByText("本地统计未完成", { exact: true }).waitFor();
+  const failedTrendGlance = await popup.evaluate(() => window.codexCoco.glance());
+  assert(
+    !failedTrendGlance.value.items
+      .find((item) => item.id === "usage")
+      .metrics.some((metric) => metric.id.startsWith("tokens:")),
+  );
+  await rm(localSource);
+  await task(page, "scan-trend", { force: false });
+  assert.equal((await state(page)).state.trendFailed, false);
   await application.evaluate(({ dialog }, path) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
   }, other);
   await task(page, "choose-local-home");
-  await task(page, "refresh");
   await page.getByText("14 天 · 2K tokens", { exact: true }).waitFor();
   await task(page, "list-models");
   const commands = (await readFile(trace, "utf8"))

@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ModuleHost } from "../apps/desktop/src/application/module-host";
@@ -16,12 +17,15 @@ import type { LocalUsageService } from "../apps/desktop/src/modules/usage/local-
 
 const directories: string[] = [];
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all(
     directories.splice(0).map((path) => rm(path, { recursive: true, force: true })),
   );
 });
 
 it("keeps quota, daily statistics and menu text across auxiliary failure, cancellation and new-window snapshots", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 9, 30, 12));
   const directory = await mkdtemp(join(tmpdir(), "codex-coco-usage-state-"));
   directories.push(directory);
   const toolsState = usageToolsSchema.parse({
@@ -47,7 +51,7 @@ it("keeps quota, daily statistics and menu text across auxiliary failure, cancel
   };
   const scan = localScanResultSchema.parse({
     trend: {
-      capturedAt: Date.now(),
+      capturedAt: new Date(2026, 9, 30, 12).getTime(),
       days: 30,
       source: "session-events",
       scope: "all-local-unassigned",
@@ -114,4 +118,132 @@ it("keeps quota, daily statistics and menu text across auxiliary failure, cancel
   } finally {
     await host.shutdown();
   }
+});
+
+it("invalidates failed local scans without losing successful quota and clears the warning on retry", async () => {
+  let fails = false;
+  const local: LocalUsageService = {
+    chooseHome: async () => false,
+    scan: async () => {
+      if (fails) throw new Error("PRIVATE_SCAN_FAILURE");
+      return localScanResultSchema.parse({
+        trend: {
+          capturedAt: Date.now(),
+          days: 30,
+          source: "session-events",
+          scope: "all-local-unassigned",
+          points: [{ day: "2026-10-26", tokens: 42 }],
+          unassignedTokens: 42,
+          limited: false,
+          scannedFiles: 1,
+          reusedFiles: 0,
+        },
+        fallback: null,
+      });
+    },
+  };
+  const { usageDefaults, usageResultSchema } =
+    await import("../apps/desktop/src/modules/usage/contract");
+  const runtime = await createUsageModule(
+    async () => ({ rateLimits: { primary: { usedPercent: 25 } } }),
+    undefined,
+    local,
+  ).start(new AbortController().signal, {
+    configuration: () => usageDefaults,
+    requestOperation: () => false,
+  });
+  const context = {
+    signal: new AbortController().signal,
+    config: usageDefaults,
+    report: () => undefined,
+  };
+  try {
+    await runtime.execute("refresh", {}, context);
+    expect(usageResultSchema.parse(runtime.state!()).trend?.points[0]?.tokens).toBe(42);
+    fails = true;
+    await runtime.execute("refresh", {}, context);
+    expect(usageResultSchema.parse(runtime.state!())).toMatchObject({
+      status: "ready",
+      trend: null,
+      trendFailed: true,
+    });
+    fails = false;
+    await runtime.execute("scan-trend", { force: false }, context);
+    expect(usageResultSchema.parse(runtime.state!())).toMatchObject({
+      status: "ready",
+      trendFailed: false,
+    });
+    fails = true;
+    await expect(runtime.execute("scan-trend", { force: false }, context)).rejects.toThrow();
+    expect(usageResultSchema.parse(runtime.state!())).toMatchObject({
+      status: "ready",
+      trend: null,
+      trendFailed: true,
+    });
+  } finally {
+    await runtime.stop();
+  }
+});
+
+it("publishes uncertain redemption as the durable runtime state instead of leaving current quota ready", async () => {
+  const { usageDefaults, usageResultSchema } =
+    await import("../apps/desktop/src/modules/usage/contract");
+  const input = { attemptKey: randomUUID(), reference: null };
+  const feedback = { ...input, outcome: "pending" as const, updatedAt: Date.now() };
+  const runtime = await createUsageModule(
+    async () => ({ rateLimits: { primary: { usedPercent: 90 } } }),
+    undefined,
+    undefined,
+    {
+      latest: async () => feedback,
+      consume: async () => feedback,
+    },
+  ).start(new AbortController().signal, {
+    configuration: () => usageDefaults,
+    requestOperation: () => false,
+  });
+  const context = {
+    signal: new AbortController().signal,
+    config: usageDefaults,
+    report: () => undefined,
+  };
+  try {
+    await runtime.execute("refresh", {}, context);
+    const result = await runtime.execute("consume-reset", input, context);
+    expect(usageResultSchema.parse(runtime.state!())).toMatchObject({
+      status: "error",
+      reason: "READ_FAILED",
+      reset: feedback,
+    });
+    expect(usageResultSchema.parse(runtime.state!())).toEqual(usageResultSchema.parse(result));
+  } finally {
+    await runtime.stop();
+  }
+});
+
+it("anchors local totals to calendar dates and never presents yesterday as today's usage", async () => {
+  const { trendTotals, trendIsCurrentDay } =
+    await import("../apps/desktop/src/modules/usage/contract");
+  const trend = localScanResultSchema.parse({
+    trend: {
+      capturedAt: new Date(2026, 9, 25, 23, 59).getTime(),
+      days: 30,
+      source: "session-events",
+      scope: "all-local-unassigned",
+      points: [
+        { day: "2026-10-18", tokens: 10 },
+        { day: "2026-10-25", tokens: 20 },
+        { day: "2026-10-27", tokens: 999 },
+      ],
+      unassignedTokens: 30,
+      limited: false,
+      scannedFiles: 1,
+      reusedFiles: 0,
+    },
+    fallback: null,
+  }).trend;
+  expect(trendTotals(trend)).toEqual({ today: 20, week: 20, month: 30 });
+  const midnight = new Date(2026, 9, 26, 0, 1).getTime();
+  expect(trendIsCurrentDay(trend, midnight)).toBe(false);
+  expect(trendTotals(trend, midnight)).toEqual({ today: 0, week: 20, month: 30 });
 });
