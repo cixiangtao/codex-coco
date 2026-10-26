@@ -308,6 +308,23 @@ try {
       .code,
     "FORBIDDEN",
   );
+  // Main-window permission probes may focus it and dismiss the native popover.
+  const popupWindow = await application.browserWindow(popup);
+  if (!(await popupWindow.evaluate((window) => window.isVisible()))) {
+    await application.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu()
+        .items.flatMap((item) => item.submenu?.items ?? [])
+        .find((item) => item.label === "显示或收起速览")
+        .click(),
+    );
+  }
+  await popupWindow.evaluate((window) => {
+    window.show();
+    window.focus();
+  });
+  await popup.waitForFunction(
+    () => document.querySelector(".glance-shell")?.getAttribute("data-visible") === "true",
+  );
   await popup.screenshot({
     path: join(output, "glance-quick-restart.png"),
     animations: "disabled",

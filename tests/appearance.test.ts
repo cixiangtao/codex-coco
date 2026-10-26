@@ -163,6 +163,31 @@ describe("appearance lifecycle", () => {
     expect(f.connection.remove.mock.calls.at(-1)?.[0]).toBe(9229);
     await f.host.shutdown();
   });
+  it("honors a changed fixed port after discovery while keeping synchronization on the owned port", async () => {
+    const f = await setup();
+    try {
+      const imported = appearanceResultSchema.parse(await f.execute("import-image"));
+      f.config.main = { ...f.config.main, enabled: true, image: imported.imported };
+      await f.execute("inspect");
+      await f.execute("apply");
+      f.config.port = 9331;
+      expect(await f.execute("apply")).toMatchObject({ reason: "REMOVE_FIRST" });
+      f.connection.verify.mockRejectedValueOnce(new Error("RELOAD"));
+      await f.execute("sync");
+      expect(f.connection.apply.mock.lastCall?.[0]).toBe(9229);
+      await f.execute("remove");
+      await f.execute("apply");
+      expect(f.connection.apply.mock.lastCall?.[0]).toBe(9331);
+      expect(await f.execute("verify")).toMatchObject({
+        active: true,
+        connection: "ready",
+        connectedPort: 9331,
+      });
+    } finally {
+      await f.runtime.stop();
+      await f.host.shutdown();
+    }
+  });
   it("keeps the last applied look separate from configuration saved for a later application", async () => {
     const f = await setup();
     const imported = appearanceResultSchema.parse(await f.execute("import-image"));

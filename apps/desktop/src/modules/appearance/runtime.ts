@@ -304,9 +304,11 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             }
             const targetPort =
               launchedPort ??
-              detectedPort ??
-              (await dependencies.launcher?.port(config)) ??
-              config.port;
+              (name === "sync" && port !== null
+                ? port
+                : config.portMode === "fixed"
+                  ? config.port
+                  : (detectedPort ?? (await dependencies.launcher?.port(config)) ?? config.port));
             if (name === "remove") {
               if (port === null) port = targetPort; // Explicit recovery can remove a surviving style from an earlier run.
               restoring = false;
@@ -321,6 +323,8 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
                 cssCache.css || undefined,
               );
               active = port !== null && appliedConfig !== null;
+              connectionStatus = "ready";
+              detectedPort = targetPort;
               return result();
             }
             if (!config.wallpaper.enabled && !config.main.enabled && !config.sidebar.enabled) {
@@ -348,6 +352,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             count = await connection.apply(port, css, context.signal);
             count = await connection.verify(port, context.signal, css);
             active = true;
+            detectedPort = targetPort;
             connectionStatus = "ready";
             failures = 0;
             return result();

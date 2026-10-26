@@ -113,6 +113,39 @@ async function verifyEditorUi(page, application, targetPage) {
   await page.locator("#main-x").focus();
   await page.locator("#main-x").press("ArrowRight");
   assert.equal(await page.locator("#main-x").inputValue(), "61");
+  // Keep editing while a native picker is pending; import completion must merge into the latest draft.
+  await application.evaluate(({ dialog }) => {
+    globalThis.restoreImagePicker = dialog.showOpenDialog;
+    dialog.showOpenDialog = () =>
+      new Promise((resolve) => {
+        globalThis.finishImagePicker = resolve;
+      });
+  });
+  await page.getByRole("button", { name: "导入主面板插画", exact: true }).click();
+  await page.waitForFunction(
+    async () =>
+      (await window.codexCoco.modules()).value.find((m) => m.id === "appearance").operation
+        ?.name === "import-image",
+  );
+  await page.locator("#main-x").press("ArrowRight");
+  assert.equal(await page.locator("#main-x").inputValue(), "62");
+  await application.evaluate(({ dialog }, path) => {
+    globalThis.finishImagePicker({ canceled: false, filePaths: [path] });
+    dialog.showOpenDialog = globalThis.restoreImagePicker;
+  }, image);
+  await page
+    .getByRole("button", { name: "导入主面板插画", exact: true })
+    .waitFor({ state: "visible" });
+  await page.waitForFunction(
+    async () =>
+      (await window.codexCoco.modules()).value.find((m) => m.id === "appearance").operation
+        ?.phase === "succeeded",
+  );
+  assert.equal(
+    await page.locator("#main-x").inputValue(),
+    "62",
+    "Import must preserve intervening edits",
+  );
   await layer.getByRole("button", { name: "全局壁纸", exact: true }).click();
   assert.equal(await page.locator("#wallpaper-x").inputValue(), "50");
   await layer.getByRole("button", { name: "侧栏插画", exact: true }).click();
@@ -133,7 +166,7 @@ async function verifyEditorUi(page, application, targetPage) {
   await tabs.filter({ hasText: "布景编辑" }).click();
   assert.equal(await page.locator("#sidebar-y").inputValue(), "81");
   await layer.getByRole("button", { name: "主面板插画", exact: true }).click();
-  assert.equal(await page.locator("#main-x").inputValue(), "61");
+  assert.equal(await page.locator("#main-x").inputValue(), "62");
   assert.equal(
     await targetPage.locator("#codex-coco-appearance").count(),
     0,

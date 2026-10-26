@@ -43,6 +43,11 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
   const [launchFeedback, setLaunchFeedback] = useState<AppearanceLaunchFeedback | null>(null);
   const [selectedLayer, setSelectedLayer] = useState<Layer>("main");
   const [activeTab, setActiveTab] = useState("editor");
+  const currentDraft = useRef(draft);
+  useEffect(() => {
+    currentDraft.current = draft;
+  }, [draft]);
+  const editVersion = useRef(0);
   const task = snapshot.operation;
   const busy = pending || task?.phase === "running" || task?.phase === "cancelling";
   const enabled = snapshot.phase === "running";
@@ -90,6 +95,8 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
   const conflict = dirty && baseRevision !== snapshot.config.revision;
   function update(next: AppearanceConfig) {
     if (!dirty) setBaseRevision(snapshot.config.revision);
+    editVersion.current++;
+    currentDraft.current = next;
     setDraft(next);
     setDirty(true);
     setMessage("");
@@ -163,14 +170,19 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
         );
         const result = appearanceResultSchema.safeParse(completed.result);
         if (result.success && result.data.imported) {
+          const latest = currentDraft.current;
           update({
-            ...draft,
-            [layer]: { ...draft[layer], image: result.data.imported, enabled: true },
+            ...latest,
+            [layer]: { ...latest[layer], image: result.data.imported, enabled: true },
           });
           const preview = result.data.preview;
           if (preview)
             setPreviews((previous) => ({ ...previous, [result.data.imported!]: preview }));
-        }
+        } else if (completed.phase === "cancelled") setMessage("图片导入已取消。");
+        else if (completed.phase !== "succeeded" || !result.success)
+          setMessage("图片导入未完成，请重试。");
+        else if (result.data.status === "error")
+          setMessage(appearanceFailures[result.data.reason!]);
       }
     } catch {
       if (launching) setLaunchFeedback({ operation, phase: "error", reason: "LAUNCH_FAILED" });
@@ -180,6 +192,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
     }
   }
   async function save(apply: boolean) {
+    const savedVersion = editVersion.current;
     if (!appearanceConfigSchema.safeParse(draft).success) {
       setMessage("请检查端口与图层数值是否在允许范围内。");
       return;
@@ -198,7 +211,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
       }
       acceptModuleSnapshot(response.value);
       setBaseRevision(response.value.config.revision);
-      setDirty(false);
+      if (savedVersion === editVersion.current) setDirty(false);
       if (apply) await run("apply");
       else setMessage("布景配置已保存。");
     } catch {
