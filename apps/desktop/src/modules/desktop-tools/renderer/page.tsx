@@ -217,7 +217,7 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
           <AlertDescription>请取消当前修改后重新编辑。</AlertDescription>
         </Alert>
       )}
-      <SettingsGroup title="菜单栏图标">
+      <SettingsGroup title="菜单栏图标" disabled={busy}>
         <SettingsRow layout="stacked">
           <FieldLabel>菜单栏图标</FieldLabel>
           <ToggleGroup
@@ -290,7 +290,7 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
           )}
         </SettingsRow>
       </SettingsGroup>
-      <SettingsGroup title="动画与性能">
+      <SettingsGroup title="动画与性能" disabled={busy}>
         {(
           [
             { key: "animate", title: "播放图标动画" },
@@ -332,6 +332,7 @@ export default function DesktopToolsPage({ snapshot }: { snapshot: ModuleSnapsho
       </SettingsGroup>
       <SettingsGroup
         title="系统集成"
+        disabled={busy}
         description="先保存偏好，再单独应用到系统；停用模块不会撤销已保存的登录项。"
       >
         <SettingsRow>

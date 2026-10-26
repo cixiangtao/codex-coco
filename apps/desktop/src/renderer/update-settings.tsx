@@ -126,7 +126,7 @@ export function UpdateSettings() {
         </Alert>
       )}
       {conflict && <p role="alert">其他窗口已更新设置，请取消本地修改后重新编辑。</p>}
-      <SettingsGroup title="版本与发布源">
+      <SettingsGroup title="版本与发布源" disabled={busy}>
         <SettingsRow>
           <FieldLabel>当前版本 {state.currentVersion}</FieldLabel>
           <output>{labels[state.phase]}</output>

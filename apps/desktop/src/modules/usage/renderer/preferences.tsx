@@ -48,6 +48,7 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
     <div className="usage-preferences">
       <SettingsGroup
         title="刷新与本地记录"
+        disabled={pending}
         description="启动时仍读取一次；关闭主窗口不停止后台刷新，停用模块即停止。"
       >
         <SettingsRow>
@@ -78,7 +79,7 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
           </FieldDescription>
         </SettingsRow>
       </SettingsGroup>
-      <SettingsGroup title="额度通知">
+      <SettingsGroup title="额度通知" disabled={pending}>
         <SettingsRow>
           <FieldLabel htmlFor="usage-notifications">系统通知</FieldLabel>
           <Switch
@@ -114,7 +115,7 @@ export function UsagePreferences({ snapshot }: { snapshot: ModuleSnapshot }) {
           <FieldDescription>严重阈值必须小于提醒阈值。</FieldDescription>
         </SettingsRow>
       </SettingsGroup>
-      <SettingsGroup title="菜单栏显示">
+      <SettingsGroup title="菜单栏显示" disabled={pending}>
         {(
           [
             { key: "showPrimaryInMenuBar", label: "菜单栏显示主要额度窗口" },
