@@ -71,7 +71,21 @@ if (args.includes("--version")) {
       send({
         account: { type: "chatgpt", email: "private@example.test", accessToken: "private-token" },
       });
-    else if (request.method === "model/list") {
+    else if (request.method === "config/read") {
+      if (mode() === "config-unsupported") {
+        process.stdout.write(JSON.stringify({ id: request.id, error: { code: -32601 } }) + "\n");
+        return;
+      }
+      send({
+        config: {
+          model: mode() === "config-invalid" ? "--unsafe-option" : "controlled-model",
+          model_reasoning_effort: "high",
+          secret: "private-token",
+          mcp_servers: { private: { command: "private-command" } },
+        },
+        layers: [{ path: "/private/config.toml" }],
+      });
+    } else if (request.method === "model/list") {
       if (mode() === "models-invalid") {
         send({ data: [{ id: "--unsafe-option" }], nextCursor: null });
         return;

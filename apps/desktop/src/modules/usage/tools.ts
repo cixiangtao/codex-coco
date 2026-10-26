@@ -18,6 +18,7 @@ import { createAppServerRequest, codexCommand, type ReaderOptions } from "./app-
 import { runCodexCommand, type CommandOptions } from "./process";
 import {
   intelligenceInputSchema,
+  intelligenceSummary,
   intelligenceHistorySchema,
   modelOptionSchema,
   usageToolsSchema,
@@ -47,6 +48,8 @@ export function createUsageToolsService(options: {
   fetchImpl?: typeof fetch;
 }): UsageToolsService {
   let state: UsageTools = {
+    defaults: null,
+    defaultsStatus: "unread",
     requestedRuns: null,
     installation: "unknown",
     models: [],
@@ -129,8 +132,43 @@ export function createUsageToolsService(options: {
     }
     throw new Error("MODELS_UNAVAILABLE");
   }
+  async function defaults(signal: AbortSignal) {
+    state.defaults = null;
+    state.defaultsStatus = "unavailable";
+    try {
+      const raw = await createAppServerRequest(
+        { method: "config/read", params: { includeLayers: false } },
+        options.rpc,
+      )(signal);
+      // Strip every other config key in the backend before creating the public snapshot.
+      const response = z
+        .object({
+          config: z.object({
+            model: z.unknown().optional(),
+            model_reasoning_effort: z.unknown().optional(),
+          }),
+        })
+        .parse(raw);
+      const configured = state.models.find((model) => model.id === response.config.model);
+      const selected =
+        configured ??
+        (response.config.model === null || response.config.model === undefined
+          ? state.models.find((model) => model.isDefault)
+          : null);
+      if (!selected) return;
+      const effort = response.config.model_reasoning_effort ?? selected.defaultEffort;
+      if (effort !== null && (typeof effort !== "string" || !selected.efforts.includes(effort)))
+        return;
+      state.defaults = { model: selected.id, effort };
+      state.defaultsStatus = "ready";
+    } catch {
+      signal.throwIfAborted();
+    }
+  }
   return {
     reset: () => {
+      state.defaults = null;
+      state.defaultsStatus = "unread";
       state.models = [];
       state.samples = [];
       state.requestedRuns = null;
@@ -142,6 +180,7 @@ export function createUsageToolsService(options: {
       try {
         if (name === "list-models") {
           await models(signal);
+          await defaults(signal);
           return;
         }
         if (name === "load-intelligence-history") {
@@ -200,6 +239,7 @@ export function createUsageToolsService(options: {
                 throw new Error("UPDATE_FAILED");
               try {
                 await models(signal);
+                await defaults(signal);
               } catch {
                 signal.throwIfAborted();
                 state.error = "MODELS_UNAVAILABLE";
@@ -233,7 +273,22 @@ export function createUsageToolsService(options: {
           return;
         }
         if (name !== "run-intelligence") throw new Error("UNKNOWN_TOOL_OPERATION");
-        const request = intelligenceInputSchema.parse(input);
+        const requested = intelligenceInputSchema.parse(input);
+        const selectedModel =
+          requested.model ??
+          state.defaults?.model ??
+          state.models.find((model) => model.isDefault)?.id ??
+          null;
+        const catalogModel = state.models.find((model) => model.id === selectedModel);
+        const request = {
+          ...requested,
+          model: selectedModel,
+          effort:
+            requested.effort ??
+            (requested.model === null ? state.defaults?.effort : null) ??
+            catalogModel?.defaultEffort ??
+            null,
+        };
         state.requestedRuns = request.runs;
         state.history = await history();
         state.samples = [];
@@ -353,10 +408,7 @@ export function createUsageToolsService(options: {
           // Cancellation keeps completed samples and their summary, without inventing a result
           // for the interrupted sample. A cancellation before any answer leaves no history.
           if (!signal.aborted || state.samples.some((sample) => sample.correct !== null)) {
-            const completed = state.samples.filter((sample) => sample.correct !== null);
-            const rates = completed
-              .filter((sample) => sample.outputTokens !== null && sample.elapsedMs > 0)
-              .map((sample) => sample.outputTokens! / (sample.elapsedMs / 1000));
+            const summary = intelligenceSummary(state.samples);
             state.history = [
               {
                 id: randomUUID(),
@@ -364,11 +416,7 @@ export function createUsageToolsService(options: {
                 model: request.model ?? "CLI 默认模型",
                 effort: request.effort,
                 requested: request.runs,
-                completed: completed.length,
-                correct: completed.filter((sample) => sample.correct).length,
-                averageTokensPerSecond: rates.length
-                  ? rates.reduce((sum, value) => sum + value, 0) / rates.length
-                  : null,
+                ...summary,
               },
               ...state.history,
             ].slice(0, 100);

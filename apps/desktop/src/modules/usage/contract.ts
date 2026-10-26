@@ -209,9 +209,15 @@ export const intelligenceHistorySchema = z.strictObject({
   requested: z.number().int().min(1).max(5),
   completed: z.number().int().min(0).max(5),
   correct: z.number().int().min(0).max(5),
+  averageReasoningTokens: z.number().nonnegative().nullable().default(null),
   averageTokensPerSecond: z.number().nonnegative().nullable(),
 });
 export const usageToolsSchema = z.strictObject({
+  defaults: z
+    .strictObject({ model: modelIdSchema, effort: effortSchema.nullable() })
+    .nullable()
+    .default(null),
+  defaultsStatus: z.enum(["unread", "ready", "unavailable"]).default("unread"),
   requestedRuns: z.number().int().min(1).max(5).nullable().default(null),
   installation: z.enum(["unknown", "standalone", "package-manager", "homebrew"]),
   models: z.array(modelOptionSchema).max(200),
@@ -236,6 +242,79 @@ export const usageToolsSchema = z.strictObject({
     .nullable(),
 });
 export type UsageTools = z.infer<typeof usageToolsSchema>;
+/** Summary excludes failed samples and preserves missing counters rather than treating them as zero. */
+export function intelligenceSummary(samples: UsageTools["samples"]) {
+  const completed = samples.filter((sample) => sample.correct !== null);
+  const average = (values: number[]) =>
+    values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  return {
+    completed: completed.length,
+    correct: completed.filter((sample) => sample.correct).length,
+    averageReasoningTokens: average(
+      completed.flatMap((sample) =>
+        sample.reasoningTokens === null ? [] : [sample.reasoningTokens],
+      ),
+    ),
+    averageTokensPerSecond: average(
+      completed.flatMap((sample) =>
+        sample.outputTokens === null || sample.elapsedMs <= 0
+          ? []
+          : [sample.outputTokens / (sample.elapsedMs / 1000)],
+      ),
+    ),
+  };
+}
+
+/** Compares complete runs only, against up to five earlier runs with the same explicit model and effort. */
+export function intelligenceBaseline(history: UsageTools["history"]) {
+  const latest = history[0];
+  if (!latest || latest.completed !== latest.requested || latest.model === "CLI 默认模型")
+    return null;
+  const previous = history
+    .slice(1)
+    .filter(
+      (entry) =>
+        entry.model === latest.model &&
+        entry.effort === latest.effort &&
+        entry.completed === entry.requested,
+    )
+    .slice(0, 5);
+  if (!previous.length) return null;
+  const average = (values: number[]) =>
+    values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  const reasoning = average(
+    previous.flatMap((entry) =>
+      entry.averageReasoningTokens === null ? [] : [entry.averageReasoningTokens],
+    ),
+  );
+  const speed = average(
+    previous.flatMap((entry) =>
+      entry.averageTokensPerSecond === null ? [] : [entry.averageTokensPerSecond],
+    ),
+  );
+  const accuracy =
+    (previous.reduce((sum, entry) => sum + entry.correct, 0) /
+      previous.reduce((sum, entry) => sum + entry.completed, 0)) *
+    100;
+  return {
+    runs: previous.length,
+    model: latest.model,
+    effort: latest.effort,
+    reasoning,
+    speed,
+    accuracy,
+    reasoningDifference:
+      latest.averageReasoningTokens === null || reasoning === null
+        ? null
+        : latest.averageReasoningTokens - reasoning,
+    speedPercent:
+      latest.averageTokensPerSecond === null || speed === null || speed === 0
+        ? null
+        : ((latest.averageTokensPerSecond - speed) / speed) * 100,
+    accuracyDifference: (latest.correct / latest.completed) * 100 - accuracy,
+  };
+}
+
 export const usageResultSchema = z.discriminatedUnion("status", [
   z.strictObject({
     trendFailed: z.boolean().default(false),

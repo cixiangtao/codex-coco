@@ -58,6 +58,7 @@ try {
   await page.getByRole("tab", { name: "辅助工具", exact: true }).click();
   await page.getByRole("button", { name: "读取可用模型", exact: true }).click();
   await page.getByRole("button", { name: "受控模型", exact: true }).waitFor();
+  await page.getByText(/已读取 Codex 默认设置：controlled-model · high/).waitFor();
   await page.getByRole("button", { name: "受控模型", exact: true }).click();
   await page.getByRole("button", { name: "high", exact: true }).click();
   await page.getByRole("button", { name: "开始样本检测", exact: true }).click();
@@ -70,6 +71,12 @@ try {
   await page.getByRole("button", { name: "开始样本检测", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "确认执行", exact: true }).click();
   await page.getByText("已完成 3/3 个样本，正确 3 个，正确率 100%。", { exact: true }).waitFor();
+  await page.getByRole("definition").filter({ hasText: "16 tokens" }).waitFor();
+  await page.getByLabel("样本次数（1–5）", { exact: true }).fill("1");
+  await page.getByRole("button", { name: "开始样本检测", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "确认执行", exact: true }).click();
+  await page.getByText("已完成 1/1 个样本，正确 1 个，正确率 100%。", { exact: true }).waitFor();
+  await page.getByLabel("历史检测基线", { exact: true }).waitFor();
   const output = join(
     root,
     packaged ? "work/usage-tools-verification-packaged" : "work/usage-tools-verification",
@@ -107,8 +114,9 @@ try {
   const history = JSON.parse(
     await readFile(join(directory, "data/usage-tools/intelligence-history.json"), "utf8"),
   );
-  assert.equal(history.length, 1);
-  assert.equal(history[0].correct, 3);
+  assert.equal(history.length, 2);
+  assert.equal(history[0].correct, 1);
+  assert.equal(history[0].averageReasoningTokens, 16);
   assert(!JSON.stringify(history).match(/private|explanation/));
   await writeFile(mode, "hang");
   await page.getByRole("button", { name: "开始样本检测", exact: true }).click();
@@ -119,7 +127,7 @@ try {
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
-    if (commands.filter((command) => command.args.includes("exec")).length === 4) break;
+    if (commands.filter((command) => command.args.includes("exec")).length === 5) break;
     await delay(25);
   } while (Date.now() < until);
   await page.getByRole("button", { name: "取消任务", exact: true }).click();

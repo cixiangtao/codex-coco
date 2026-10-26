@@ -15,7 +15,7 @@ import {
 import { Alert, AlertTitle, AlertDescription } from "@codex-coco/ui/components/alert";
 import type { ModuleSnapshot } from "../../../contracts/modules";
 import { acceptModuleSnapshot } from "../../../renderer/client/modules";
-import { usageState } from "../contract";
+import { usageState, intelligenceSummary, intelligenceBaseline } from "../contract";
 
 const failures = {
   MODELS_UNAVAILABLE: "模型列表不可用，请刷新列表或检查登录与 CLI 版本。",
@@ -36,7 +36,9 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
   >(null);
   const state = usageState(snapshot);
   const tools = state ? state.tools : null;
-  const selected = tools?.models.find((value) => value.id === model);
+  const selected =
+    tools?.models.find((value) => value.id === (model ?? tools.defaults?.model)) ??
+    tools?.models.find((value) => model === null && value.isDefault);
   const busy =
     pending ||
     snapshot.phase !== "running" ||
@@ -59,12 +61,15 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
       setPending(false);
     }
   }
-  const completed = tools?.samples.filter((value) => value.correct !== null) ?? [];
-  const correct = completed.filter((value) => value.correct).length;
+  const summary = intelligenceSummary(tools?.samples ?? []);
+  const baseline = tools ? intelligenceBaseline(tools.history) : null;
+  const delta = (value: number | null, unit: string) =>
+    value === null ? "暂无可比数据" : `${value >= 0 ? "+" : ""}${value.toFixed(1)}${unit}`;
   return (
     <div className="settings-sections">
       <SettingsGroup
         title="样本检测"
+        disabled={busy}
         description="固定糖果题的重复样本检测会消耗模型额度，仅由你明确开始。结果用于对比本次样本，不能代表模型整体能力；少量错误不等于降智。"
       >
         <SettingsRow layout="stacked">
@@ -110,8 +115,12 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
             ))}
           </ToggleGroup>
           <FieldDescription>
-            检测忽略用户配置，使用所选模型或 CLI 内置默认模型；不会接入用户的
-            MCP、应用或项目上下文。
+            {tools?.defaultsStatus === "ready" && tools.defaults
+              ? `已读取 Codex 默认设置：${tools.defaults.model} · ${tools.defaults.effort ?? "默认强度"}。`
+              : tools?.defaultsStatus === "unavailable"
+                ? "默认设置暂不可用，可明确选择模型；未选择时采用模型目录默认或 CLI 内置默认。"
+                : "读取可用模型时一并识别 Codex 默认模型与推理强度。"}
+            仅传入模型与强度；检测仍忽略其余配置，不接入 MCP、应用或项目上下文。
           </FieldDescription>
         </SettingsRow>
         <SettingsRow>
@@ -181,10 +190,27 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
           {tools && tools.samples.length > 0 && (
             <>
               <p>
-                已完成 {completed.length}/{tools.requestedRuns ?? tools.samples.length} 个样本，正确{" "}
-                {correct} 个，正确率{" "}
-                {completed.length ? Math.round((correct / completed.length) * 100) : 0}%。
+                已完成 {summary.completed}/{tools.requestedRuns ?? tools.samples.length}{" "}
+                个样本，正确 {summary.correct} 个，正确率{" "}
+                {summary.completed ? Math.round((summary.correct / summary.completed) * 100) : 0}%。
               </p>
+              <dl className="grid grid-cols-2 gap-4" aria-label="检测统计摘要">
+                <div>
+                  <dt className="text-xs text-muted-foreground">平均推理消耗</dt>
+                  <dd className="text-lg font-semibold">
+                    {formatTokens(summary.averageReasoningTokens)} tokens
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">平均输出速度（含请求等待）</dt>
+                  <dd className="text-lg font-semibold">
+                    {summary.averageTokensPerSecond === null
+                      ? "未知"
+                      : summary.averageTokensPerSecond.toFixed(1)}{" "}
+                    tokens/s
+                  </dd>
+                </div>
+              </dl>
               {tools.samples.map((sample) => (
                 <details key={sample.index}>
                   <summary>
@@ -202,6 +228,29 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
               ))}
             </>
           )}
+          {baseline && (
+            <div aria-label="历史检测基线" className="flex flex-col gap-2">
+              <p className="text-sm font-medium">最近完整检测与历史基线</p>
+              <p className="text-xs text-muted-foreground">
+                {baseline.model} · {baseline.effort ?? "默认强度"}，对照此前 {baseline.runs}{" "}
+                次完整检测；样本差异不代表模型整体能力变化。
+              </p>
+              <dl className="grid grid-cols-2 gap-4">
+                <div>
+                  <dt>正确率差值</dt>
+                  <dd>{delta(baseline.accuracyDifference, " 个百分点")}</dd>
+                </div>
+                <div>
+                  <dt>输出速度差值</dt>
+                  <dd>{delta(baseline.speedPercent, "%")}</dd>
+                </div>
+                <div>
+                  <dt>平均推理消耗差值</dt>
+                  <dd>{delta(baseline.reasoningDifference, " tokens")}</dd>
+                </div>
+              </dl>
+            </div>
+          )}
           {tools && tools.history.length > 0 && (
             <details>
               <summary>最近 {tools.history.length} 条检测历史</summary>
@@ -209,7 +258,8 @@ export function UsageToolsPanel({ snapshot }: { snapshot: ModuleSnapshot }) {
                 {tools.history.map((entry) => (
                   <li key={entry.id}>
                     {new Date(entry.capturedAt).toLocaleString("zh-CN")} · {entry.model} ·{" "}
-                    {entry.effort ?? "默认"} · {entry.correct}/{entry.completed} 通过 ·{" "}
+                    {entry.effort ?? "默认"} · {entry.correct}/{entry.completed} 通过 · 平均推理{" "}
+                    {formatTokens(entry.averageReasoningTokens)} tokens ·{" "}
                     {entry.averageTokensPerSecond === null
                       ? "速度未知"
                       : `${entry.averageTokensPerSecond.toFixed(1)} tokens/s`}

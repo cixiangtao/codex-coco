@@ -67,6 +67,7 @@ export interface AppServerRequest {
     | "account/rateLimits/read"
     | "account/rateLimitResetCredit/consume"
     | "model/list"
+    | "config/read"
     | "account/usage/read";
   params?: Record<string, string | boolean | number>;
   expectedScope?: string;
@@ -194,14 +195,14 @@ export function createAppServerRequest(
               finish("INVALID_RESPONSE");
               continue;
             }
-            if (!account.data.account && request.method !== "model/list") {
+            if (!account.data.account && !["model/list", "config/read"].includes(request.method)) {
               finish("NOT_SIGNED_IN");
               continue;
             }
             if (
               account.data.account &&
               account.data.account.type !== "chatgpt" &&
-              request.method !== "model/list"
+              !["model/list", "config/read"].includes(request.method)
             ) {
               finish("UNSUPPORTED_ACCOUNT");
               continue;

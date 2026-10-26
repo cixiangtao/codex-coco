@@ -7,6 +7,12 @@ import { setTimeout as delay } from "node:timers/promises";
 import { createUsageToolsService } from "../apps/desktop/src/modules/usage/tools";
 import { createUsageModule } from "../apps/desktop/src/modules/usage/runtime";
 import { ModuleHost } from "../apps/desktop/src/application/module-host";
+import {
+  intelligenceBaseline,
+  intelligenceSummary,
+  intelligenceHistorySchema,
+} from "../apps/desktop/src/modules/usage/contract";
+import { randomUUID } from "node:crypto";
 import type { ModuleSnapshot } from "../apps/desktop/src/contracts/modules";
 const directories: string[] = [];
 const fixture = fileURLToPath(new URL("./fixtures/usage-tools.mjs", import.meta.url));
@@ -150,6 +156,87 @@ describe("explicit intelligence and CLI tools", () => {
     const restarted = createUsageToolsService(f.options);
     await restarted.execute("load-intelligence-history", {}, signal, () => undefined);
     expect(restarted.snapshot().history).toHaveLength(1);
+  });
+  it("reads only validated model defaults and sends them explicitly without importing the remaining configuration", async () => {
+    const f = await setup();
+    const signal = new AbortController().signal;
+    await f.service.execute("list-models", {}, signal, () => undefined);
+    expect(f.service.snapshot()).toMatchObject({
+      defaultsStatus: "ready",
+      defaults: { model: "controlled-model", effort: "high" },
+    });
+    expect(JSON.stringify(f.service.snapshot())).not.toMatch(/private|mcp_servers|secret|layers/);
+    await f.service.execute(
+      "run-intelligence",
+      { model: null, effort: null, runs: 1 },
+      signal,
+      () => undefined,
+    );
+    const commands = (await readFile(f.trace, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    const args = commands.find((entry) => entry.args.includes("exec")).args;
+    expect(args).toContain("controlled-model");
+    expect(args).toContain('model_reasoning_effort="high"');
+    expect(args).toContain("--ignore-user-config");
+    expect(f.service.snapshot().history[0]).toMatchObject({
+      model: "controlled-model",
+      effort: "high",
+      averageReasoningTokens: 16,
+    });
+    for (const mode of ["config-invalid", "config-unsupported"]) {
+      await writeFile(f.mode, mode);
+      await f.service.execute("list-models", {}, signal, () => undefined);
+      expect(f.service.snapshot()).toMatchObject({
+        defaultsStatus: "unavailable",
+        defaults: null,
+        error: null,
+      });
+      expect(f.service.snapshot().models).toHaveLength(2);
+      expect(JSON.stringify(f.service.snapshot())).not.toContain("--unsafe-option");
+    }
+  });
+
+  it("compares compatible complete history, migrates absent reasoning counts and leaves missing or zero baselines unknown", () => {
+    const entry = (patch = {}) =>
+      intelligenceHistorySchema.parse({
+        id: randomUUID(),
+        capturedAt: 123,
+        model: "controlled-model",
+        effort: "high",
+        requested: 2,
+        completed: 2,
+        correct: 2,
+        averageTokensPerSecond: 10,
+        ...patch,
+      });
+    const baseline = intelligenceBaseline([
+      entry({ correct: 1, averageTokensPerSecond: 15, averageReasoningTokens: 30 }),
+      entry({ model: "different-model", averageReasoningTokens: 999 }),
+      entry({ effort: "low", averageReasoningTokens: 999 }),
+      entry({ completed: 1, averageReasoningTokens: 999 }),
+      entry({ averageReasoningTokens: 20 }),
+      entry(),
+    ]);
+    expect(baseline).toMatchObject({
+      runs: 2,
+      reasoning: 20,
+      reasoningDifference: 10,
+      speedPercent: 50,
+      accuracyDifference: -50,
+    });
+    expect(intelligenceBaseline([entry({ completed: 1 }), entry()])).toBeNull();
+    expect(intelligenceBaseline([entry(), entry({ averageTokensPerSecond: 0 })])).toMatchObject({
+      reasoningDifference: null,
+      speedPercent: null,
+    });
+    expect(intelligenceSummary([])).toMatchObject({
+      completed: 0,
+      averageReasoningTokens: null,
+      averageTokensPerSecond: null,
+    });
+    expect(entry().averageReasoningTokens).toBeNull();
   });
   it("rejects malformed model catalogs without treating them as callable model arguments", async () => {
     const f = await setup();
