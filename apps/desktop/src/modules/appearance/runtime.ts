@@ -63,6 +63,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
       ].map((name) => [
         name,
         {
+          background: name === "sync" || name === "monitor",
           input: ["preview-image", "remove-image"].includes(name)
             ? assetInputSchema
             : emptyAppearanceInput,
@@ -122,12 +123,18 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
           ].includes(currentOperation)
         )
           connectionFailure = next.reason;
-        published = {
+        const nextPublished: AppearanceResult = {
           ...next,
           imported: null,
           preview: null,
           ...(connectionFailure ? { status: "error", reason: connectionFailure } : {}),
         };
+        // A successful maintenance heartbeat is not a new user-visible event.
+        if (published && ["sync", "monitor"].includes(currentOperation)) {
+          const unchanged = { ...nextPublished, checkedAt: published.checkedAt };
+          if (JSON.stringify(unchanged) === JSON.stringify(published)) return next;
+        }
+        published = nextPublished;
         return next;
       };
       const schedule = () => {
@@ -395,6 +402,11 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
       const parsed = appearanceResultSchema.safeParse(snapshot.state ?? snapshot.operation?.result);
       if (!parsed.success) return { description: "已启用，等待在主窗口连接并应用布景。" };
       const state = parsed.data;
+      if (
+        snapshot.operation?.phase === "failed" &&
+        ["sync", "monitor"].includes(snapshot.operation.name)
+      )
+        return { phase: "error", description: "布景维护未完成，请在主窗口检查连接后重试。" };
       const busy =
         snapshot.operation?.phase === "running" || snapshot.operation?.phase === "cancelling";
       const saved = appearanceConfigSchema.safeParse(snapshot.config.value);
@@ -429,7 +441,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             : state.status === "error"
               ? appearanceFailures[state.reason!]
               : state.active
-                ? `布景已应用，持续同步 ${state.targets} 个窗口。`
+                ? `布景已应用到 ${state.targets} 个窗口。`
                 : state.connection === "needs-restart"
                   ? "Codex 正在运行，尚未开启布景连接。重启后自动应用已保存布景。"
                   : state.connection === "stopped"

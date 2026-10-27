@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 import { AppearanceQuickActions } from "../apps/desktop/src/application/appearance-quick-actions";
 import type { GlanceDetail } from "../apps/desktop/src/contracts/glance";
 import type { ModuleSnapshot } from "../apps/desktop/src/contracts/modules";
+import type { ModuleHost } from "../apps/desktop/src/application/module-host";
 
 function fixture() {
   const snapshot: ModuleSnapshot = {
@@ -16,11 +17,14 @@ function fixture() {
     operation: null,
   };
   const detail: GlanceDetail = { description: "公开提示", appearanceAction: "restart" };
-  const run = vi.fn(() => snapshot);
+  const run = vi.fn<ModuleHost["runInteractive"]>(async (_input, _id, beforeRun) => {
+    beforeRun?.();
+    return snapshot;
+  });
   const gateway = new AppearanceQuickActions({
     snapshots: () => [snapshot],
     glanceDetails: () => new Map([["appearance", detail]]),
-    run,
+    runInteractive: run,
   });
   return { gateway, snapshot, detail, run };
 }
@@ -40,6 +44,7 @@ it("restricts glance to a current public action and returns no module result", a
   expect(run).toHaveBeenCalledWith(
     { moduleId: "appearance", operation: "restart-application", input: {} },
     undefined,
+    expect.any(Function),
   );
   detail.appearanceAction = "launch";
   consent.mockClear();
@@ -73,5 +78,17 @@ it("cancellation and changes during confirmation never restart; concurrent submi
   snapshot.phase = "disabled";
   await expect(gateway.execute({ action: "restart" }, async () => true)).rejects.toThrow("启用");
   expect(run).not.toHaveBeenCalled();
+  expect(gateway.busy).toBe(false);
+});
+it("revalidates the public action after waiting for maintenance", async () => {
+  const { gateway, run, snapshot } = fixture();
+  run.mockImplementationOnce(async (_input, _id, beforeRun) => {
+    snapshot.revision++;
+    beforeRun?.();
+    return snapshot;
+  });
+  await expect(gateway.execute({ action: "restart" }, async () => true)).rejects.toThrow(
+    "确认期间",
+  );
   expect(gateway.busy).toBe(false);
 });

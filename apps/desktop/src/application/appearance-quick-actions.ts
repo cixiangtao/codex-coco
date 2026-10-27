@@ -4,7 +4,9 @@ import { ModuleError, type ModuleHost } from "./module-host";
 /** A narrow glance capability: no paths, arbitrary operations, configuration or private results. */
 export class AppearanceQuickActions {
   busy = false;
-  constructor(private readonly host: Pick<ModuleHost, "snapshots" | "glanceDetails" | "run">) {}
+  constructor(
+    private readonly host: Pick<ModuleHost, "snapshots" | "glanceDetails" | "runInteractive">,
+  ) {}
 
   async execute(input: unknown, confirmRestart: () => Promise<boolean>, correlationId?: string) {
     const parsed = appearanceQuickActionSchema.safeParse(input);
@@ -26,16 +28,20 @@ export class AppearanceQuickActions {
     try {
       if (action === "restart" && !(await confirmRestart()))
         return { outcome: "cancelled" as const };
-      const after = check();
-      if (revision !== after.revision || generation !== after.generation)
-        throw new ModuleError("CONFLICT", "确认期间设置或状态已变化，请重新操作。");
-      this.host.run(
+      const recheck = () => {
+        const after = check();
+        if (revision !== after.revision || generation !== after.generation)
+          throw new ModuleError("CONFLICT", "确认期间设置或状态已变化，请重新操作。");
+      };
+      recheck();
+      await this.host.runInteractive(
         {
           moduleId: "appearance",
           operation: action === "apply" ? "apply" : `${action}-application`,
           input: {},
         },
         correlationId,
+        recheck,
       );
       return { outcome: "started" as const };
     } finally {

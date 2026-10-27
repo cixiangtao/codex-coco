@@ -23,6 +23,8 @@ export interface OperationDefinition {
   input: z.ZodType<JsonValue>;
   output: z.ZodType<JsonValue>;
   timeoutMs: number;
+  /** Scheduled maintenance publishes domain changes, not task progress. Explicit calls stay visible. */
+  background?: boolean;
 }
 export interface OperationContext {
   signal: AbortSignal;
@@ -62,6 +64,7 @@ export class ModuleError extends Error {
   }
 }
 interface Task {
+  background: boolean;
   snapshot: ModuleOperationSnapshot;
   controller: AbortController;
   pending: Promise<void>;
@@ -79,6 +82,10 @@ interface Entry {
   control: Promise<unknown>;
   runtime?: ModuleRuntime;
   task?: Task;
+  visibleOperation?: ModuleOperationSnapshot;
+  maintenanceFailure?: ModuleOperationSnapshot;
+  interactivePending?: boolean;
+  publishedContent?: string;
   observedPhase: string;
   observedGeneration: number;
   phaseStartedAt: number;
@@ -125,7 +132,7 @@ export class ModuleHost {
             requestOperation: (name, input) => {
               if (signal.aborted || this.closed) return false;
               try {
-                this.run({ moduleId: definition.id, operation: name, input });
+                this.runScheduled({ moduleId: definition.id, operation: name, input });
                 return true;
               } catch {
                 return false;
@@ -206,7 +213,7 @@ export class ModuleHost {
       revision: entry.revision,
       config: entry.config.snapshot(),
       operations: Object.keys(entry.definition.operations),
-      operation: entry.task?.snapshot ?? null,
+      operation: entry.maintenanceFailure ?? entry.visibleOperation ?? null,
       ...(state === undefined ? {} : { state }),
     });
   }
@@ -232,7 +239,11 @@ export class ModuleHost {
       this.listeners.delete(listener);
     };
   }
-  private publish(entry: Entry) {
+  private publish(entry: Entry, onlyIfChanged = false) {
+    const { revision: _revision, ...content } = this.snapshot(entry);
+    const serialized = JSON.stringify(content);
+    if (onlyIfChanged && entry.publishedContent === serialized) return;
+    entry.publishedContent = serialized;
     entry.revision++;
     for (const listener of this.listeners) listener(this.snapshot(entry));
   }
@@ -319,6 +330,44 @@ export class ModuleHost {
   }
   /** Starts one operation per module; other modules and configuration writes remain independent. */
   run(input: unknown, correlationId: string = randomUUID()) {
+    return this.startOperation(input, correlationId, false);
+  }
+  /** Only statically opted-in maintenance is quiet; ordinary automatic work retains feedback. */
+  runScheduled(input: unknown) {
+    return this.startOperation(input, randomUUID(), true);
+  }
+  /** A user action waits for owned maintenance to settle without cancelling the applied scene. */
+  async runInteractive(input: unknown, correlationId?: string, beforeRun?: () => void) {
+    this.assertOpen();
+    const request = this.parse(runModuleOperationSchema, input);
+    const entry = this.get(request.moduleId);
+    if (entry.interactivePending) throw new ModuleError("MODULE_BUSY", "模块有尚未结束的任务。");
+    const task = entry.task;
+    if (task?.background && !task.settled) {
+      const runtime = entry.runtime;
+      entry.interactivePending = true;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          task.pending,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new ModuleError("MODULE_BUSY", "后台维护尚未结束，请稍后重试。")),
+              entry.definition.operations[task.snapshot.name]!.timeoutMs + this.timeoutMs,
+            );
+          }),
+        ]);
+        if (entry.runtime !== runtime)
+          throw new ModuleError("MODULE_UNAVAILABLE", "模块状态已变化，请重新操作。");
+      } finally {
+        clearTimeout(timer);
+        entry.interactivePending = false;
+      }
+    }
+    beforeRun?.();
+    return this.run(request, correlationId);
+  }
+  private startOperation(input: unknown, correlationId: string, scheduled: boolean) {
     this.assertOpen();
     const request = this.parse(runModuleOperationSchema, input);
     const entry = this.get(request.moduleId);
@@ -331,9 +380,10 @@ export class ModuleHost {
     const runtime = entry.runtime;
     if (status.phase !== "running" || !entry.desired || !runtime)
       throw new ModuleError("MODULE_UNAVAILABLE", "请先启用模块。");
-    if (entry.task && !entry.task.settled)
+    if (entry.interactivePending || (entry.task && !entry.task.settled))
       throw new ModuleError("MODULE_BUSY", "模块有尚未结束的任务。");
     const task: Task = {
+      background: scheduled && operation.background === true,
       snapshot: {
         id: z.uuid().parse(correlationId),
         name: request.operation,
@@ -350,6 +400,10 @@ export class ModuleHost {
       startedAt: performance.now(),
     };
     entry.task = task;
+    if (!task.background) {
+      entry.visibleOperation = task.snapshot;
+      delete entry.maintenanceFailure;
+    }
     this.diagnostics.record({
       event: "task.start",
       moduleId: request.moduleId,
@@ -373,7 +427,7 @@ export class ModuleHost {
                 return;
               if (!Number.isFinite(progress) || progress < 0 || progress > 100) return;
               task.snapshot.progress = progress;
-              this.publish(entry);
+              this.publish(entry, task.background);
             },
           }),
         );
@@ -386,7 +440,7 @@ export class ModuleHost {
       () => this.abortTask(entry, task, "TASK_TIMEOUT"),
       operation.timeoutMs,
     );
-    this.publish(entry);
+    this.publish(entry, task.background);
     return this.snapshot(entry);
   }
   cancel(input: unknown) {
@@ -417,6 +471,8 @@ export class ModuleHost {
       if (task.settled) return;
       task.snapshot.phase = "failed";
       task.snapshot.error = "TASK_UNRESPONSIVE";
+      if (task.background) entry.maintenanceFailure = task.snapshot;
+      else entry.visibleOperation = task.snapshot;
       this.diagnostics.record({
         event: "task.unresponsive",
         moduleId: entry.definition.id,
@@ -430,7 +486,7 @@ export class ModuleHost {
       this.publish(entry);
       void this.manager.disable(entry.definition.id).catch(() => undefined);
     }, this.timeoutMs);
-    this.publish(entry);
+    this.publish(entry, task.background);
   }
   private finish(entry: Entry, task: Task, result: JsonValue, failed: boolean) {
     task.settled = true;
@@ -454,6 +510,11 @@ export class ModuleHost {
         : null;
     task.snapshot.result = cancelled || failed ? null : result;
     if (task.snapshot.phase === "succeeded") task.snapshot.progress = 100;
+    // Unexpected task failures remain recoverable even when maintenance normally stays quiet.
+    if (task.background) {
+      if (task.snapshot.error) entry.maintenanceFailure = task.snapshot;
+      else delete entry.maintenanceFailure;
+    }
     this.diagnostics.record({
       event: "task.finish",
       moduleId: entry.definition.id,
@@ -464,7 +525,7 @@ export class ModuleHost {
       ...(task.snapshot.error ? { errorCode: task.snapshot.error } : {}),
       durationMs: performance.now() - task.startedAt,
     });
-    this.publish(entry);
+    this.publish(entry, task.background);
   }
   /** Rejects new work first, cancels tasks, then drains short config/control queues and cleanup. */
   async shutdown() {

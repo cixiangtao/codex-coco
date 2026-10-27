@@ -178,7 +178,7 @@ function probeAppearance() {
     return;
   lastAppearanceProbe = Date.now();
   try {
-    modules.run({ moduleId: "appearance", operation: "monitor", input: {} });
+    modules.runScheduled({ moduleId: "appearance", operation: "monitor", input: {} });
   } catch {
     /* A concurrent task owns the module. */
   }
@@ -500,7 +500,9 @@ function registerIpc() {
   handle(channels.enableModule, (input) => modules.setEnabled(input));
   handle(channels.saveModuleConfig, (input) => modules.saveConfig(input));
   handle(channels.resetModuleConfig, (input) => modules.resetConfig(input));
-  handle(channels.runModuleOperation, (input, correlationId) => modules.run(input, correlationId));
+  handle(channels.runModuleOperation, (input, correlationId) =>
+    modules.runInteractive(input, correlationId),
+  );
   handle(channels.cancelModuleOperation, (input) => modules.cancel(input));
   modules.subscribe((snapshot) => {
     updateGlance();

@@ -449,3 +449,11 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - 已查看 `work/usage-tools-verification/samples.png`、`sample-settings-compact.png` 和 `work/appearance-verification/editor-light.png`。全部使用临时数据/受控 CLI 或临时目标，未读取真实账号用量、发起真实推理/兑换、升级真实 CLI、修改真实登录项、重启或注入正在聊天的 Codex。签名、公证、发布、真实更新安装与 Widget App Group 注册不在本地验收结果内。
 
 额外的打包版 `verify-ui-instruments --packaged` 与 `verify-appearance-launcher --packaged` 均通过，补齐界面、草稿与速览同步，以及原生启动/确认取消/快捷启动自动应用验证；本轮共完成 16 组打包版回归。
+
+## 外观后台维护静默化（2026-10-27）
+
+- 外观调度的 `sync` / `monitor` 不再占用前台操作状态；无领域状态变化时保留时间和上次操作结果，不推送新快照。主窗口和速览稳定显示已应用，真实连接、窗口数量、错误与恢复变化仍发布。用户操作等待当前维护实际结束，等待期间阻止新的调度抢占；停用、退出与速览 revision 变化仍阻止过时操作。
+- `pnpm run check` 通过：25 个文件、205 项测试、格式、Oxlint、124 个源文件依赖边界、分进程类型检查及生产构建。合同测试覆盖无变化零事件、真实变化发布、显式任务仍可见、未 opt-in 的定时任务保持原反馈、等待串行、停用拒绝、快捷动作重新校验以及意外异常脱敏与恢复。
+- 生产入口 `node scripts/verify-appearance.mjs` 通过。连续观察至少两轮真实 CDP 巡检，外观前台事件与保存栏 DOM 变化均为 0，保存并应用按钮保持可用；受控目标失效时显示异常，恢复后回到已应用，新窗口数量正常更新。原有三层像素、草稿、重载、撤销、停用、退出清理和 opt-in 恢复仍通过。已查看 `work/appearance-verification/quiet-maintenance.png`。
+- 生产入口 `verify-appearance-launcher`、`verify-modules`、`verify-menu-bar` 均通过，覆盖快捷启动/重启确认取消、操作完成反馈、跨窗口、模块退出、损坏恢复与菜单栏只读权限。启动回归首次因旧“持续同步”文案断言超时，更新为“已应用到”后整组重跑通过，未放宽业务断言。
+- 全部使用临时数据及受控 Electron 目标，没有操作真实 Codex；本轮未重新打包、替换安装版或发布。

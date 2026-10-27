@@ -155,9 +155,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
           setMessage(appearanceFailures[result.data.reason!]);
         else if (operation === "apply")
           setMessage(
-            result.data.active
-              ? "已应用当前布景，并开始同步窗口。"
-              : "所有图层已关闭，当前没有布景需要应用。",
+            result.data.active ? "已应用当前布景。" : "所有图层已关闭，当前没有布景需要应用。",
           );
         else if (operation === "remove") setMessage("布景已撤销。");
         else if (operation === "verify") setMessage("布景验证通过。");
@@ -244,7 +242,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
         </div>
         <PinBlockButton id="appearance.status" />
         <Badge tone={dirty ? "warning" : result?.active ? "success" : "neutral"}>
-          {dirty ? "有未保存修改" : result?.active ? "同步中" : enabled ? "未应用布景" : "已停用"}
+          {dirty ? "有未保存修改" : result?.active ? "已应用" : enabled ? "未应用布景" : "已停用"}
         </Badge>
       </header>
       {message && <output aria-live="polite">{message}</output>}
@@ -435,7 +433,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
           {busy
             ? "正在处理布景…"
             : result?.active
-              ? `正在同步 ${result.targets} 个 Codex 窗口，停用模块或退出时撤销。`
+              ? `已应用到 ${result.targets} 个 Codex 窗口，停用模块或退出时撤销。`
               : result?.targets
                 ? `已识别 ${result.targets} 个 Codex 窗口。`
                 : "保存配置后，点击应用才会修改目标窗口。"}

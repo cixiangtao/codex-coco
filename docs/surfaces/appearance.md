@@ -11,3 +11,7 @@ Card 提供统一标题、说明、表面与圆角，Box 管理布局。底部�
 验收：980×800、720×640、明暗主题、编辑/图库/连接各标签、空图库、图片选择与导入、三层切换及参数保持、预览键盘与拖动、放弃草稿、仅保存不应用、明确重启取消、错误恢复、三层目标像素与退出清理。仅操作临时 Electron 目标，不操作真实 Codex。
 
 启动/重启明确操作自动接续应用与验证已保存布景，页面顶部和速览根据连接状态提供恢复入口。启动反馈区分已连接与布景已应用；所有图层关闭时不宣称应用成功。
+
+2026-10-27：后台布景维护和连接监测保持静默。无变化的巡检不发布新的前台快照，不刷新状态时间、不切换处理中、不禁用表单，也不覆盖上一次明确操作的反馈；页面稳定显示“已应用”。窗口数量、连接、失败或恢复变化时仍立即发布。用户操作遇到维护任务时等待它实际结束，避免并发与周期性“模块忙”；等待后重新核对模块生命周期，速览快捷动作还要重新核对公开状态与 revision。
+
+参考核对：Codex Dream Skin 的固定提交 `6fc42df48a6a5365011f55cc349e20c038e56d1d` 中，[macOS README](https://github.com/Fei-Away/Codex-Dream-Skin/blob/6fc42df48a6a5365011f55cc349e20c038e56d1d/macos/README.md) 说明持续维护跨重载；[injector.mjs](https://github.com/Fei-Away/Codex-Dream-Skin/blob/6fc42df48a6a5365011f55cc349e20c038e56d1d/macos/scripts/injector.mjs) 将 watcher 与带 token 的操作状态反馈分别处理；[injector-bootstrap.test.mjs](https://github.com/Fei-Away/Codex-Dream-Skin/blob/6fc42df48a6a5365011f55cc349e20c038e56d1d/macos/tests/injector-bootstrap.test.mjs) 约束成功安装后不重复执行完整注入。这里只核对维护与操作反馈的边界；Codex Coco 独立实现宿主静默任务和状态去重，未复制上游代码，也未改变自身三秒验证与失败退避策略。

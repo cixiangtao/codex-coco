@@ -41,6 +41,7 @@ export interface ModuleSnapshot {
   error: string | null;
   config: ModuleConfigSnapshot;
   operations: string[];
+  /** Latest visible task; unchanged scheduled maintenance preserves it, failures remain visible. */
   operation: ModuleOperationSnapshot | null;
   /** Validated public domain state, independent of the most recent task's outcome. */
   state?: JsonValue;

@@ -163,6 +163,36 @@ describe("appearance lifecycle", () => {
     expect(f.connection.remove.mock.calls.at(-1)?.[0]).toBe(9229);
     await f.host.shutdown();
   });
+  it("keeps maintenance timestamps stable until window count, failure or recovery changes", async () => {
+    const f = await setup();
+    try {
+      const imported = appearanceResultSchema.parse(await f.execute("import-image"));
+      f.config.main = { ...f.config.main, enabled: true, image: imported.imported };
+      await f.execute("apply");
+      const before = f.runtime.state?.();
+      vi.useFakeTimers();
+      await vi.advanceTimersByTimeAsync(3000);
+      await f.execute("sync");
+      expect(f.runtime.state?.()).toEqual(before);
+      f.connection.verify.mockResolvedValue(3);
+      await f.execute("sync");
+      expect(f.runtime.state?.()).toMatchObject({ active: true, targets: 3 });
+      expect(f.runtime.state?.()).not.toEqual(before);
+      f.connection.verify.mockRejectedValueOnce(new Error("NOT_CONNECTED"));
+      f.connection.apply.mockRejectedValueOnce(new Error("NOT_CONNECTED"));
+      await f.execute("sync");
+      expect(f.runtime.state?.()).toMatchObject({
+        active: false,
+        status: "error",
+        reason: "NOT_CONNECTED",
+      });
+      await f.execute("sync");
+      expect(f.runtime.state?.()).toMatchObject({ active: true, status: "ready", reason: null });
+    } finally {
+      await f.runtime.stop();
+      await f.host.shutdown();
+    }
+  });
   it("honors a changed fixed port after discovery while keeping synchronization on the owned port", async () => {
     const f = await setup();
     try {

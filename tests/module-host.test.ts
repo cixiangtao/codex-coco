@@ -50,6 +50,148 @@ afterEach(async () => {
 });
 
 describe("module operation loop", () => {
+  async function maintenanceFixture() {
+    const createGate = () => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((done) => {
+        resolve = done;
+      });
+      return { promise, resolve };
+    };
+    const definition = createFoundationFixture("one");
+    definition.operations = {
+      ...definition.operations,
+      maintain: { ...definition.operations.count!, background: true },
+    };
+    definition.state = fixtureResultSchema;
+    let state = { label: "public", completed: 1 };
+    let gate = createGate();
+    let maintenanceDone = false;
+    let fail = false;
+    let interactiveCalls = 0;
+    definition.start = async () => ({
+      state: () => state,
+      execute: async (name, _input, context) => {
+        if (name === "maintain") {
+          context.report(50);
+          await gate.promise;
+          maintenanceDone = true;
+          if (fail) throw new Error("PRIVATE_MAINTENANCE_ERROR");
+        } else interactiveCalls++;
+        return state;
+      },
+      stop: async () => {
+        gate.resolve();
+      },
+    });
+    const { host } = await fixture([definition]);
+    await enable(host);
+    run(host);
+    await finished(host);
+    return {
+      host,
+      start: () => {
+        gate = createGate();
+        maintenanceDone = false;
+        host.runScheduled({ moduleId: "one", operation: "maintain", input: { steps: 1 } });
+      },
+      release: () => gate.resolve(),
+      change: () => {
+        state = { ...state, completed: state.completed + 1 };
+      },
+      done: () => maintenanceDone,
+      fail: (value: boolean) => {
+        fail = value;
+      },
+      calls: () => interactiveCalls,
+    };
+  }
+  it("keeps scheduled maintenance progress and unchanged results out of public snapshots", async () => {
+    const f = await maintenanceFixture();
+    const before = snapshot(f.host);
+    const updates: ModuleSnapshot[] = [];
+    f.host.subscribe((value) => updates.push(value));
+    f.start();
+    await Promise.resolve();
+    expect(snapshot(f.host)).toEqual(before);
+    expect(() => run(f.host)).toThrow("尚未结束");
+    f.release();
+    await expect.poll(f.done).toBe(true);
+    expect(updates).toEqual([]);
+    expect(snapshot(f.host)).toEqual(before);
+    f.start();
+    f.change();
+    f.release();
+    await expect.poll(() => updates.length).toBe(1);
+    expect(updates[0]?.state).toEqual({ label: "public", completed: 2 });
+    expect(updates[0]?.operation).toEqual(before.operation);
+    const explicit = f.host.run({ moduleId: "one", operation: "maintain", input: { steps: 1 } });
+    expect(explicit.operation).toMatchObject({ name: "maintain", phase: "running" });
+    await finished(f.host);
+    const ordinary = f.host.runScheduled({
+      moduleId: "one",
+      operation: "count",
+      input: { steps: 1 },
+    });
+    expect(ordinary.operation).toMatchObject({ name: "count", phase: "running" });
+    await finished(f.host);
+  });
+  it("reserves one user action behind maintenance and rechecks state before dispatch", async () => {
+    const f = await maintenanceFixture();
+    f.start();
+    let checked = false;
+    const input = { moduleId: "one", operation: "count", input: { steps: 1 } };
+    const pending = f.host.runInteractive(input, undefined, () => {
+      checked = true;
+    });
+    await expect(f.host.runInteractive(input)).rejects.toThrow("尚未结束");
+    expect(f.calls()).toBe(1);
+    expect(checked).toBe(false);
+    f.release();
+    expect((await pending).operation).toMatchObject({ name: "count", phase: "running" });
+    await finished(f.host);
+    expect(checked).toBe(true);
+    expect(f.calls()).toBe(2);
+    f.start();
+    const stale = f.host.runInteractive(input, undefined, () => {
+      throw new Error("STALE");
+    });
+    const rejected = expect(stale).rejects.toThrow("STALE");
+    f.release();
+    await rejected;
+    expect(f.calls()).toBe(2);
+  });
+  it("publishes redacted maintenance failures and restores the last user result after recovery", async () => {
+    const f = await maintenanceFixture();
+    const before = snapshot(f.host).operation;
+    f.fail(true);
+    f.start();
+    f.release();
+    await expect.poll(() => snapshot(f.host).operation?.phase).toBe("failed");
+    expect(snapshot(f.host).operation).toMatchObject({
+      name: "maintain",
+      error: "TASK_FAILED",
+      result: null,
+    });
+    expect(JSON.stringify(snapshot(f.host))).not.toContain("PRIVATE");
+    f.fail(false);
+    f.start();
+    f.release();
+    await expect.poll(() => snapshot(f.host).operation).toEqual(before);
+  });
+  it("does not dispatch a waiting user action after maintenance is stopped", async () => {
+    const f = await maintenanceFixture();
+    f.start();
+    const pending = f.host.runInteractive({
+      moduleId: "one",
+      operation: "count",
+      input: { steps: 1 },
+    });
+    const rejected = expect(pending).rejects.toMatchObject({ code: "MODULE_UNAVAILABLE" });
+    await f.host.setEnabled({ moduleId: "one", enabled: false });
+    await rejected;
+    expect(f.calls()).toBe(1);
+  });
   it("validates and bounds opt-in domain state without disrupting other module reads", async () => {
     let state: JsonValue = { label: "public", completed: 1 };
     const definition = createFoundationFixture("one");

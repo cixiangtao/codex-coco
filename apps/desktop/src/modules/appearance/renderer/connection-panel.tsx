@@ -138,7 +138,7 @@ export function AppearanceConnectionPanel({
                     ? "正在等待 Codex 主窗口就绪，随后自动应用并验证已保存布景。"
                     : launchFeedback.phase === "ready"
                       ? launchFeedback.applied
-                        ? "已保存布景已应用，正在持续同步窗口。"
+                        ? "已应用保存的布景。"
                         : "已保存设置中的所有图层均已关闭，无需应用布景。"
                       : launchFeedback.phase === "cancelled"
                         ? "已停止后续操作；已经启动的 Codex 会保留，可以检查连接后继续。"

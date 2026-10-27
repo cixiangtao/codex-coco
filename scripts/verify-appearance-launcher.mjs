@@ -406,7 +406,7 @@ try {
     null,
     { timeout: 40_000 },
   );
-  await popup.getByText("布景已应用，持续同步 1 个窗口。", { exact: true }).waitFor();
+  await popup.getByText("布景已应用到 1 个窗口。", { exact: true }).waitFor();
   // Launching the target can move native focus and close the panel. Reopen it for visual evidence.
   await application.browserWindow(popup).then((win) =>
     win.evaluate((win) => {

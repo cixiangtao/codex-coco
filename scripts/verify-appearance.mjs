@@ -90,6 +90,82 @@ async function configure(page, update) {
   assert.equal(result.status, "ready", JSON.stringify(result));
   return result;
 }
+async function verifyQuietMaintenance(page, targetPage) {
+  await page.getByAltText("主面板插画图片预览", { exact: true }).waitFor();
+  await page.waitForFunction(async () => {
+    const snapshot = (await window.codexCoco.modules()).value.find((m) => m.id === "appearance");
+    return !["running", "cancelling"].includes(snapshot.operation?.phase);
+  });
+  await targetPage.evaluate(() => {
+    const original = document.getElementById.bind(document);
+    window.maintenanceChecks = 0;
+    document.getElementById = (id) => {
+      if (id === "codex-coco-appearance") window.maintenanceChecks++;
+      return original(id);
+    };
+    window.restoreLookup = () => {
+      document.getElementById = original;
+    };
+  });
+  await page.evaluate(() => {
+    const footer = document.querySelector(".appearance-save-bar");
+    window.maintenanceEvents = 0;
+    window.maintenanceMutations = 0;
+    window.stopMaintenanceEvents = window.codexCoco.onModuleChanged((snapshot) => {
+      if (snapshot.id === "appearance") window.maintenanceEvents++;
+    });
+    window.maintenanceObserver = new MutationObserver((records) => {
+      window.maintenanceMutations += records.length;
+    });
+    window.maintenanceObserver.observe(footer, {
+      subtree: true,
+      attributes: true,
+      childList: true,
+      characterData: true,
+    });
+  });
+  // Observe at least two real scheduled CDP checks, not just a static screenshot between them.
+  await targetPage.waitForFunction(() => window.maintenanceChecks >= 2, undefined, {
+    timeout: 12000,
+  });
+  await delay(150);
+  const quiet = await page.evaluate(() => {
+    window.stopMaintenanceEvents();
+    window.maintenanceObserver.disconnect();
+    return { events: window.maintenanceEvents, mutations: window.maintenanceMutations };
+  });
+  await targetPage.evaluate(() => window.restoreLookup());
+  assert.deepEqual(quiet, { events: 0, mutations: 0 });
+  assert.equal(
+    await page.getByRole("button", { name: "保存并应用布景", exact: true }).isEnabled(),
+    true,
+  );
+  await page
+    .getByText("已应用到 1 个 Codex 窗口，停用模块或退出时撤销。", { exact: true })
+    .waitFor();
+  await page.screenshot({ path: join(output, "quiet-maintenance.png"), scale: "css" });
+  // Genuine maintenance failures and recovery must still reach the page.
+  await targetPage.evaluate(() => {
+    delete document.documentElement.dataset.codexWindowType;
+  });
+  await page.waitForFunction(
+    async () => {
+      const state = (await window.codexCoco.modules()).value.find(
+        (m) => m.id === "appearance",
+      ).state;
+      return state.status === "error" && !state.active;
+    },
+    undefined,
+    { timeout: 10000 },
+  );
+  await page.getByText("布景应用未完成，请检查连接后重试或撤销。", { exact: true }).waitFor();
+  await targetPage.evaluate(() => {
+    document.documentElement.dataset.codexWindowType = "electron";
+  });
+  await page
+    .getByText("已应用到 1 个 Codex 窗口，停用模块或退出时撤销。", { exact: true })
+    .waitFor({ timeout: 15000 });
+}
 async function verifyEditorUi(page, application, targetPage) {
   const capture = async (name) => {
     await page.locator(".desktop-content").evaluate((node) => {
@@ -437,6 +513,7 @@ try {
   assert.equal((await operation(page, "inspect")).targets, 1);
   assert.equal((await operation(page, "apply")).active, true);
   assert.equal((await operation(page, "verify")).targets, 1);
+  await verifyQuietMaintenance(page, targetPage);
   assert.equal(await targetPage.locator("#codex-coco-appearance").count(), 1);
   const pointer = await targetPage
     .locator('[data-codex-coco-surface="main"]')
@@ -464,6 +541,9 @@ try {
   });
   const second = await nextEvent;
   await second.locator("#codex-coco-appearance").waitFor({ state: "attached", timeout: 8000 });
+  await page
+    .getByText("已应用到 2 个 Codex 窗口，停用模块或退出时撤销。", { exact: true })
+    .waitFor();
   await page.getByRole("region", { name: "布景交互预览", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({
     path: join(output, "settings.png"),
@@ -564,6 +644,8 @@ try {
         pointerPositioning: true,
         namedPresets: true,
         computedStyleVerification: true,
+        quietMaintenance: true,
+        maintenanceFailureAndRecovery: true,
         optInRestartRestoration: true,
         reload: true,
         newWindow: true,

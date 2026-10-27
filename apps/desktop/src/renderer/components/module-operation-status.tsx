@@ -11,6 +11,8 @@ const labels: Record<string, string> = {
   remove: "撤销布景",
   verify: "验证布景",
   inspect: "检查连接",
+  sync: "维护布景",
+  monitor: "检查布景连接",
   "import-image": "导入图片",
   "choose-application": "选择应用",
   "list-models": "读取模型目录",
