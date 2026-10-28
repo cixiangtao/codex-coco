@@ -1,6 +1,6 @@
 {
   "name": "@codex-coco/desktop",
-  "version": "0.1.0-dev.1",
+  "version": "0.1.0-preview.1",
   "private": true,
   "description": "Codex Coco desktop host and application.",
   "homepage": "https://github.com/cixiangtao/codex-coco#readme",

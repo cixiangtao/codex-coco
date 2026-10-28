@@ -1,6 +1,6 @@
 {
   "name": "codex-coco",
-  "version": "0.1.0-dev.1",
+  "version": "0.1.0-preview.1",
   "private": true,
   "description": "A macOS desktop companion for Codex usage, appearance, and menu bar workflows.",
   "homepage": "https://github.com/cixiangtao/codex-coco#readme",
