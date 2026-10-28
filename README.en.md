@@ -4,7 +4,7 @@ A Codex desktop companion, shaped around personal workflows.
 
 [中文](README.md)
 
-**Status: local development build with phase-two core features implemented.** This remains a local-only repository. There is no public release, update feed, code signing or notarization. UI refinement follows core functionality. Controlled tests do not substitute for real-account, current-Codex, signed-update or Widget registration acceptance; see the [phase-two checklist](docs/phase-two.md).
+**Status: local development build with phase-two core features implemented.** The source is public on GitHub. There is no official binary release, update feed, code signing or notarization. UI refinement follows core functionality. Controlled tests do not substitute for real-account, current-Codex, signed-update or Widget registration acceptance; see the [phase-two checklist](docs/phase-two.md).
 
 ## Features
 
@@ -17,6 +17,10 @@ A Codex desktop companion, shaped around personal workflows.
 - WidgetKit: native extension source and shared-state contract, typechecked but not signed or registered.
 - Application updates: version checks, confirmed download/checksum validation, cancellation and explicit native installation/relaunch. Unsigned builds reject replacement; no feed is configured by default.
 
+## Contributing and support
+
+Report bugs and propose improvements in [GitHub Issues](https://github.com/cixiangtao/codex-coco/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) for development requirements and [SECURITY.md](SECURITY.md) for private vulnerability reports. The Chinese README is the primary entry point; this English companion covers core features, development and data boundaries.
+
 ## Development
 
 Use Node.js 24 and pnpm 12.14.0.
@@ -28,7 +32,7 @@ pnpm run check
 pnpm run verify:packaged
 ```
 
-`check` runs Oxfmt, Oxlint, Oxc AST dependency checks, process-specific TypeScript checks, contract tests and production builds. `verify:packaged` builds a local unsigned macOS arm64 directory and runs eleven controlled desktop workflows. `pnpm run pack` never publishes; keep `run` to avoid pnpm's npm-package command.
+`check` runs Oxfmt, Oxlint, Oxc AST dependency checks, process-specific TypeScript checks, contract tests and production builds. `verify:packaged` builds a local unsigned macOS arm64 directory and runs the controlled desktop workflows listed in package.json. `pnpm run pack` never publishes; keep `run` to avoid pnpm's npm-package command.
 
 Optional `verify:appearance-launcher` and `verify:widget` require an existing Swift compiler and macOS SDK; they do not install a toolchain. See package.json for individual desktop and usage verification commands. Run production files using `pnpm run build` followed by `pnpm run start`.
 

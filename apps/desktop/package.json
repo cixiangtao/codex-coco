@@ -3,8 +3,17 @@
   "version": "0.1.0-dev.1",
   "private": true,
   "description": "Codex Coco 桌面宿主与应用基础。",
+  "homepage": "https://github.com/cixiangtao/codex-coco#readme",
+  "bugs": {
+    "url": "https://github.com/cixiangtao/codex-coco/issues"
+  },
   "license": "MIT",
   "author": "cixiangtao",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cixiangtao/codex-coco.git",
+    "directory": "apps/desktop"
+  },
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {

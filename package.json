@@ -3,8 +3,16 @@
   "version": "0.1.0-dev.1",
   "private": true,
   "description": "一个按自己习惯打磨的 Codex 桌面伴侣。",
+  "homepage": "https://github.com/cixiangtao/codex-coco#readme",
+  "bugs": {
+    "url": "https://github.com/cixiangtao/codex-coco/issues"
+  },
   "license": "MIT",
   "author": "cixiangtao",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cixiangtao/codex-coco.git"
+  },
   "type": "module",
   "scripts": {
     "format": "oxfmt --write .",

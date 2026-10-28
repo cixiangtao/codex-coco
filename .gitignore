@@ -6,3 +6,11 @@ coverage/
 .DS_Store
 *.log
 work/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision

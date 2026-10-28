@@ -3,7 +3,16 @@
   "version": "0.1.0-dev.1",
   "private": true,
   "description": "Codex Coco 自有组件、语义变量与受控主题能力。",
+  "homepage": "https://github.com/cixiangtao/codex-coco#readme",
+  "bugs": {
+    "url": "https://github.com/cixiangtao/codex-coco/issues"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cixiangtao/codex-coco.git",
+    "directory": "packages/ui"
+  },
   "type": "module",
   "exports": {
     "./components/*": "./src/components/*.tsx",

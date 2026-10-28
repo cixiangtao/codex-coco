@@ -6,7 +6,7 @@
 
 Codex Coco 将用量、外观和系统偏好放进一个 Electron 应用，为更多模块保留独立生命周期、配置和界面入口。个人使用习惯、学习与持续打磨是项目的出发点。
 
-**当前状态：二期核心功能已接入的本地开发版。** 仍只维护本地仓库，未发布、未签名、未公证。真实账号、真实 Codex 版本、系统登录项、签名更新与 Widget 注册的验收边界见 [二期清单](docs/phase-two.md) 和 [验证记录](docs/verification.md)。UI 先保持功能可用，视觉后续统一调整。旧原型已归档并移除，没有恢复旧引擎。
+**当前状态：二期核心功能已接入的本地开发版。** 源码已开源；当前尚无正式安装包发布，未签名、未公证。真实账号、真实 Codex 版本、系统登录项、签名更新与 Widget 注册的验收边界见 [二期清单](docs/phase-two.md) 和 [验证记录](docs/verification.md)。UI 先保持功能可用，视觉后续统一调整。旧原型已归档并移除，没有恢复旧引擎。
 
 ## 当前能力
 
@@ -23,6 +23,10 @@ Codex Coco 将用量、外观和系统偏好放进一个 Electron 应用，为�
 | 应用更新 | 检查、手动下载与校验、取消、明确安装重启；当前无发布源，未签名包明确拒绝自替换                                |
 
 用量行为对照和明确缺口见 [用量对照记录](docs/usage-parity.md)。详细边界：[用量](docs/usage.md) · [外观](docs/appearance.md) · [菜单栏](docs/menu-bar.md) · [应用更新](docs/updates.md)。模型样本用于固定题对比，不代表模型整体能力评价。
+
+## 参与和反馈
+
+问题与建议请提交到 [GitHub Issues](https://github.com/cixiangtao/codex-coco/issues)。开发约定见 [贡献指南](CONTRIBUTING.md)，安全问题请使用 [私密报告渠道](SECURITY.md)。中文 README 是主要入口，英文说明维护核心功能、开发和数据边界。
 
 ## 开发
 
@@ -96,7 +100,7 @@ native/widget/   WidgetKit 源码与接入说明
 
 默认配置位于 `~/Library/Application Support/Codex Coco/foundation/`；开发与验证可用 `CODEX_COCO_DATA_DIR` 隔离。设置和旧应用数据不混用，不读取两个旧仓库的配置。诊断只保存固定事件、耗时、错误码和关联 ID，排除原始异常、配置、账号、模型回答与私有路径。没有遥测或云同步。
 
-应用更新默认空源和手动检查；后台检查只查版本，不自动下载或安装。当前没有公开发布渠道。Widget 共享默认关闭，实际原生扩展注册步骤见 [native/widget](native/widget/README.md)。
+应用更新默认空源和手动检查；后台检查只查版本，不自动下载或安装。源码仓库位于 [GitHub](https://github.com/cixiangtao/codex-coco)，尚无正式 Release。Widget 共享默认关闭，实际原生扩展注册步骤见 [native/widget](native/widget/README.md)。
 
 ## 验证和后续
 
