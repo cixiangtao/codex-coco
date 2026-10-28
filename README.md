@@ -1,5 +1,7 @@
 # Codex Coco
 
+<img src="apps/desktop/resources/branding/icon.png" width="96" height="96" alt="Codex Coco" />
+
 A Codex desktop companion, shaped around personal workflows.
 
 [简体中文](README.zh-CN.md)
@@ -54,7 +56,7 @@ The main window hosts full operations; the menu-bar popover receives only public
 
 Settings default to `~/Library/Application Support/Codex Coco/foundation/`; override with `CODEX_COCO_DATA_DIR` for isolated development. Old repositories, settings and services are untouched. Diagnostics exclude private paths, account data, configuration contents and raw exceptions. There is no telemetry or cloud synchronization.
 
-Update checks are manual by default; opt-in checks never download automatically, and downloaded packages are not installed on ordinary quit. A complete update between two public Codex Coco versions and Widget App Group registration remain unverified. The current application uses Electron's default icon and a self-signed identity without Apple notarization. See [updates](docs/updates.md), [appearance](docs/appearance.md), [verification](docs/verification.md), [architecture](docs/architecture.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
+Update checks are manual by default; opt-in checks never download automatically, and downloaded packages are not installed on ordinary quit. A complete update between two public Codex Coco versions and Widget App Group registration remain unverified. The current source includes an [original double-C icon](docs/branding.md); the published preview.1 predates this icon. Preview distribution uses a self-signed identity without Apple notarization. See [updates](docs/updates.md), [appearance](docs/appearance.md), [verification](docs/verification.md), [architecture](docs/architecture.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 Performance scripts provide isolated machine-specific measurements. No new performance baseline was established for this feature batch.
 

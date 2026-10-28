@@ -16,6 +16,7 @@
   "type": "module",
   "scripts": {
     "format": "oxfmt --write .",
+    "icons:generate": "node scripts/generate-app-icons.mjs",
     "format:check": "oxfmt --check .",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "dev": "pnpm --filter @codex-coco/desktop dev",

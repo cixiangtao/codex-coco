@@ -48,6 +48,9 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 const here = dirname(fileURLToPath(import.meta.url));
+const applicationIcon = app.isPackaged
+  ? join(process.resourcesPath, "codex-coco/branding/icon.png")
+  : join(app.getAppPath(), "resources/branding/icon.png");
 const rendererRoot = resolve(here, "../renderer");
 const productionUrl = "app://codex-coco/index.html";
 const developmentUrl =
@@ -203,6 +206,7 @@ function createWindow(context: WindowContext = { kind: "main", page: "appearance
     theme.mode === "system" ? (nativeTheme.shouldUseDarkColors ? "dark" : "light") : theme.mode;
   const win = new BrowserWindow({
     title: "Codex Coco",
+    icon: applicationIcon,
     ...(context.kind === "main"
       ? {
           width: 980,
@@ -554,6 +558,7 @@ async function start() {
   const began = performance.now();
   diagnostics.record({ event: "app.start" });
   await app.whenReady();
+  if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIcon);
   protocol.handle("app", async (request) => {
     try {
       const url = new URL(request.url);

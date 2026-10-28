@@ -486,3 +486,12 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - 用户报告“Apple 无法验证”提示。只读检查本机 Applications 中的 0.1.0-preview.1：完整固定证书与 bundle ID 验证通过，Gatekeeper 评估拒绝。自签名身份连续性与 Apple 开发者验证/公证是不同条件；没有通过换免费证书消除提示，也没有修改本机信任、隔离属性或 Gatekeeper。
 - 英文主 README、中文 README 与发行文档明确给出“尝试打开 → 系统设置 → 隐私与安全性 → 仍要打开 → 打开”。新增中英文 INSTALL.txt，并在新 DMG 根目录放置 Read Me First.txt。
 - 使用预览打包配置构建本地 DMG，显式覆盖为不签名、仅本地的 Codex-Coco-local-icon-check.dmg，未使用私钥或上传发行附件。只读挂载后核对安装说明全文、Applications 链接与应用图标，均通过并卸载临时卷。
+
+## Codex Coco 品牌图标（2026-10-28）
+
+- 新建原创双 C SVG，采用圆润几何、深色底与米白/薄荷绿。没有复制、改色或嵌入 OpenAI 图标资产。PNG 与十种尺寸表示的 ICNS 从同一 SVG 生成；普通构建直接使用已提交资产，无新增依赖。来源与生成入口见 [品牌说明](branding.md)。
+- 接入 macOS CFBundleIconFile、DMG 卷图标、开发态 Dock、窗口、标题栏、关于弹窗与两个 README；用户自选菜单栏图标保持独立。
+- `pnpm run check` 最终通过：221 项测试、Oxfmt、Oxlint、125 个源文件 AST 边界、类型检查和生产构建。初次全套测试中既有重置卡夹具因 500ms 超时未写 ledger 失败，单文件五项重跑及完整 check 重跑均通过，没有修改该测试或业务实现。
+- 生产入口和本地打包应用通过标题栏/关于图像实际加载、80px 关于图像尺寸及 renderer 错误检查；打包版明暗主题均通过并截图。已核对 about-light.png、about-packaged.png 与 about-packaged-dark.png。完整 ICNS 内容与 bundle 中 CFBundleIconFile 指定文件逐字节一致，DMG 只读挂载复核通过。
+- 额外尝试 Electron app.getFileIcon 读取应用目录时进程退出，未将该探针作为 Finder 实测通过项，也未在产品中接入这个 API。最终按 bundle 声明、真实资源字节和实际应用启动验收，不宣称取得 Finder 窗口截图。
+- 本轮未导入签名身份、修改已安装应用、变更系统安全设置或推送/发布；本地 DMG 显式不签名，线上 preview.1 附件保持原样。没有重跑原生更新实验或全量桌面回归。

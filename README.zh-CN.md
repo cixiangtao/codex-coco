@@ -1,5 +1,7 @@
 # Codex Coco
 
+<img src="apps/desktop/resources/branding/icon.png" width="96" height="96" alt="Codex Coco" />
+
 一个按自己习惯打磨的 Codex 桌面伴侣。
 
 [English](README.md)
@@ -110,7 +112,7 @@ native/widget/   WidgetKit 源码与接入说明
 
 ## 验证和后续
 
-当前优先验证 macOS arm64，本地包仍使用 Electron 默认图标。受控 Electron 页面、CLI 与更新引擎验证不能替代真实账号、真实目标版本、签名安装或系统扩展验收。完整记录在 [验证记录](docs/verification.md)，待真实环境确认的条目在 [二期清单](docs/phase-two.md)。
+当前优先验证 macOS arm64，源码与本地包已接入[原创双 C 图标](docs/branding.md)，已发布的 preview.1 尚未包含这个图标。受控 Electron 页面、CLI 与更新引擎验证不能替代真实账号、真实目标版本、签名安装或系统扩展验收。完整记录在 [验证记录](docs/verification.md)，待真实环境确认的条目在 [二期清单](docs/phase-two.md)。
 
 `profile:desktop` / `profile:packaged` 使用临时数据测启动及所有 Electron 进程的 CPU、工作集。功能增加后没有重新建立性能基线，不宣称本轮性能达标。参见 [测量口径](docs/diagnostics-and-performance.md)。历史界面对照可用 `design:review` 查看，包含合成数据，正式应用不加载该入口。
 

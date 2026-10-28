@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from "@codex-coco/ui/components/tooltip";
 import { navigation, type PageId } from "./navigation";
+import applicationLogo from "../assets/icon.svg";
 
 /** Application-owned layout; native window controls remain owned by Electron. */
 export function WindowShell({
@@ -29,7 +30,10 @@ export function WindowShell({
         </a>
         <header className="desktop-titlebar">
           <div aria-hidden="true" />
-          <h1>Codex Coco</h1>
+          <h1 className="flex items-center justify-center gap-1.5">
+            <img src={applicationLogo} width={18} height={18} alt="" aria-hidden="true" />
+            Codex Coco
+          </h1>
           <span className="desktop-draft-indicator">{dirty ? "主题预览中" : ""}</span>
         </header>
         <aside className="desktop-sidebar">

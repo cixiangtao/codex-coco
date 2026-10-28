@@ -19,6 +19,7 @@ import {
 } from "@codex-coco/ui/components/dialog";
 import { themeModes, themePresetIds } from "@codex-coco/ui/theme/contract";
 import type { ThemeEditor } from "../client/theme-editor";
+import applicationLogo from "../assets/icon.svg";
 const modeLabels = { light: "浅色", dark: "深色", system: "跟随系统" };
 const presetLabels = {
   neutral: "中性",
@@ -184,10 +185,17 @@ export function SettingsPage({ editor }: { editor: ThemeEditor }) {
             <Dialog>
               <DialogTrigger render={<Button variant="outline" />}>关于 Codex Coco</DialogTrigger>
               <DialogContent>
+                <img
+                  src={applicationLogo}
+                  width={80}
+                  height={80}
+                  alt="Codex Coco 标志"
+                  className="mx-auto"
+                />
                 <DialogHeader>
                   <DialogTitle>Codex Coco</DialogTitle>
                   <DialogDescription>
-                    本地开发版。用量与外观业务正在建设，菜单栏速览已提供模块状态与主窗口入口。
+                    独立的 Codex 桌面伴侣，提供用量、外观与菜单栏速览。
                   </DialogDescription>
                 </DialogHeader>
                 <p className="text-sm text-muted-foreground">
