@@ -6,7 +6,8 @@ import { dirname, join, resolve } from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { createServer } from "node:http";
-const exec = promisify(execFile);
+const run = promisify(execFile);
+const exec = (command, args) => run(command, args, { timeout: 90_000, maxBuffer: 1024 * 1024 });
 const appRequire = createRequire(resolve("apps/desktop/package.json"));
 const { build, Platform, Arch } = appRequire("electron-builder");
 const electronDist = dirname(dirname(dirname(dirname(appRequire("electron")))));
@@ -83,8 +84,10 @@ async function make(version) {
   return join(output, "mac-arm64", `${appName}.app`);
 }
 async function archive(app, name) {
+  console.log(`Archiving ${name}.`);
   const file = join(root, `${name}.zip`);
   await exec("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", app, file]);
+  console.log(`Archived ${name}.`);
   return file;
 }
 async function runCase(name, zip, expected) {
@@ -98,6 +101,7 @@ async function runCase(name, zip, expected) {
     JSON.stringify({ url: `http://127.0.0.1:${server.address().port}/feed` }),
   );
   payload = zip;
+  console.log(`Starting ${name}.`);
   const environment = { ...process.env };
   delete environment.ELECTRON_RUN_AS_NODE;
   const child = spawn(join(installed, "Contents/MacOS", appName), [], {
@@ -118,21 +122,34 @@ async function runCase(name, zip, expected) {
   );
   if (expected === "rejected")
     assert(!events.some((event) => event.event === "downloaded" || event.event === "installed"));
-  if (expected === "installed")
+  if (expected === "installed") {
     assert(events.some((event) => event.event === "installed" && event.version === "0.0.2"));
+    const version = await exec("/usr/libexec/PlistBuddy", [
+      "-c",
+      "Print :CFBundleShortVersionString",
+      join(installed, "Contents/Info.plist"),
+    ]);
+    assert.equal(version.stdout.trim(), "0.0.2");
+  }
   console.log(JSON.stringify({ case: name, ok: true, events }));
   child.kill();
 }
 let oldApp;
 try {
+  console.log("Building baseline fixture.");
   oldApp = await make("0.0.1");
+  console.log("Built baseline fixture.");
+  console.log("Building candidate fixture.");
   const newApp = await make("0.0.2");
+  console.log("Built candidate fixture.");
   const good = await archive(newApp, "same-certificate");
   const certificate = resolve("apps/desktop/resources/signing/certificate.crt");
+  console.log("Removing recipient certificate trust.");
   await exec("sudo", ["-n", "security", "remove-trusted-cert", "-d", certificate]);
+  console.log("Checking recipient certificate trust.");
   let untrusted = false;
   try {
-    await exec("security", ["verify-cert", "-c", certificate, "-p", "codeSign"]);
+    await exec("security", ["verify-cert", "-L", "-l", "-c", certificate, "-p", "codeSign"]);
   } catch {
     untrusted = true;
   }
@@ -162,6 +179,7 @@ try {
     resolve("apps/desktop/resources/signing/certificate.crt"),
   ]);
   for (const child of children) if (child.exitCode === null) child.kill();
+  server.closeAllConnections();
   await new Promise((done) => server.close(done));
   await rm(root, { recursive: true, force: true });
 }
