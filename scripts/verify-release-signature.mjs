@@ -32,6 +32,10 @@ try {
   assert.equal(result.ok, true);
   assert.equal(result.value.installSupported, true);
   assert.equal(result.value.phase, "idle");
+  assert.equal(
+    result.value.currentVersion,
+    JSON.parse(await readFile("apps/desktop/package.json", "utf8")).version,
+  );
   assert.deepEqual(session.errors, []);
   console.log("Production app accepts the pinned self-signed identity without an Apple Team ID.");
 } finally {
