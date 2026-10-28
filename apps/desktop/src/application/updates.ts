@@ -1,20 +1,30 @@
 import { readFile, writeFile, mkdir, rename, unlink, lstat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import {
   updateSnapshotSchema,
+  releaseCheckSchema,
+  releasesUrl,
+  type ReleaseCheck,
   updatePreferencesSchema,
   updateDefaults,
   saveUpdatePreferencesSchema,
   updateActionSchema,
   type UpdateSnapshot,
+  type UpdatePreferences,
 } from "../contracts/updates";
 import { SettingsError } from "./settings-store";
 /** App-wide updater stays owned until application quit; it is not a business module. */
 export interface UpdateEngine {
   supported(): Promise<boolean>;
-  check(source: string): Promise<{ version: string; available: boolean }>;
-  download(signal: AbortSignal, progress: (percent: number) => void): Promise<void>;
+  check(signal: AbortSignal): Promise<ReleaseCheck | null>;
+  download(
+    version: string,
+    signal: AbortSignal,
+    progress: (percent: number) => void,
+  ): Promise<void>;
+  openRelease(url: string): Promise<void>;
   install(): void;
   onError?(listener: () => void): () => void;
 }
@@ -39,8 +49,10 @@ export class ApplicationUpdates {
       revision: 0,
       preferences: updateDefaults,
       currentVersion: version,
-      phase: "unconfigured",
-      reason: "SOURCE_UNCONFIGURED",
+      phase: "idle",
+      reason: null,
+      installSupported: false,
+      releaseUrl: null,
       availableVersion: null,
       progress: null,
       checkedAt: null,
@@ -68,16 +80,17 @@ export class ApplicationUpdates {
     clearTimeout(this.timer);
     if (
       !this.stopped &&
-      this.state.preferences.source &&
       this.state.preferences.intervalHours &&
       this.state.reason !== "SETTINGS_UNAVAILABLE"
     )
       this.timer = setTimeout(() => {
-        if (!this.pending && this.state.phase !== "downloaded") this.begin("check");
+        if (!this.pending && !["downloaded", "installing"].includes(this.state.phase))
+          this.begin("check");
         else this.schedule();
       }, this.state.preferences.intervalHours * 3600_000);
   }
   async load() {
+    this.publish({ installSupported: await this.engine.supported() });
     try {
       if ((await lstat(this.file)).size > 8192) throw new Error("INVALID");
       const stored = JSON.parse(await readFile(this.file, "utf8")) as {
@@ -86,17 +99,36 @@ export class ApplicationUpdates {
         preferences?: unknown;
       };
       if (
-        stored.version !== 1 ||
+        (stored.version !== 1 && stored.version !== 2) ||
         !Number.isSafeInteger(stored.revision) ||
         Number(stored.revision) < 0
       )
         throw new Error("INVALID");
-      const preferences = updatePreferencesSchema.parse(stored.preferences);
+      // Legacy custom feeds are retired. Preserve the file until the next explicit save/reset.
+      const legacy = z.strictObject({
+        source: z
+          .string()
+          .max(2048)
+          .refine(
+            (value) =>
+              !value ||
+              (z.url().safeParse(value).success &&
+                value.startsWith("https://") &&
+                !/[?#@\s]/.test(value) &&
+                value.endsWith("/")),
+          ),
+        intervalHours: updatePreferencesSchema.shape.intervalHours,
+      });
+      let preferences: UpdatePreferences;
+      if (stored.version === 1) {
+        legacy.parse(stored.preferences);
+        preferences = { ...updateDefaults };
+      } else preferences = updatePreferencesSchema.parse(stored.preferences);
       this.publish({
         revision: Number(stored.revision),
         preferences,
-        phase: preferences.source ? "idle" : "unconfigured",
-        reason: preferences.source ? null : "SOURCE_UNCONFIGURED",
+        phase: "idle",
+        reason: null,
       });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT")
@@ -116,11 +148,11 @@ export class ApplicationUpdates {
     if (this.saving) throw new SettingsError("CONFLICT", "更新设置正在保存，请稍候。");
     const parsed = saveUpdatePreferencesSchema.safeParse(input);
     if (!parsed.success)
-      throw new SettingsError("INVALID_INPUT", "更新设置无效，请检查 HTTPS 更新目录和检查间隔。");
+      throw new SettingsError("INVALID_INPUT", "更新设置无效，请检查后台检查间隔。");
     if (this.state.reason === "SETTINGS_UNAVAILABLE")
       throw new SettingsError("SETTINGS_UNAVAILABLE", "更新设置损坏，请先重置并保留备份。");
     if (this.pending || this.state.phase === "downloaded" || this.state.phase === "installing")
-      throw new SettingsError("CONFLICT", "请等待当前更新结束；下载完成后重启应用可更换更新源。");
+      throw new SettingsError("CONFLICT", "请等待当前更新结束；下载完成后重启应用可修改更新偏好。");
     if (parsed.data.expectedRevision !== this.state.revision)
       throw new SettingsError("CONFLICT", "更新设置已在其他窗口修改，请重新载入。");
     const revision = this.state.revision + 1;
@@ -133,7 +165,7 @@ export class ApplicationUpdates {
       await mkdir(dirname(this.file), { recursive: true, mode: 0o700 });
       const temporary = `${this.file}.${randomUUID()}.tmp`;
       try {
-        await writeFile(temporary, JSON.stringify({ version: 1, revision, preferences }), {
+        await writeFile(temporary, JSON.stringify({ version: 2, revision, preferences }), {
           flag: "wx",
           mode: 0o600,
         });
@@ -145,9 +177,11 @@ export class ApplicationUpdates {
       this.publish({
         revision,
         preferences,
-        phase: preferences.source ? "idle" : "unconfigured",
-        reason: preferences.source ? null : "SOURCE_UNCONFIGURED",
+        phase: "idle",
+        reason: null,
         availableVersion: null,
+        releaseUrl: null,
+        checkedAt: null,
         progress: null,
       });
       this.schedule();
@@ -164,7 +198,17 @@ export class ApplicationUpdates {
     if (!parsed.success) throw new SettingsError("INVALID_INPUT", "更新操作无效。");
     const action = parsed.data.action;
     if (this.saving) throw new SettingsError("CONFLICT", "更新设置正在保存，请稍候。");
+    if (action === "open-release") {
+      try {
+        await this.engine.openRelease(this.state.releaseUrl ?? releasesUrl);
+      } catch {
+        throw new SettingsError("INVALID_INPUT", "无法打开 GitHub 发布页面，请稍后重试。");
+      }
+      return this.snapshot();
+    }
     if (action === "cancel") {
+      if (this.state.phase === "installing")
+        throw new SettingsError("CONFLICT", "安装任务不能取消。");
       this.controller?.abort();
       if (this.pending) this.publish({ phase: "cancelling" });
       return this.snapshot();
@@ -183,9 +227,11 @@ export class ApplicationUpdates {
         this.publish({
           revision: this.state.revision + 1,
           preferences: updateDefaults,
-          phase: "unconfigured",
-          reason: "SOURCE_UNCONFIGURED",
+          phase: "idle",
+          reason: null,
           availableVersion: null,
+          releaseUrl: null,
+          checkedAt: null,
           progress: null,
         });
         this.available = false;
@@ -202,20 +248,33 @@ export class ApplicationUpdates {
     if (action === "install") {
       if (this.state.phase !== "downloaded")
         throw new SettingsError("INVALID_INPUT", "尚无校验完成的更新包。");
+      clearTimeout(this.timer);
       this.publish({ phase: "installing", reason: null });
+      this.pending = (async () => {
+        try {
+          if (!(await this.engine.supported())) {
+            this.publish({
+              phase: "unsupported",
+              reason: "SIGNED_INSTALL_REQUIRED",
+              installSupported: false,
+            });
+            return;
+          }
+          if (!this.stopped) this.engine.install();
+        } catch {
+          this.publish({ phase: "error", reason: "INSTALL_FAILED" });
+        }
+      })();
       try {
-        this.engine.install();
-      } catch {
-        this.publish({ phase: "error", reason: "INSTALL_FAILED" });
+        await this.pending;
+      } finally {
+        this.pending = null;
+        if (this.snapshot().phase !== "installing") this.schedule();
       }
       return this.snapshot();
     }
     if (this.state.phase === "downloaded")
       throw new SettingsError("CONFLICT", "更新包已下载，请确认安装或重新打开应用后再检查。");
-    if (!this.state.preferences.source) {
-      this.publish({ phase: "unconfigured", reason: "SOURCE_UNCONFIGURED" });
-      return this.snapshot();
-    }
     if (this.state.reason === "SETTINGS_UNAVAILABLE")
       throw new SettingsError("SETTINGS_UNAVAILABLE", "请先恢复更新设置。");
     if (action === "download" && !this.available)
@@ -232,29 +291,38 @@ export class ApplicationUpdates {
       reason: null,
       progress: null,
     });
+    if (action === "check") {
+      this.available = false;
+      this.publish({ availableVersion: null, releaseUrl: null, checkedAt: null });
+    }
     this.pending = (async () => {
       try {
-        if (!(await this.engine.supported())) {
-          this.publish({ phase: "unsupported", reason: "SIGNED_INSTALL_REQUIRED" });
-          return;
-        }
         controller.signal.throwIfAborted();
         if (action === "check") {
-          const checked = await this.engine.check(this.state.preferences.source);
+          const result = await this.engine.check(controller.signal);
           controller.signal.throwIfAborted();
-          if (
-            !/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(checked.version) ||
-            checked.version.length > 80
-          )
-            throw new Error("INVALID");
-          this.available = checked.available;
+          const checked = result === null ? null : releaseCheckSchema.parse(result);
+          this.available = checked?.available ?? false;
           this.publish({
-            phase: checked.available ? "available" : "up-to-date",
-            availableVersion: checked.available ? checked.version : null,
+            phase: checked ? (checked.available ? "available" : "up-to-date") : "no-release",
+            availableVersion: checked?.available ? checked.version : null,
+            releaseUrl: checked?.releaseUrl ?? null,
             checkedAt: Date.now(),
           });
         } else {
-          await this.engine.download(controller.signal, (percent) => {
+          const supported = await this.engine.supported();
+          controller.signal.throwIfAborted();
+          if (!supported) {
+            this.publish({
+              phase: "unsupported",
+              reason: "SIGNED_INSTALL_REQUIRED",
+              installSupported: false,
+            });
+            return;
+          }
+          const version = this.state.availableVersion;
+          if (!version) throw new Error("RELEASE_REQUIRED");
+          await this.engine.download(version, controller.signal, (percent) => {
             if (!controller.signal.aborted && !this.stopped && Number.isFinite(percent))
               this.publish({ progress: Math.max(0, Math.min(100, Math.round(percent))) });
           });

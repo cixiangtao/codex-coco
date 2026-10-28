@@ -1,4 +1,6 @@
-import { app } from "electron";
+import { app, net, shell } from "electron";
+import { readGithubRelease } from "../../application/github-releases";
+import { updateRepository, releasesUrl, releaseCheckSchema } from "../../contracts/updates";
 import type { MacUpdater } from "electron-updater";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -47,15 +49,25 @@ export function createNativeUpdateEngine(directory: string): UpdateEngine {
         return false;
       }
     },
-    check: async (source) => {
-      const engine = await get();
-      engine.setFeedURL({ provider: "generic", url: source, useMultipleRangeRequest: false });
-      const result = await engine.checkForUpdates();
-      if (!result) throw new Error("CHECK_FAILED");
-      return { version: result.updateInfo.version, available: result.isUpdateAvailable };
+    check: (signal) =>
+      readGithubRelease(
+        (input, init) => net.fetch(input instanceof URL ? input.toString() : input, init),
+        app.getVersion(),
+        signal,
+      ),
+    openRelease: async (url) => {
+      if (url !== releasesUrl && !releaseCheckSchema.shape.releaseUrl.safeParse(url).success)
+        throw new Error("INVALID_RELEASE_URL");
+      await shell.openExternal(url);
     },
-    download: async (signal, progress) => {
+    download: async (version, signal, progress) => {
       const engine = await get();
+      engine.setFeedURL({ provider: "github", ...updateRepository, private: false });
+      const checked = await engine.checkForUpdates();
+      signal.throwIfAborted();
+      // A release changed after the prompt: require a new explicit check rather than downloading a different version.
+      if (!checked?.isUpdateAvailable || checked.updateInfo.version !== version)
+        throw new Error("RELEASE_CHANGED");
       const { CancellationToken } = await import("electron-updater");
       const token = new CancellationToken();
       const abort = () => token.cancel();

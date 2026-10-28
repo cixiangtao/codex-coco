@@ -20,7 +20,7 @@ Codex Coco 将用量、外观和系统偏好放进一个 Electron 应用，为�
 | 菜单栏   | 跨模块只读速览、额度窗口与标签选择、原生及自定义图标、19 个 GIF、逐图速度、按需 CPU 联动                      |
 | 设置     | 浅色/深色/系统主题、自定义主色、安装版登录项确认、公开共享快照、更新偏好与配置恢复                            |
 | 原生扩展 | WidgetKit 源码与共享合同；已类型检查，仍需 Team、签名与 App Group 注册                                        |
-| 应用更新 | 检查、手动下载与校验、取消、明确安装重启；当前无发布源，未签名包明确拒绝自替换                                |
+| 应用更新 | GitHub Releases 检查与发布页下载，签名版支持确认下载、校验和安装；未签名包可检测、不可自替换                  |
 
 用量行为对照和明确缺口见 [用量对照记录](docs/usage-parity.md)。详细边界：[用量](docs/usage.md) · [外观](docs/appearance.md) · [菜单栏](docs/menu-bar.md) · [应用更新](docs/updates.md)。模型样本用于固定题对比，不代表模型整体能力评价。
 
@@ -100,7 +100,7 @@ native/widget/   WidgetKit 源码与接入说明
 
 默认配置位于 `~/Library/Application Support/Codex Coco/foundation/`；开发与验证可用 `CODEX_COCO_DATA_DIR` 隔离。设置和旧应用数据不混用，不读取两个旧仓库的配置。诊断只保存固定事件、耗时、错误码和关联 ID，排除原始异常、配置、账号、模型回答与私有路径。没有遥测或云同步。
 
-应用更新默认空源和手动检查；后台检查只查版本，不自动下载或安装。源码仓库位于 [GitHub](https://github.com/cixiangtao/codex-coco)，尚无正式 Release。Widget 共享默认关闭，实际原生扩展注册步骤见 [native/widget](native/widget/README.md)。
+应用更新固定使用本仓库 GitHub Releases，默认手动检查；后台检查只查版本，不自动下载或安装。源码仓库位于 [GitHub](https://github.com/cixiangtao/codex-coco)，尚无正式 Release。Widget 共享默认关闭，实际原生扩展注册步骤见 [native/widget](native/widget/README.md)。
 
 ## 验证和后续
 

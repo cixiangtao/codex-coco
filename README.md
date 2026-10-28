@@ -4,7 +4,7 @@ A Codex desktop companion, shaped around personal workflows.
 
 [简体中文](README.zh-CN.md)
 
-**Status: local development build with phase-two core features implemented.** The source is public on GitHub. There is no official binary release, update feed, code signing or notarization. UI refinement follows core functionality. Controlled tests do not substitute for real-account, current-Codex, signed-update or Widget registration acceptance; see the [phase-two checklist](docs/phase-two.md).
+**Status: local development build with phase-two core features implemented.** The source is public on GitHub. There is no official binary release, code signing or notarization. UI refinement follows core functionality. Controlled tests do not substitute for real-account, current-Codex, signed-update or Widget registration acceptance; see the [phase-two checklist](docs/phase-two.md).
 
 ## Features
 
@@ -15,7 +15,7 @@ A Codex desktop companion, shaped around personal workflows.
 - Menu bar: read-only cross-module summaries, quota labels, native/custom icons, 19 licensed GIFs, per-icon speed and optional CPU-linked animation.
 - Settings: light/dark/system modes, custom primary color, explicit packaged-app login-item changes, public shared snapshots and update preferences.
 - WidgetKit: native extension source and shared-state contract, typechecked but not signed or registered.
-- Application updates: version checks, confirmed download/checksum validation, cancellation and explicit native installation/relaunch. Unsigned builds reject replacement; no feed is configured by default.
+- Application updates: manual or opt-in scheduled checks against [GitHub Releases](https://github.com/cixiangtao/codex-coco/releases), including unsigned builds; release-page downloads, confirmed native download/checksum validation, cancellation and explicit installation/relaunch for signed macOS apps. No stable release is published yet.
 
 ## Contributing and support
 

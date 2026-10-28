@@ -14,3 +14,7 @@ mac:
   identity: null
   target:
     - dir
+publish:
+  provider: github
+  owner: cixiangtao
+  repo: codex-coco

@@ -457,3 +457,15 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - 生产入口 `node scripts/verify-appearance.mjs` 通过。连续观察至少两轮真实 CDP 巡检，外观前台事件与保存栏 DOM 变化均为 0，保存并应用按钮保持可用；受控目标失效时显示异常，恢复后回到已应用，新窗口数量正常更新。原有三层像素、草稿、重载、撤销、停用、退出清理和 opt-in 恢复仍通过。已查看 `work/appearance-verification/quiet-maintenance.png`。
 - 生产入口 `verify-appearance-launcher`、`verify-modules`、`verify-menu-bar` 均通过，覆盖快捷启动/重启确认取消、操作完成反馈、跨窗口、模块退出、损坏恢复与菜单栏只读权限。启动回归首次因旧“持续同步”文案断言超时，更新为“已应用到”后整组重跑通过，未放宽业务断言。
 - 全部使用临时数据及受控 Electron 目标，没有操作真实 Codex；本轮未重新打包、替换安装版或发布。
+
+## GitHub 开源与 Releases 更新接入（2026-10-28）
+
+用户授权创建公开仓库，先完成开源准备并推送，再实现 GitHub Releases 更新；公开入口采用英文主语言、中文辅助。仓库为 [cixiangtao/codex-coco](https://github.com/cixiangtao/codex-coco)，英文 README.md 与中文 README.zh-CN.md 互链，贡献、安全、Issue/PR 模板和包元数据已统一。原 MIT 与第三方资产声明保留，没有恢复原型或上传旧项目。
+
+- 推送前检查 main 的 87 次既有提交、968 个历史文件对象，常见 GitHub/OpenAI/AWS 令牌、私钥与内部服务地址规则没有命中；这是定向检查，不表述为全面安全审计。仅推送 main，没有上传 Codex 检查点引用、本机配置、日志或生成物。
+- 创建公开仓库与 origin 后读回仓库身份、可见性和远端 main；启用私密漏洞报告、漏洞告警与安全更新，确认 secret scanning 与 push protection 已开启。未添加常规定时升级或自动合并。CI 使用固定 SHA 的官方 Actions、Node 24 与 pnpm 12.14.0，权限只读，不触发发行。开源准备提交的 GitHub macOS CI 已完成干净依赖安装和 check。
+- 更新源固定为该仓库。版本检测使用独立匿名 REST API，不依赖签名或更新器附件；404 显示尚无正式版本。签名安装条件只约束应用内下载与安装。打开发布页只接受后台构造的本仓库受限地址。
+- `pnpm run check` 通过：27 个测试文件、217 项测试、Oxfmt、Oxlint、125 个源文件 AST 边界、分进程/包/测试类型检查与生产构建。新增测试覆盖版本比较、正式标签、草稿/预发布拒绝、有界响应、匿名固定请求、取消、原始响应排除、旧设置迁移、配置冲突/备份、签名检查期间的安装锁和退出等待。原生适配受控测试还验证 GitHub provider 与版本变化时不下载另一版本。
+- `pnpm run pack` 生成最终源码的 macOS arm64 未签名应用。生产入口与该本地包的 `verify-updates` 均通过：无版本、新版、失败恢复、取消、打开受限发布页、未签名可检查且拒绝下载/安装、多窗口、重启持久化、损坏备份、速览拒绝读写与导航。脚本使用临时目录及受控网络，不打开外部浏览器。曾因网络桩拦截本地文件资源导致第二窗口无法加载，限定桩的网络范围后整组重跑通过。
+- 另以临时数据启动真实 Electron，明确调用检查，未使用网络桩，实际 GitHub 返回 `no-release`，`reason: null`，符合公开仓库尚无正式 Release 的状态。未读取 GitHub 凭据或业务账号。
+- 已查看更新界面的新版提示截图。没有新增依赖；没有运行全量 verify:packaged 或性能采样，没有签名、公证、真实更新包下载/安装、创建 Release、上传包或注册 Widget。GitHub 源码开源与检测成功不代表签名发行链路已完成。

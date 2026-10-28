@@ -13,12 +13,13 @@ import {
 } from "@codex-coco/ui/components/dialog";
 import {
   updatePreferencesSchema,
+  updateRepository,
   type UpdateSnapshot,
   type UpdateAction,
   type UpdatePreferences,
 } from "../contracts/updates";
 const labels: Record<UpdateSnapshot["phase"], string> = {
-  unconfigured: "尚未配置发布源",
+  "no-release": "尚无正式版本",
   idle: "等待检查",
   checking: "正在检查更新",
   available: "发现可用版本",
@@ -31,9 +32,9 @@ const labels: Record<UpdateSnapshot["phase"], string> = {
   error: "更新操作未完成",
 };
 const reasons = {
-  SOURCE_UNCONFIGURED: "当前仅维护本地仓库，没有配置发布源。",
-  SIGNED_INSTALL_REQUIRED: "自动替换需要正式签名的 macOS 安装版；当前运行模式不支持。",
-  CHECK_FAILED: "检查失败，请检查更新目录与网络后重试。",
+  SIGNED_INSTALL_REQUIRED:
+    "应用内更新需要正式签名的 macOS 安装版；仍可打开 GitHub 发布页面手动下载。",
+  CHECK_FAILED: "检查失败，请检查网络或稍后重试；GitHub 请求限额也可能导致失败。",
   DOWNLOAD_FAILED: "下载或校验失败，请重新检查版本后再试。",
   INSTALL_FAILED: "系统未能验证或安装更新，当前应用不会冒充更新成功。",
   SETTINGS_UNAVAILABLE: "更新设置损坏，重置时会先保留原文件备份。",
@@ -125,6 +126,12 @@ export function UpdateSettings() {
           <AlertDescription>{reasons[state.reason]}</AlertDescription>
         </Alert>
       )}
+      {!state.installSupported && (
+        <p className="text-sm text-muted-foreground">
+          当前版本支持检查新版；应用内更新需要签名的 macOS 安装版，可通过 GitHub 发布页面手动下载。
+        </p>
+      )}
+      {state.phase === "no-release" && <output>仓库尚未发布正式版本，请稍后再检查。</output>}
       {conflict && <p role="alert">其他窗口已更新设置，请取消本地修改后重新编辑。</p>}
       <SettingsGroup title="版本与发布源" disabled={busy}>
         <SettingsRow>
@@ -135,16 +142,12 @@ export function UpdateSettings() {
           </FieldDescription>
         </SettingsRow>
         <SettingsRow layout="stacked">
-          <FieldLabel htmlFor="update-source">发布源目录</FieldLabel>
-          <Input
-            id="update-source"
-            value={value.source}
-            placeholder="https://updates.example.com/codex-coco/"
-            onChange={(event) => edit({ source: event.target.value })}
-            disabled={busy || state.phase === "downloaded"}
-          />
+          <FieldLabel>GitHub 发布仓库</FieldLabel>
+          <p className="text-sm break-all">
+            {updateRepository.owner}/{updateRepository.repo}
+          </p>
           <FieldDescription>
-            使用可信发布者提供的 HTTPS 目录及 latest-mac.yml。默认留空，不会请求网络。
+            只检查该仓库的正式 Release，忽略草稿和预发布。默认手动检查，不在启动时联网。
           </FieldDescription>
         </SettingsRow>
         <SettingsRow>
@@ -184,7 +187,7 @@ export function UpdateSettings() {
       </div>
       <SettingsGroup
         title="更新操作"
-        description="下载由更新引擎校验 SHA-512；安装阶段由 macOS 验证应用签名并替换。下载后普通退出不会自动安装。检查请求取消后会等待底层请求结束。"
+        description="签名版可在应用内下载并校验 SHA-512，安装时由 macOS 验证签名。下载和安装分别确认，普通退出不会自动安装。"
       >
         <SettingsRow layout="stacked">
           <FieldLabel>检查与安装</FieldLabel>
@@ -201,17 +204,30 @@ export function UpdateSettings() {
             <Button
               variant="outline"
               disabled={
-                busy || !state.availableVersion || state.phase === "downloaded" || Boolean(draft)
+                busy ||
+                !state.installSupported ||
+                !state.availableVersion ||
+                state.phase === "downloaded" ||
+                Boolean(draft)
               }
               onClick={() => setConfirm("download")}
             >
               下载更新包
             </Button>
             <Button
-              disabled={busy || state.phase !== "downloaded"}
+              disabled={busy || !state.installSupported || state.phase !== "downloaded"}
               onClick={() => setConfirm("install")}
             >
               安装并重启 Codex Coco
+            </Button>
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => {
+                void run({ action: "open-release" });
+              }}
+            >
+              打开 GitHub 发布页面
             </Button>
             <Button
               variant="outline"
@@ -255,8 +271,8 @@ export function UpdateSettings() {
               {confirm === "install"
                 ? "请先保存当前工作。系统将验证已校验的更新包，正常退出后替换并重新打开 Codex Coco。"
                 : confirm === "download"
-                  ? "将从已保存的发布源下载所列版本并校验完整性，不会自动安装。"
-                  : "会停用后台检查、清空发布源，并保留现有配置文件备份。"}
+                  ? "将从 GitHub Releases 下载所列版本并校验完整性，不会自动安装。"
+                  : "会停用后台检查，并保留现有配置文件备份。GitHub 发布仓库保持不变。"}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3">
@@ -268,8 +284,7 @@ export function UpdateSettings() {
               onClick={() => {
                 const action = confirm;
                 setConfirm(null);
-                if (action)
-                  void run(action === "install" ? { action, confirmed: true } : { action });
+                if (action) void run(action === "reset" ? { action } : { action, confirmed: true });
               }}
             >
               确认继续
