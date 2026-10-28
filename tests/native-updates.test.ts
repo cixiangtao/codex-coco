@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import identity from "../apps/desktop/resources/signing/identity.json";
 import { releasesUrl, updateRepository } from "../apps/desktop/src/contracts/updates";
 
 const mocks = vi.hoisted(() => ({
@@ -10,11 +11,30 @@ const mocks = vi.hoisted(() => ({
   feed: vi.fn(),
   check: vi.fn(),
   download: vi.fn(),
+  packaged: false,
+  signatureValid: true,
+  signatureCheck: vi.fn(),
 }));
 vi.mock("../apps/desktop/node_modules/electron", () => ({
-  app: { getVersion: () => "0.1.0-dev.1", isPackaged: false },
+  app: {
+    getVersion: () => "0.1.0-dev.1",
+    get isPackaged() {
+      return mocks.packaged;
+    },
+  },
   net: { fetch: mocks.fetch },
   shell: { openExternal: mocks.open },
+}));
+vi.mock("node:child_process", () => ({
+  execFile: (
+    file: string,
+    args: string[],
+    _options: unknown,
+    callback: (error: Error | null, result: string) => void,
+  ) => {
+    mocks.signatureCheck(file, args);
+    callback(mocks.signatureValid ? null : new Error("PRIVATE signature failure"), "");
+  },
 }));
 vi.mock("../apps/desktop/node_modules/electron-updater", () => ({
   MacUpdater: class {
@@ -32,6 +52,8 @@ const { createNativeUpdateEngine } = await import("../apps/desktop/src/desktop/m
 const directories: string[] = [];
 afterEach(async () => {
   vi.clearAllMocks();
+  mocks.packaged = false;
+  mocks.signatureValid = true;
   await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 async function engine() {
@@ -77,4 +99,21 @@ it("uses the public GitHub provider and refuses changed or missing versions befo
   mocks.check.mockResolvedValue({ isUpdateAvailable: true, updateInfo: { version: "0.2.0" } });
   await port.download("0.2.0", signal, () => undefined);
   expect(mocks.download).toHaveBeenCalledTimes(1);
+});
+
+it("requires the pinned certificate and bundle identifier without requiring an Apple Team ID", async () => {
+  mocks.packaged = true;
+  const port = await engine();
+  expect(await port.supported()).toBe(true);
+  expect(mocks.signatureCheck).toHaveBeenCalledWith(
+    "/usr/bin/codesign",
+    expect.arrayContaining([
+      "--strict",
+      "--deep",
+      "-R",
+      `anchor H"${identity.sha1}" and identifier "${identity.bundleId}"`,
+    ]),
+  );
+  mocks.signatureValid = false;
+  expect(await port.supported()).toBe(false);
 });

@@ -1,4 +1,5 @@
 import { app, net, shell } from "electron";
+import identity from "../../../resources/signing/identity.json";
 import { readGithubRelease } from "../../application/github-releases";
 import { updateRepository, releasesUrl, releaseCheckSchema } from "../../contracts/updates";
 import type { MacUpdater } from "electron-updater";
@@ -36,15 +37,19 @@ export function createNativeUpdateEngine(directory: string): UpdateEngine {
       if (!app.isPackaged || process.platform !== "darwin") return false;
       const bundle = dirname(dirname(dirname(process.execPath)));
       try {
-        await exec("/usr/bin/codesign", ["--verify", "--deep", "--strict", bundle], {
-          timeout: 10_000,
-          maxBuffer: 64 * 1024,
-        });
-        const detail = await exec("/usr/bin/codesign", ["-dv", "--verbose=4", bundle], {
-          timeout: 5000,
-          maxBuffer: 64 * 1024,
-        });
-        return /^TeamIdentifier=[A-Z0-9]+$/m.test(detail.stderr);
+        await exec(
+          "/usr/bin/codesign",
+          [
+            "--verify",
+            "--deep",
+            "--strict",
+            "-R",
+            `anchor H"${identity.sha1}" and identifier "${identity.bundleId}"`,
+            bundle,
+          ],
+          { timeout: 10_000, maxBuffer: 64 * 1024 },
+        );
+        return true;
       } catch {
         return false;
       }
