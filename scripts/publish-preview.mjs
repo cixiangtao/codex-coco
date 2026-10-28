@@ -84,24 +84,29 @@ const findRelease = async () =>
   (await api("releases?per_page=100")).find((value) => value.tag_name === tag) ?? null;
 let release = await findRelease();
 if (!release) {
-  await gh([
-    "release",
-    "create",
-    tag,
-    "--repo",
-    repository,
-    "--verify-tag",
-    "--target",
-    sourceSha,
-    "--draft",
-    "--prerelease",
-    "--latest=false",
-    "--title",
-    `Codex Coco ${pkg.version}`,
-    "--notes-file",
-    `docs/releases/${pkg.version}.md`,
-  ]);
-  release = await findRelease();
+  // Creation returns the authoritative resource; the release list may still be stale.
+  release = JSON.parse(
+    await gh([
+      "api",
+      "--method",
+      "POST",
+      `repos/${repository}/releases`,
+      "-f",
+      `tag_name=${tag}`,
+      "-f",
+      `target_commitish=${sourceSha}`,
+      "-f",
+      `name=Codex Coco ${pkg.version}`,
+      "-F",
+      "draft=true",
+      "-F",
+      "prerelease=true",
+      "-f",
+      "make_latest=false",
+      "-f",
+      `body=${await readFile(`docs/releases/${pkg.version}.md`, "utf8")}`,
+    ]),
+  );
 }
 assert.equal(release.prerelease, true);
 for (const [name, hash] of hashes) {
@@ -132,7 +137,7 @@ if (release.draft)
     "--prerelease",
     "--latest=false",
   ]);
-const published = await findRelease();
+const published = await api(`releases/${release.id}`);
 assert.equal(published.draft, false);
 assert.equal(published.prerelease, true);
 for (const [name, hash] of hashes)
