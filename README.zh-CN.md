@@ -8,13 +8,13 @@
 
 Codex Coco 将用量、外观和系统偏好放进一个 Electron 应用，为更多模块保留独立生命周期、配置和界面入口。个人使用习惯、学习与持续打磨是项目的出发点。
 
-**当前状态：二期核心功能已接入的本地开发版。** 源码已开源；已发布 [0.1.0-preview.1](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1) 自签名预览版，仅支持 macOS Apple Silicon。没有使用 Apple Developer ID 或公证。真实账号、真实 Codex 版本、系统登录项、签名更新与 Widget 注册的验收边界见 [二期清单](docs/phase-two.md) 和 [验证记录](docs/verification.md)。UI 先保持功能可用，视觉后续统一调整。旧原型已归档并移除，没有恢复旧引擎。
+**当前状态：macOS Apple Silicon 自签名预览版，二期核心功能已接入。** 源码已开源；已发布 [0.1.0-preview.2](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.2) 自签名预览版，仅支持 macOS Apple Silicon。没有使用 Apple Developer ID 或公证。真实账号、真实 Codex 版本、系统登录项、签名更新与 Widget 注册的验收边界见 [二期清单](docs/phase-two.md) 和 [验证记录](docs/verification.md)。UI 先保持功能可用，视觉后续统一调整。旧原型已归档并移除，没有恢复旧引擎。
 
 ## 下载
 
-在 [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1) 下载 macOS arm64 的 DMG 或 ZIP，核对 SHA256SUMS.txt 后，将 Codex Coco.app 移到 Applications。若提示“Apple 无法验证 Codex Coco”，先关闭提示，再到 **系统设置 → 隐私与安全性 → 仍要打开**，最后确认 **打开**。长期自签名不能消除这个首次打开提示。详见 [安装指南](apps/desktop/resources/INSTALL.txt) 和 [Apple 官方说明](https://support.apple.com/102445)，无需安装根证书或关闭全局 Gatekeeper。
+在 [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.2) 下载 macOS arm64 的 DMG 或 ZIP，核对 SHA256SUMS.txt 后，将 Codex Coco.app 移到 Applications。若提示“Apple 无法验证 Codex Coco”，先关闭提示，再到 **系统设置 → 隐私与安全性 → 仍要打开**，最后确认 **打开**。长期自签名不能消除这个首次打开提示。详见 [安装指南](apps/desktop/resources/INSTALL.txt) 和 [Apple 官方说明](https://support.apple.com/102445)，无需安装根证书或关闭全局 Gatekeeper。
 
-已发布的 preview.1 需要手动升级一次。新版已在本地接入自动检查、提示和一键下载安装并重启；预览版接收预览版与稳定版，稳定版只接收稳定版。免费长期自签名身份、验证范围与日常发行流程见 [发行说明](docs/releases.md)。
+preview.1 用户需要手动升级一次到 preview.2。已发布的 preview.2 接入自动检查、提示和一键下载安装并重启；预览版接收预览版与稳定版，稳定版只接收稳定版。免费长期自签名身份、验证范围与日常发行流程见 [发行说明](docs/releases.md)。
 
 ## 当前能力
 
@@ -112,7 +112,7 @@ native/widget/   WidgetKit 源码与接入说明
 
 ## 验证和后续
 
-当前优先验证 macOS arm64，源码与本地包已接入[原创双 C 图标](docs/branding.md)，已发布的 preview.1 尚未包含这个图标。受控 Electron 页面、CLI 与更新引擎验证不能替代真实账号、真实目标版本、签名安装或系统扩展验收。完整记录在 [验证记录](docs/verification.md)，待真实环境确认的条目在 [二期清单](docs/phase-two.md)。
+当前优先验证 macOS arm64，已发布的 preview.2 包含[原创双 C 图标](docs/branding.md)。受控 Electron 页面、CLI 与更新引擎验证不能替代真实账号、真实目标版本、签名安装或系统扩展验收。完整记录在 [验证记录](docs/verification.md)，待真实环境确认的条目在 [二期清单](docs/phase-two.md)。
 
 `profile:desktop` / `profile:packaged` 使用临时数据测启动及所有 Electron 进程的 CPU、工作集。功能增加后没有重新建立性能基线，不宣称本轮性能达标。参见 [测量口径](docs/diagnostics-and-performance.md)。历史界面对照可用 `design:review` 查看，包含合成数据，正式应用不加载该入口。
 

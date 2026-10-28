@@ -507,3 +507,13 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - 720px 实际窗口中，从已滚动页面切换后提示仍在可视区域；已核对 one-click-update-notice.png。首次截图暴露提示滚出屏幕，改为内容区顶部保持可见并补充几何断言。设计检测无新增问题；既有迷你图表顶部 3px 圆角符合 DESIGN.md 的 rounded.plot，按值登记窄范围误报例外，没有更改图表形状。
 - 应用和根版本已准备为 0.1.0-preview.2，英文发行说明包含旧 preview.1 需手动升级一次的迁移边界。本地 DMG/ZIP 使用预览配置但明确覆盖为不签名，仅用于打包验证，来源清单标为 local-unsigned-test；未读取私钥、修改已安装应用或发起真实账户操作。
 - 本轮未推送或发布 preview.2，没有替换 preview.1 附件。签名发行与两个公开产品版本间的一键端到端更新尚待后续验收；没有声称首次 Apple 提示已消失，也未重跑全部桌面或原生两版本实验。
+
+## preview.2 公开签名发行（2026-10-28）
+
+- 用户明确同意继续推送与发布。应用源码提交为 d759f5c49591a0fcf5afd5f5766dad1a0550cbbf，标签 v0.1.0-preview.2 固定到该提交；签名身份沿用首次预览，没有生成或导入新的本机证书。
+- [运行 40672880591](https://github.com/cixiangtao/codex-coco/actions/runs/40672880591) 开启 full_validation，build 与独立 verify 均成功。云端通过 229 项测试、实际签名包启动/版本/安装资格和 worker 校验。未信任证书的收件 runner 再次验证错误签名拒绝、资源篡改拒绝，以及同证书合成应用 0.0.1 下载、替换和重启为 0.0.2。
+- 首次 publish 已创建草稿，但立即通过列表回读时没有找到它。修复为使用创建接口返回的资源，发布后按 Release ID 核对；新增受控回归模拟列表持续过时，验证六项附件上传与发布，测试、lint 和类型检查通过。修复提交 f371a7d 的 GitHub CI 也已通过。
+- [恢复运行 40674491612](https://github.com/cixiangtao/codex-coco/actions/runs/40674491612) 通过 verified_run 复用上述已验证附件，仅执行 publish，build/verify 均跳过。已读回 [公开 Release](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.2) 非草稿、Pre-release，按非 latest 发布；共 DMG、ZIP、preview-mac.yml、来源清单、校验和与许可证六项附件。
+- 重新从公开 Release 下载 ZIP、preview-mac.yml、SHA256SUMS.txt 与来源清单。ZIP SHA-256 为 307bc2d5877adcd7fa91dbdf615768ba399400ef8b30b8327bc5815d83f588e1；更新元数据 SHA-256 为 90bb0a015525cd6db4440b3bfbbf7c0870095cf3fb8a644a4500bdad8c0784ea。文件与校验清单、源提交、长期证书及元数据中的 SHA-512/大小全部一致。
+- 解压公开签名应用，在临时数据下验证完整固定证书签名、CFBundleIconFile 对应图标与仓库资产逐字节一致、标题栏图像加载、版本 0.1.0-preview.2、installSupported=true 和默认每日检查。实际匿名检查公开 GitHub 后得到 up-to-date，发布页指向 preview.2，无 renderer 错误；未使用网络桩。
+- 英文主 README、中文辅助 README 和品牌说明已同步当前下载与图标。preview.1 用户仍需手动升级一次；两个公开产品版本间的一键完整替换没有冒充验收通过。本轮没有替换 Applications 中的应用、修改系统信任/隔离属性、使用真实业务账号或执行真实安装。

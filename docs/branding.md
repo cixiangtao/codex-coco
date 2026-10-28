@@ -8,4 +8,4 @@ Run `pnpm run icons:generate` on macOS after changing the SVG. The script render
 
 Finder, Dock and the DMG volume receive the ICNS through electron-builder's mac.icon setting. Development runs set the Dock image from the PNG; windows use the same PNG. The title bar, About dialog and repository READMEs use the same mark. Existing user-selected menu bar icons remain separate.
 
-The published 0.1.0-preview.1 archive still has the default Electron icon. A future release must publish a new version through the existing Actions workflow; existing signed archives are not modified in place. The local icon-check DMG is an unsigned packaging check, not a signed public release.
+The original 0.1.0-preview.1 archive has the default Electron icon; the published 0.1.0-preview.2 includes this project icon. Releases use new versions through the existing Actions workflow; existing signed archives are not modified in place. The local icon-check DMG is an unsigned packaging check, not a signed public release.
