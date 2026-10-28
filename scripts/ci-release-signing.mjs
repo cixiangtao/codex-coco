@@ -4,6 +4,7 @@ import { randomBytes, X509Certificate } from "node:crypto";
 import { mkdir, readFile, writeFile, appendFile } from "node:fs/promises";
 import { join } from "node:path";
 const exec = promisify(execFile);
+let stage = "inputs";
 try {
   if (
     !process.env.GITHUB_ACTIONS ||
@@ -25,10 +26,12 @@ try {
   await writeFile(pass, process.env.COCO_SIGNING_PASSWORD, { mode: 0o600 });
   await writeFile(certificate, pem);
   const password = randomBytes(32).toString("hex");
+  stage = "create-keychain";
   await exec("security", ["create-keychain", "-p", password, keychain]);
   await exec("security", ["unlock-keychain", "-p", password, keychain]);
   await exec("security", ["set-keychain-settings", "-lut", "21600", keychain]);
   await exec("security", ["list-keychains", "-d", "user", "-s", keychain]);
+  stage = "import-identity";
   await exec("security", [
     "import",
     p12,
@@ -51,6 +54,7 @@ try {
     keychain,
   ]);
   // Trust exists only on the disposable GitHub runner, never on an end user's machine.
+  stage = "trust-runner-certificate";
   await exec("sudo", [
     "-n",
     "security",
@@ -64,12 +68,15 @@ try {
     "/Library/Keychains/System.keychain",
     certificate,
   ]);
+  stage = "find-identity";
   const found = await exec("security", ["find-identity", "-v", "-p", "codesigning", keychain]);
   if (!found.stdout.includes(pin.sha1)) throw new Error("IDENTITY");
   const probeSource = join(directory, "probe.c");
   const probeBinary = join(directory, "probe");
   await writeFile(probeSource, "int main(void) { return 0; }\n");
+  stage = "compile-probe";
   await exec("clang", [probeSource, "-o", probeBinary]);
+  stage = "sign-probe";
   await exec("codesign", [
     "--force",
     "--sign",
@@ -79,15 +86,19 @@ try {
     "--timestamp=none",
     probeBinary,
   ]);
+  stage = "verify-probe";
   await exec("codesign", ["--verify", "--strict", "-R", `anchor H"${pin.sha1}"`, probeBinary]);
   await appendFile(
     process.env.GITHUB_ENV,
     `CSC_KEYCHAIN=${keychain}\nCSC_NAME=${pin.commonName}\nCSC_IDENTITY_AUTO_DISCOVERY=false\n`,
   );
   console.log("Pinned self-signed identity installed on disposable runner.");
-} catch {
-  console.error(
-    "Release signing setup failed. Verify the two signing Secrets and the committed public certificate.",
-  );
+} catch (error) {
+  const reason = /specified item could not be found/i.test(String(error.stderr))
+    ? "KEYCHAIN_ITEM_NOT_FOUND"
+    : /error:/i.test(String(error.stderr))
+      ? "TOOL_REJECTED"
+      : "SETUP_FAILED";
+  console.error(`Release signing setup failed at ${stage}: ${reason}.`);
   process.exitCode = 1;
 }
