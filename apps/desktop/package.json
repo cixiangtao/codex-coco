@@ -2,7 +2,7 @@
   "name": "@codex-coco/desktop",
   "version": "0.1.0-dev.1",
   "private": true,
-  "description": "Codex Coco 桌面宿主与应用基础。",
+  "description": "Codex Coco desktop host and application.",
   "homepage": "https://github.com/cixiangtao/codex-coco#readme",
   "bugs": {
     "url": "https://github.com/cixiangtao/codex-coco/issues"

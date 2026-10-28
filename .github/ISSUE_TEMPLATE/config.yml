@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: 私密报告安全漏洞
+  - name: Report a security vulnerability privately
     url: https://github.com/cixiangtao/codex-coco/security/advisories/new
-    about: 不要在公开 Issue 中披露敏感数据或未修复漏洞细节。
+    about: Do not disclose sensitive data or unpatched exploit details in public issues.

@@ -1,26 +1,26 @@
-name: 缺陷报告
-description: 报告可复现的问题
+name: Bug report
+description: Report a reproducible problem
 body:
   - type: markdown
     attributes:
-      value: 安全漏洞请使用 SECURITY.md 中的私密渠道。请勿上传账号、令牌、本机配置或日志原文。
+      value: Report vulnerabilities privately using SECURITY.md. Do not include account data, tokens, local configuration, or raw logs.
   - type: textarea
     id: environment
     attributes:
-      label: 版本与环境
-      description: 提交编号或应用版本、macOS 版本、芯片架构、开发运行或本地打包。
+      label: Version and environment
+      description: Commit or app version, macOS version, chip architecture, and development or packaged build.
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
-      label: 复现步骤
-      description: 尽量提供最小步骤和脱敏截图。
+      label: Steps to reproduce
+      description: Provide minimal steps and sanitized screenshots where useful.
     validations:
       required: true
   - type: textarea
     id: behavior
     attributes:
-      label: 预期与实际结果
+      label: Expected and actual behavior
     validations:
       required: true

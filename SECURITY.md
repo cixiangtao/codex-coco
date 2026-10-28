@@ -1,15 +1,15 @@
-# 安全策略
+# Security policy
 
-Codex Coco 当前处于开发阶段，尚无正式签名安装包发行。安全修复以默认分支的当前开发版本为目标，暂不承诺旧开发快照的维护周期或响应时限。
+Codex Coco is in development and has no official signed binary releases. Security fixes target the current default branch. No support window for older development snapshots or response-time guarantee is promised.
 
-## 私密报告
+## Private reports
 
-请通过 [GitHub 私密漏洞报告](https://github.com/cixiangtao/codex-coco/security/advisories/new) 联系维护者。不要公开提交尚未修复的漏洞利用细节、登录令牌、账号数据、本机私有路径或日志原文。
+Use [GitHub private vulnerability reporting](https://github.com/cixiangtao/codex-coco/security/advisories/new). Do not disclose unpatched exploit details, login tokens, account data, private local paths, or raw logs in public issues.
 
-报告请尽量包含受影响的提交或版本、操作系统、最小复现步骤、实际影响，以及脱敏后的必要证据。等待维护者确认后再协调公开披露。
+Include the affected version or commit, operating system, minimal reproduction steps, expected impact, and sanitized evidence. Coordinate public disclosure with the maintainer after acknowledgement.
 
-## 数据与信任边界
+## Trust and data boundaries
 
-模块默认停用；凭据留在后台或 Codex CLI。公开 IPC 和菜单栏只接收经过校验的数据投影。外观通过用户明确选择的本机 CDP 目标工作；应用更新的检测、下载和安装是分别控制的操作。完整说明见 [README](README.md)、[菜单栏边界](docs/menu-bar.md) 和 [更新说明](docs/updates.md)。
+Business modules are disabled by default. Credentials stay in backend services or the Codex CLI. Renderer IPC and menu bar views receive validated public projections. Appearance changes target a user-selected local CDP application. Update checks, downloads, and installation are controlled separately. See the [README](README.md), [menu bar boundaries](docs/menu-bar.md), and [update documentation](docs/updates.md).
 
-CI 使用临时数据和受控服务，不应引入真实账号或签名私钥。源码 MIT 许可不等同于所有运行场景已经完成安全审计。
+CI uses temporary data and controlled services. It must not require real accounts or signing private keys. The MIT license does not imply that every runtime scenario has received a security audit.

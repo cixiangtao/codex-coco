@@ -1,11 +1,11 @@
-## 变化和原因
+## Change and motivation
 
-说明具体场景与修改后的行为。
+Describe the use case and resulting behavior.
 
-## 验证
+## Verification
 
-列出实际执行的检查命令和结果；界面变化附脱敏截图。注明未覆盖的真实环境边界。
+List checks actually run and their results. Include sanitized screenshots for UI changes and state any real-environment limitations.
 
-## 来源与数据
+## Sources and data
 
-涉及第三方代码或素材时说明许可证记录；确认未提交凭据、账号数据、本机配置或构建产物。
+Record license notices for reused code or assets. Confirm that no credentials, account data, local configuration, or generated builds are included.
