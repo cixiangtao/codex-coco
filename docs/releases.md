@@ -6,7 +6,7 @@ The root and desktop package manifests own the application version together. Pre
 
 ## Free self-signed identity
 
-A project-owned RSA code-signing certificate provides update identity continuity without an Apple Developer membership. This is separate from Developer ID and notarization: users still receive macOS first-launch checks. Ad-hoc signing alone is not the update identity.
+A project-owned RSA code-signing certificate provides update identity continuity without an Apple Developer membership. No Apple timestamp service is used (`timestamp=none`). This is separate from Developer ID and notarization: users still receive macOS first-launch checks. Ad-hoc signing alone is not the update identity.
 
 The public certificate and fingerprint are committed in `apps/desktop/resources/signing/`. The application verifies the complete bundle and requires this certificate and the expected bundle identifier. It does not accept any arbitrary self-signed app or a missing signature. Squirrel.Mac continues to verify downloaded bundles against the running app's designated requirement.
 

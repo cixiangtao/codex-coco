@@ -75,6 +75,7 @@ async function make(version) {
         hardenedRuntime: false,
         gatekeeperAssess: false,
         notarize: false,
+        timestamp: "none",
         extendInfo: { NSAppTransportSecurity: { NSAllowsLocalNetworking: true } },
       },
     },
