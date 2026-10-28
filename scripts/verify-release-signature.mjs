@@ -13,7 +13,7 @@ await exec("codesign", [
   "--deep",
   "--strict",
   "-R",
-  `anchor H"${pin.sha1}" and identifier "${pin.bundleId}"`,
+  `=anchor H"${pin.sha1}" and identifier "${pin.bundleId}"`,
   bundle,
 ]);
 assert.equal(

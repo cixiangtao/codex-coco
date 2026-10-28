@@ -44,7 +44,7 @@ export function createNativeUpdateEngine(directory: string): UpdateEngine {
             "--deep",
             "--strict",
             "-R",
-            `anchor H"${identity.sha1}" and identifier "${identity.bundleId}"`,
+            `=anchor H"${identity.sha1}" and identifier "${identity.bundleId}"`,
             bundle,
           ],
           { timeout: 10_000, maxBuffer: 64 * 1024 },

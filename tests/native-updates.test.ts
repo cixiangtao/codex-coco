@@ -111,7 +111,7 @@ it("requires the pinned certificate and bundle identifier without requiring an A
       "--strict",
       "--deep",
       "-R",
-      `anchor H"${identity.sha1}" and identifier "${identity.bundleId}"`,
+      `=anchor H"${identity.sha1}" and identifier "${identity.bundleId}"`,
     ]),
   );
   mocks.signatureValid = false;

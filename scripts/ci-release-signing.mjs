@@ -87,7 +87,7 @@ try {
     probeBinary,
   ]);
   stage = "verify-probe";
-  await exec("codesign", ["--verify", "--strict", "-R", `anchor H"${pin.sha1}"`, probeBinary]);
+  await exec("codesign", ["--verify", "--strict", "-R", `=anchor H"${pin.sha1}"`, probeBinary]);
   await appendFile(
     process.env.GITHUB_ENV,
     `CSC_KEYCHAIN=${keychain}\nCSC_NAME=${pin.commonName}\nCSC_IDENTITY_AUTO_DISCOVERY=false\n`,
