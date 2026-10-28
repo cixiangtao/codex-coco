@@ -28,6 +28,7 @@ try {
   await exec("security", ["create-keychain", "-p", password, keychain]);
   await exec("security", ["unlock-keychain", "-p", password, keychain]);
   await exec("security", ["set-keychain-settings", "-lut", "21600", keychain]);
+  await exec("security", ["list-keychains", "-d", "user", "-s", keychain]);
   await exec("security", [
     "import",
     p12,
@@ -65,6 +66,20 @@ try {
   ]);
   const found = await exec("security", ["find-identity", "-v", "-p", "codesigning", keychain]);
   if (!found.stdout.includes(pin.sha1)) throw new Error("IDENTITY");
+  const probeSource = join(directory, "probe.c");
+  const probeBinary = join(directory, "probe");
+  await writeFile(probeSource, "int main(void) { return 0; }\n");
+  await exec("clang", [probeSource, "-o", probeBinary]);
+  await exec("codesign", [
+    "--force",
+    "--sign",
+    pin.sha1,
+    "--keychain",
+    keychain,
+    "--timestamp=none",
+    probeBinary,
+  ]);
+  await exec("codesign", ["--verify", "--strict", "-R", `anchor H"${pin.sha1}"`, probeBinary]);
   await appendFile(
     process.env.GITHUB_ENV,
     `CSC_KEYCHAIN=${keychain}\nCSC_NAME=${pin.commonName}\nCSC_IDENTITY_AUTO_DISCOVERY=false\n`,
