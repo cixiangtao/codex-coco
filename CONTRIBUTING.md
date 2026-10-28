@@ -27,6 +27,6 @@ CI checks formatting, lint, dependency boundaries, types, contract tests, and pr
 
 ## Dependencies and releases
 
-Pin exact dependency versions and keep only pnpm-lock.yaml. Routine upgrades remain a maintainer decision. Security fixes still require review and checks; they are not automatically merged. Source pushes do not publish versions. There is no signed release pipeline yet; GitHub Actions will be the sole publisher for future automated release targets.
+Pin exact dependency versions and keep only pnpm-lock.yaml. Routine upgrades remain a maintainer decision. Security fixes still require review and checks; they are not automatically merged. Source pushes do not publish versions. GitHub Actions is the sole publisher for self-signed previews. Routine publication reuses the long-term signing identity and checks the actual artifact; full update-mechanism verification is reserved for certificate or updater changes. See [releases](docs/releases.md).
 
 Report security problems privately using [SECURITY.md](SECURITY.md).

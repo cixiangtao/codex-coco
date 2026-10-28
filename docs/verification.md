@@ -469,3 +469,14 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - `pnpm run pack` 生成最终源码的 macOS arm64 未签名应用。生产入口与该本地包的 `verify-updates` 均通过：无版本、新版、失败恢复、取消、打开受限发布页、未签名可检查且拒绝下载/安装、多窗口、重启持久化、损坏备份、速览拒绝读写与导航。脚本使用临时目录及受控网络，不打开外部浏览器。曾因网络桩拦截本地文件资源导致第二窗口无法加载，限定桩的网络范围后整组重跑通过。
 - 另以临时数据启动真实 Electron，明确调用检查，未使用网络桩，实际 GitHub 返回 `no-release`，`reason: null`，符合公开仓库尚无正式 Release 的状态。未读取 GitHub 凭据或业务账号。
 - 已查看更新界面的新版提示截图。没有新增依赖；没有运行全量 verify:packaged 或性能采样，没有签名、公证、真实更新包下载/安装、创建 Release、上传包或注册 Widget。GitHub 源码开源与检测成功不代表签名发行链路已完成。
+
+## 长期自签名预览发布（2026-10-28）
+
+- 用户选择免费长期自签名方案。私钥只保存在仓库外的私有目录与 GitHub Actions Secrets，公开仓库仅保存证书与指纹；本机与收件 runner 未导入或信任证书。签名 runner 的临时钥匙串随任务销毁。预览未使用 Apple Developer ID、Apple 时间戳或公证，首次安装仍可能受到 macOS 未知开发者检查。
+- `pnpm run check` 通过：28 个文件、221 项测试、Oxfmt、Oxlint、125 个源文件 AST 边界、分进程类型检查与生产构建。新增覆盖固定证书安装资格及复用发行产物的来源校验。
+- [完整验证运行 40660543495](https://github.com/cixiangtao/codex-coco/actions/runs/40660543495) 的 build 与 verify 均成功。实际 Codex Coco 签名包在签名端及独立收件 runner 上通过完整签名、固定证书、arm64、版本、真实启动和更新 IPC 检查，打包 worker 回归通过。
+- 全新收件 runner 没有收到私钥或信任证书，使用相同 Electron 的两个合成版本验证真实 Squirrel.Mac 更新：错误签名拒绝、资源篡改拒绝、同证书 0.0.1 下载并替换重启为 0.0.2；另检查安装目录实际版本。这个实验验证原生机制，不代表两个公开 Codex Coco 产品版本之间已经完成更新验收。
+- 初次 publish 在草稿 Release 查询处失败；修复后 [恢复运行 40662478494](https://github.com/cixiangtao/codex-coco/actions/runs/40662478494) 复用上述已验证原始产物，没有重新构建。来源、版本、证书、校验和、标签与已存在资产均核对后发布 [v0.1.0-preview.1](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1)。应用源码提交为 `793fc60d2461a6060c5786123e55143f6f1335c5`；Release 非草稿、为 Pre-release、非 latest，包含 DMG、ZIP、来源/签名清单、SHA256SUMS.txt 与生产依赖许可共五项附件，发布后读回其 SHA-256。
+- 从公开 Release 重新下载 ZIP、校验和与来源清单，确认 ZIP SHA-256 为 `1cd7815f3933354f3f263f1052547ff50b5f06a19b8b60f36f27fa7079023440`，来源提交与公开证书匹配。解压后在本机临时数据中通过完整固定证书验证、arm64、实际启动、版本 0.1.0-preview.1 和更新 IPC（installSupported=true、idle）；无 renderer 错误。没有安装到 Applications、修改钥匙串或操作真实账号与 Codex。
+- 日常发布默认 `full_validation=false`，保留 check、实际签名包、独立收件启动与 worker 校验；首次或证书/Electron/updater/installer 变更再运行两版本实验。发布失败可用 `verified_run` 复用已验证产物，依赖下载使用 pnpm 缓存。
+- 完整桌面 UI 回归独立保留，不计作本次通过项：云端曾因屏幕高度与固定窗口高度断言不符失败，本机尝试又遇到 tooltip hover 超时。未放宽既有 UI 断言，未声称本轮完整 verify:packaged 通过。预览版不进入稳定更新频道，需手动下载；完整产品跨版本更新与 Widget 注册仍待后续验收。

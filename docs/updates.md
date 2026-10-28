@@ -23,7 +23,7 @@ GitHub 的 [Release API 文档](https://docs.github.com/en/rest/releases/release
 
 正式更新 Release 需要 electron-builder 生成的 `latest-mac.yml` 和对应架构的签名 ZIP，版本必须匹配 Release 标签。DMG 可供首次手动安装，单独上传源码归档或 DMG 不构成原生自动更新链路。参见 [electron-builder 更新说明](https://www.electron.build/docs/features/auto-update/)。
 
-仓库已配置 GitHub 发布目标，但 `pnpm run pack` 仍使用 `--dir --publish never`，只生成本地未签名应用目录。免费自签名预览发行的准备与验证入口见 [发行说明](releases.md)。自签名不等于 Apple Developer ID 或公证。尚无公开发行附件，真实更新验收完成后再通过 GitHub Actions 发布预览。
+仓库已配置 GitHub 发布目标，但 `pnpm run pack` 仍使用 `--dir --publish never`，只生成本地未签名应用目录。免费自签名预览发行的准备与验证入口见 [发行说明](releases.md)。自签名不等于 Apple Developer ID 或公证。已通过 GitHub Actions 发布 0.1.0-preview.1 的自签名 DMG/ZIP；正式更新频道仍不包含预发布版，未来稳定版需保持同一签名身份并生成更新元数据。
 
 ## 配置、权限与隐私
 
@@ -35,4 +35,4 @@ GitHub 的 [Release API 文档](https://docs.github.com/en/rest/releases/release
 
 - 合同测试覆盖稳定版本比较、草稿与预发布拒绝、固定匿名 API、有界响应、HTTP 失败、取消、未签名可检查/不可下载、下载与安装确认、配置迁移、定时 opt-in、冲突、损坏备份及私有错误排除。
 - `pnpm run verify:updates` 使用真实 Electron 生产入口、临时配置及受控 `net.fetch`，验证无版本、新版、失败恢复、取消、打开受限发布页、多窗口、重启和速览权限。`node scripts/verify-updates.mjs --packaged` 验证同一未签名本地包。
-- 受控传输不请求真实 GitHub，不打开系统浏览器，不执行真实安装。真实签名 ZIP 的下载、系统签名验证、替换与重启仍需未来正式发行验收；源码仓库或本地构建通过不代表这些已经交付。
+- 受控传输不请求真实 GitHub，不打开系统浏览器，不执行真实安装。另已在独立、未导入证书的收件 runner 上，用相同 Electron 的两个合成版本验证真实 Squirrel 替换/重启、错误签名和资源篡改拒绝，并验证实际 Codex Coco 包的签名识别和启动。尚无两个公开 Codex Coco 版本间的完整真实更新验收，也不把自签名描述为 Apple 公证。

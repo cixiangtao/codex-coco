@@ -4,7 +4,13 @@ A Codex desktop companion, shaped around personal workflows.
 
 [简体中文](README.zh-CN.md)
 
-**Status: local development build with phase-two core features implemented.** The source is public on GitHub. There is no official binary release, code signing or notarization. UI refinement follows core functionality. Controlled tests do not substitute for real-account, current-Codex, signed-update or Widget registration acceptance; see the [phase-two checklist](docs/phase-two.md).
+**Status: macOS Apple Silicon preview, with phase-two core features implemented.** [Version 0.1.0-preview.1](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1) is available with a project-owned self-signed identity. It is not Apple Developer ID signed or notarized. UI refinement follows core functionality. Controlled tests do not substitute for real-account, current-Codex, signed-update or Widget registration acceptance; see the [phase-two checklist](docs/phase-two.md).
+
+## Download
+
+Get the macOS arm64 DMG or ZIP from [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1), verify SHA256SUMS.txt, and move Codex Coco.app to Applications. macOS may show an unidentified-developer prompt; follow [Apple's instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac) after verifying the download. No root certificate installation is required.
+
+This preview is not part of the stable update channel. Preview updates are downloaded manually. See [release and signing details](docs/releases.md) for the free self-signed identity, build verification and release workflow.
 
 ## Features
 
@@ -48,7 +54,7 @@ The main window hosts full operations; the menu-bar popover receives only public
 
 Settings default to `~/Library/Application Support/Codex Coco/foundation/`; override with `CODEX_COCO_DATA_DIR` for isolated development. Old repositories, settings and services are untouched. Diagnostics exclude private paths, account data, configuration contents and raw exceptions. There is no telemetry or cloud synchronization.
 
-Update checks are manual by default; opt-in checks never download automatically, and downloaded packages are not installed on ordinary quit. Native signed installation and Widget App Group registration still need a future authorized distribution setup. The current application uses Electron's default icon and remains unsigned/unnotarized. See [updates](docs/updates.md), [appearance](docs/appearance.md), [verification](docs/verification.md), [architecture](docs/architecture.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
+Update checks are manual by default; opt-in checks never download automatically, and downloaded packages are not installed on ordinary quit. A complete update between two public Codex Coco versions and Widget App Group registration remain unverified. The current application uses Electron's default icon and a self-signed identity without Apple notarization. See [updates](docs/updates.md), [appearance](docs/appearance.md), [verification](docs/verification.md), [architecture](docs/architecture.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 Performance scripts provide isolated machine-specific measurements. No new performance baseline was established for this feature batch.
 

@@ -1,6 +1,6 @@
 # Security policy
 
-Codex Coco is in development and has no official signed binary releases. Security fixes target the current default branch. No support window for older development snapshots or response-time guarantee is promised.
+Codex Coco is in development and distributes self-signed macOS previews. These are not Apple Developer ID signed or notarized. Security fixes target the current default branch. No support window for older development snapshots or response-time guarantee is promised.
 
 ## Private reports
 
