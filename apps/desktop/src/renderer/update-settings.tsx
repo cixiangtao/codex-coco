@@ -1,7 +1,7 @@
 import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
 import { useEffect, useState } from "react";
 import { Button } from "@codex-coco/ui/components/button";
-import { Input } from "@codex-coco/ui/components/input";
+import { Switch } from "@codex-coco/ui/components/switch";
 import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
 import { Alert, AlertTitle, AlertDescription } from "@codex-coco/ui/components/alert";
 import {
@@ -13,13 +13,14 @@ import {
 } from "@codex-coco/ui/components/dialog";
 import {
   updatePreferencesSchema,
+  isPreviewVersion,
   updateRepository,
   type UpdateSnapshot,
   type UpdateAction,
   type UpdatePreferences,
 } from "../contracts/updates";
 const labels: Record<UpdateSnapshot["phase"], string> = {
-  "no-release": "尚无正式版本",
+  "no-release": "尚无可用版本",
   idle: "等待检查",
   checking: "正在检查更新",
   available: "发现可用版本",
@@ -33,19 +34,19 @@ const labels: Record<UpdateSnapshot["phase"], string> = {
 };
 const reasons = {
   SIGNED_INSTALL_REQUIRED:
-    "应用内更新需要正式签名的 macOS 安装版；仍可打开 GitHub 发布页面手动下载。",
+    "应用内更新需要使用项目长期证书签名的 macOS 安装版；仍可打开发布页面手动下载。",
   CHECK_FAILED: "检查失败，请检查网络或稍后重试；GitHub 请求限额也可能导致失败。",
   DOWNLOAD_FAILED: "下载或校验失败，请重新检查版本后再试。",
   INSTALL_FAILED: "系统未能验证或安装更新，当前应用不会冒充更新成功。",
   SETTINGS_UNAVAILABLE: "更新设置损坏，重置时会先保留原文件备份。",
 };
-/** Shared updater status, window-local draft and explicit download/install confirmations. */
+/** Shared updater status and an explicit action consenting to download, verify and restart. */
 export function UpdateSettings() {
   const [state, setState] = useState<UpdateSnapshot | null>(null);
   const [draft, setDraft] = useState<{ value: UpdatePreferences; revision: number } | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const [confirm, setConfirm] = useState<"download" | "install" | "reset" | null>(null);
+  const [confirm, setConfirm] = useState<"reset" | null>(null);
   useEffect(() => {
     let live = true;
     const off = window.codexCoco.onUpdatesChanged((value) => {
@@ -131,7 +132,7 @@ export function UpdateSettings() {
           当前版本支持检查新版；应用内更新需要签名的 macOS 安装版，可通过 GitHub 发布页面手动下载。
         </p>
       )}
-      {state.phase === "no-release" && <output>仓库尚未发布正式版本，请稍后再检查。</output>}
+      {state.phase === "no-release" && <output>当前更新频道尚无可用版本，请稍后再检查。</output>}
       {conflict && <p role="alert">其他窗口已更新设置，请取消本地修改后重新编辑。</p>}
       <SettingsGroup title="版本与发布源" disabled={busy}>
         <SettingsRow>
@@ -147,22 +148,22 @@ export function UpdateSettings() {
             {updateRepository.owner}/{updateRepository.repo}
           </p>
           <FieldDescription>
-            只检查该仓库的正式 Release，忽略草稿和预发布。默认手动检查，不在启动时联网。
+            {isPreviewVersion(state.currentVersion)
+              ? "当前为预览版，接收后续预览版与稳定版更新。"
+              : "当前为稳定版，只接收稳定版更新。"}
           </FieldDescription>
         </SettingsRow>
         <SettingsRow>
-          <FieldLabel htmlFor="update-interval">后台检查间隔（小时）</FieldLabel>
-          <Input
-            id="update-interval"
-            type="number"
-            min={0}
-            max={168}
-            value={Number.isNaN(value.intervalHours) ? "" : value.intervalHours}
-            onChange={(event) => edit({ intervalHours: event.target.valueAsNumber })}
-            disabled={busy}
+          <FieldLabel htmlFor="update-automatic">自动检查更新</FieldLabel>
+          <Switch
+            id="update-automatic"
+            checked={value.intervalHours > 0}
+            onCheckedChange={(checked) => edit({ intervalHours: checked ? 24 : 0 })}
           />
           <FieldDescription>
-            0 为手动；自动检查支持 4–168 小时，只查版本，不自动下载或安装。
+            {value.intervalHours > 0
+              ? `启动后检查，之后每 ${value.intervalHours} 小时检查一次；有新版时提示，不自动下载或重启。`
+              : "仅在点击检查时联网。"}
           </FieldDescription>
         </SettingsRow>
       </SettingsGroup>
@@ -187,7 +188,7 @@ export function UpdateSettings() {
       </div>
       <SettingsGroup
         title="更新操作"
-        description="签名版可在应用内下载并校验 SHA-512，安装时由 macOS 验证签名。下载和安装分别确认，普通退出不会自动安装。"
+        description="点击更新即同意下载、校验并重启 Codex Coco，请先保存工作。下载期间可以取消，普通退出不会自动安装。"
       >
         <SettingsRow layout="stacked">
           <FieldLabel>检查与安装</FieldLabel>
@@ -202,23 +203,17 @@ export function UpdateSettings() {
               检查 Codex Coco 更新
             </Button>
             <Button
-              variant="outline"
               disabled={
-                busy ||
-                !state.installSupported ||
-                !state.availableVersion ||
-                state.phase === "downloaded" ||
-                Boolean(draft)
+                busy || !state.installSupported || !state.availableVersion || Boolean(draft)
               }
-              onClick={() => setConfirm("download")}
+              onClick={() => {
+                void run({
+                  action: state.phase === "downloaded" ? "install" : "update",
+                  confirmed: true,
+                });
+              }}
             >
-              下载更新包
-            </Button>
-            <Button
-              disabled={busy || !state.installSupported || state.phase !== "downloaded"}
-              onClick={() => setConfirm("install")}
-            >
-              安装并重启 Codex Coco
+              {state.phase === "downloaded" ? "重启完成更新" : "更新并重启 Codex Coco"}
             </Button>
             <Button
               variant="outline"
@@ -260,19 +255,9 @@ export function UpdateSettings() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {confirm === "install"
-                ? "安装并重启 Codex Coco？"
-                : confirm === "download"
-                  ? "下载更新包？"
-                  : "重置更新设置？"}
-            </DialogTitle>
+            <DialogTitle>重置更新设置？</DialogTitle>
             <DialogDescription>
-              {confirm === "install"
-                ? "请先保存当前工作。系统将验证已校验的更新包，正常退出后替换并重新打开 Codex Coco。"
-                : confirm === "download"
-                  ? "将从 GitHub Releases 下载所列版本并校验完整性，不会自动安装。"
-                  : "会停用后台检查，并保留现有配置文件备份。GitHub 发布仓库保持不变。"}
+              会恢复默认的每日自动检查，并保留现有配置文件备份。发布仓库保持不变。
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3">
@@ -284,7 +269,7 @@ export function UpdateSettings() {
               onClick={() => {
                 const action = confirm;
                 setConfirm(null);
-                if (action) void run(action === "reset" ? { action } : { action, confirmed: true });
+                if (action) void run({ action });
               }}
             >
               确认继续

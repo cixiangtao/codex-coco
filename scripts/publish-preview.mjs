@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { readFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
+import { verifyUpdateInfo } from "./release-update-info.mjs";
 const exec = promisify(execFile);
 const repository = "cixiangtao/codex-coco";
 assert.equal(process.env.GITHUB_ACTIONS, "true");
@@ -29,7 +30,14 @@ assert.equal(
 );
 const expected = ["dmg", "zip"]
   .map((ext) => `Codex-Coco-${pkg.version}-macOS-arm64-self-signed.${ext}`)
-  .concat(["release-manifest.json", "THIRD_PARTY_LICENSES.txt"]);
+  .concat(["release-manifest.json", "THIRD_PARTY_LICENSES.txt", "preview-mac.yml"]);
+const zipName = `Codex-Coco-${pkg.version}-macOS-arm64-self-signed.zip`;
+verifyUpdateInfo(
+  await readFile(join(directory, "preview-mac.yml"), "utf8"),
+  pkg.version,
+  zipName,
+  await readFile(join(directory, zipName)),
+);
 assert.deepEqual((await readdir(directory)).sort(), [...expected, "SHA256SUMS.txt"].sort());
 const lines = (await readFile(join(directory, "SHA256SUMS.txt"), "utf8")).trim().split("\n");
 assert.equal(lines.length, expected.length);

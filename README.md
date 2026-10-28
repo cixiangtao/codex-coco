@@ -12,7 +12,7 @@ A Codex desktop companion, shaped around personal workflows.
 
 Get the macOS arm64 DMG or ZIP from [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1), verify SHA256SUMS.txt, and move Codex Coco.app to Applications. If macOS says Apple could not verify Codex Coco, dismiss the alert, open **System Settings → Privacy & Security → Open Anyway**, then confirm **Open**. The self-signed identity does not remove this first-launch warning. See the [installation guide](apps/desktop/resources/INSTALL.txt) and [Apple's instructions](https://support.apple.com/102445). No root certificate installation or global Gatekeeper change is required.
 
-This preview is not part of the stable update channel. Preview updates are downloaded manually. See [release and signing details](docs/releases.md) for the free self-signed identity, build verification and release workflow.
+The published preview.1 requires a manual upgrade once. The next preview is prepared locally with automatic version checks and an explicit one-click download, verification and restart. Preview installations will follow previews and stable releases; stable installations will stay on stable releases. See [release and signing details](docs/releases.md) for the free self-signed identity, build verification and release workflow.
 
 ## Features
 
@@ -56,7 +56,7 @@ The main window hosts full operations; the menu-bar popover receives only public
 
 Settings default to `~/Library/Application Support/Codex Coco/foundation/`; override with `CODEX_COCO_DATA_DIR` for isolated development. Old repositories, settings and services are untouched. Diagnostics exclude private paths, account data, configuration contents and raw exceptions. There is no telemetry or cloud synchronization.
 
-Update checks are manual by default; opt-in checks never download automatically, and downloaded packages are not installed on ordinary quit. A complete update between two public Codex Coco versions and Widget App Group registration remain unverified. The current source includes an [original double-C icon](docs/branding.md); the published preview.1 predates this icon. Preview distribution uses a self-signed identity without Apple notarization. See [updates](docs/updates.md), [appearance](docs/appearance.md), [verification](docs/verification.md), [architecture](docs/architecture.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
+New installations check for updates after startup and daily, with an option to disable checks. Checks never download automatically. Clicking Update and Restart consents to download, verify and restart; ordinary quit never automatically installs an update. A complete update between two public Codex Coco versions and Widget App Group registration remain unverified. The current source includes an [original double-C icon](docs/branding.md); the published preview.1 predates this icon. Preview distribution uses a self-signed identity without Apple notarization. See [updates](docs/updates.md), [appearance](docs/appearance.md), [verification](docs/verification.md), [architecture](docs/architecture.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 Performance scripts provide isolated machine-specific measurements. No new performance baseline was established for this feature batch.
 

@@ -3,7 +3,11 @@ import {
   parseGithubRelease,
   readGithubRelease,
 } from "../apps/desktop/src/application/github-releases";
-import { latestReleaseApi, releasesUrl } from "../apps/desktop/src/contracts/updates";
+import {
+  latestReleaseApi,
+  previewReleasesApi,
+  releasesUrl,
+} from "../apps/desktop/src/contracts/updates";
 const release = { tag_name: "v1.2.0", draft: false, prerelease: false };
 it("compares stable versions numerically, permits v tags, and upgrades same-core development builds", () => {
   expect(parseGithubRelease(release, "1.1.99")).toMatchObject({
@@ -59,4 +63,37 @@ it("does not publish a release after cancellation", async () => {
     return new Response(JSON.stringify(release));
   });
   await expect(readGithubRelease(request, "0.1.0", controller.signal)).rejects.toThrow();
+});
+
+it("orders preview numbers numerically and promotes to stable without downgrading", () => {
+  const preview = { tag_name: "v0.1.0-preview.10", draft: false, prerelease: true };
+  expect(parseGithubRelease(preview, "0.1.0-preview.9").available).toBe(true);
+  expect(parseGithubRelease(preview, "0.1.0-preview.11").available).toBe(false);
+  expect(parseGithubRelease(preview, "0.1.0-preview.10").available).toBe(false);
+  expect(
+    parseGithubRelease({ ...preview, tag_name: "v0.1.0", prerelease: false }, "0.1.0-preview.10")
+      .available,
+  ).toBe(true);
+  expect(() => parseGithubRelease(preview, "0.1.0")).toThrow();
+});
+
+it("selects the highest supported preview or stable release, excluding drafts and foreign channels", async () => {
+  const request = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(
+      JSON.stringify([
+        { tag_name: "v0.1.0-preview.10", draft: false, prerelease: true },
+        { tag_name: "v9.0.0-preview.1", draft: true, prerelease: true },
+        { tag_name: "v9.0.0-beta.1", draft: false, prerelease: true },
+        { tag_name: "v0.1.0-preview.2", draft: false, prerelease: true },
+        { tag_name: "v0.1.0-preview.99", draft: false, prerelease: false },
+      ]),
+    ),
+  );
+  expect(
+    await readGithubRelease(request, "0.1.0-preview.1", new AbortController().signal),
+  ).toMatchObject({ version: "0.1.0-preview.10", available: true });
+  expect(request).toHaveBeenCalledWith(
+    previewReleasesApi,
+    expect.objectContaining({ credentials: "omit", redirect: "error" }),
+  );
 });

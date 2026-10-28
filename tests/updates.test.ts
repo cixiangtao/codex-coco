@@ -44,7 +44,7 @@ afterEach(async () => {
   vi.useRealTimers();
   await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
-it("does no startup network, checks without downloading, and requires explicit download/install confirmation", async () => {
+it("defers startup networking and keeps separate low-level download/install actions explicit", async () => {
   const { service, port } = await setup();
   expect(port.check).not.toHaveBeenCalled();
   await service.action({ action: "check" });
@@ -63,6 +63,89 @@ it("does no startup network, checks without downloading, and requires explicit d
   expect(port.install).not.toHaveBeenCalled();
   await service.action({ action: "install", confirmed: true });
   expect(port.install).toHaveBeenCalledTimes(1);
+});
+
+it("checks automatically after startup and daily without downloading or restarting", async () => {
+  vi.useFakeTimers();
+  const { service, port } = await setup();
+  expect(service.snapshot().preferences.intervalHours).toBe(24);
+  await vi.advanceTimersByTimeAsync(9999);
+  expect(port.check).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(port.check).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(24 * 3600_000);
+  expect(port.check).toHaveBeenCalledTimes(2);
+  expect(port.download).not.toHaveBeenCalled();
+  expect(port.install).not.toHaveBeenCalled();
+});
+
+it("honors an existing saved manual-check preference", async () => {
+  vi.useFakeTimers();
+  const { service, port } = await setup();
+  await service.save({ expectedRevision: 0, value: { intervalHours: 0 } });
+  await vi.advanceTimersByTimeAsync(168 * 3600_000);
+  expect(port.check).not.toHaveBeenCalled();
+});
+
+it("downloads and installs once from one explicit consent, and never after cancellation", async () => {
+  const { service, port } = await setup();
+  await service.action({ action: "check" });
+  await idle(service);
+  await expect(service.action({ action: "update" })).rejects.toMatchObject({
+    code: "INVALID_INPUT",
+  });
+  await service.action({ action: "update", confirmed: true });
+  await idle(service);
+  expect(port.download).toHaveBeenCalledTimes(1);
+  expect(port.install).toHaveBeenCalledTimes(1);
+  expect(service.snapshot().phase).toBe("installing");
+  let finish: (() => void) | undefined;
+  const cancelled = await setup({
+    download: async () => {
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    },
+  });
+  await cancelled.service.action({ action: "check" });
+  await idle(cancelled.service);
+  await cancelled.service.action({ action: "update", confirmed: true });
+  await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+  await cancelled.service.action({ action: "cancel" });
+  finish?.();
+  await idle(cancelled.service);
+  expect(cancelled.port.install).not.toHaveBeenCalled();
+  expect(cancelled.service.snapshot().phase).toBe("available");
+});
+
+it("does not restart from one-click consent after a failed download or shutdown", async () => {
+  const failed = await setup({
+    download: async () => {
+      throw new Error("PRIVATE checksum");
+    },
+  });
+  await failed.service.action({ action: "check" });
+  await idle(failed.service);
+  await failed.service.action({ action: "update", confirmed: true });
+  await idle(failed.service);
+  expect(failed.port.install).not.toHaveBeenCalled();
+  expect(failed.service.snapshot().reason).toBe("DOWNLOAD_FAILED");
+  let finish: (() => void) | undefined;
+  const stopping = await setup({
+    download: async () => {
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    },
+  });
+  await stopping.service.action({ action: "check" });
+  await idle(stopping.service);
+  await stopping.service.action({ action: "update", confirmed: true });
+  await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+  const stopped = stopping.service.shutdown();
+  finish?.();
+  await stopped;
+  expect(stopping.port.install).not.toHaveBeenCalled();
 });
 it("allows unsigned checks and manual release navigation while blocking native download and installation", async () => {
   const { service, port } = await setup({ supported: async () => false });

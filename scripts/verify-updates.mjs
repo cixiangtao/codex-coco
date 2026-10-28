@@ -12,13 +12,22 @@ const output = join(
   packaged ? "work/update-verification-packaged" : "work/update-verification",
 );
 await mkdir(output, { recursive: true });
+// Start legacy/manual scenarios with an explicit saved preference; defaults are checked separately.
+await writeFile(
+  join(directory, "updates.json"),
+  JSON.stringify({ version: 2, revision: 0, preferences: { intervalHours: 0 } }),
+);
 let session;
 async function launch() {
   session = await createDesktopSession(
     directory,
     { ...process.env, CODEX_COCO_FIXTURES: "0" },
     packaged
-      ? join(root, "apps/desktop/release/mac-arm64/Codex Coco.app/Contents/MacOS/Codex Coco")
+      ? join(
+          process.env.CODEX_COCO_VERIFY_BUNDLE ??
+            join(root, "apps/desktop/release/mac-arm64/Codex Coco.app"),
+          "Contents/MacOS/Codex Coco",
+        )
       : undefined,
   );
   await session.page
@@ -49,14 +58,15 @@ async function launch() {
       if (globalThis.updateQaMode === "error")
         return new Response("PRIVATE error", { status: 403 });
       if (globalThis.updateQaMode === "none") return new Response(null, { status: 404 });
+      const release = {
+        tag_name: "v999.0.0",
+        draft: false,
+        prerelease: false,
+        html_url: "https://evil.invalid/PRIVATE",
+        body: "PRIVATE_RELEASE_BODY",
+      };
       return new Response(
-        JSON.stringify({
-          tag_name: "v999.0.0",
-          draft: false,
-          prerelease: false,
-          html_url: "https://evil.invalid/PRIVATE",
-          body: "PRIVATE_RELEASE_BODY",
-        }),
+        JSON.stringify(String(input).includes("?per_page=100") ? [release] : release),
       );
     };
     shell.openExternal = async (url) => {
@@ -72,8 +82,8 @@ try {
   assert.equal(await section.getByLabel("发布源目录", { exact: true }).count(), 0);
   assert.equal(await application.evaluate(() => globalThis.updateQaRequests.length), 0);
   await section.getByRole("button", { name: "检查 Codex Coco 更新", exact: true }).click();
-  await section.getByText("尚无正式版本", { exact: true }).waitFor();
-  await section.getByText("仓库尚未发布正式版本，请稍后再检查。", { exact: true }).waitFor();
+  await section.getByText("尚无可用版本", { exact: true }).waitFor();
+  await section.getByText("当前更新频道尚无可用版本，请稍后再检查。", { exact: true }).waitFor();
   await application.evaluate(() => {
     globalThis.updateQaMode = "available";
   });
@@ -84,9 +94,8 @@ try {
   assert.equal(state.installSupported, false);
   assert.equal(state.releaseUrl, "https://github.com/cixiangtao/codex-coco/releases/tag/v999.0.0");
   assert(!JSON.stringify(state).includes("PRIVATE"));
-  assert(await section.getByRole("button", { name: "下载更新包", exact: true }).isDisabled());
   assert(
-    await section.getByRole("button", { name: "安装并重启 Codex Coco", exact: true }).isDisabled(),
+    await section.getByRole("button", { name: "更新并重启 Codex Coco", exact: true }).isDisabled(),
   );
   await section.getByRole("button", { name: "打开 GitHub 发布页面", exact: true }).click();
   await page.waitForFunction(
@@ -123,7 +132,10 @@ try {
   assert(
     requests.every(
       (request) =>
-        request.url === "https://api.github.com/repos/cixiangtao/codex-coco/releases/latest" &&
+        [
+          "https://api.github.com/repos/cixiangtao/codex-coco/releases/latest",
+          "https://api.github.com/repos/cixiangtao/codex-coco/releases?per_page=100",
+        ].includes(request.url) &&
         request.credentials === "omit" &&
         !Object.keys(request.headers).some((name) => /authorization/i.test(name)),
     ),
@@ -133,7 +145,7 @@ try {
     scale: "css",
     animations: "disabled",
   });
-  await section.getByLabel("后台检查间隔（小时）", { exact: true }).fill("4");
+  await section.getByRole("switch", { name: "自动检查更新", exact: true }).click();
   await section.getByRole("button", { name: "保存更新偏好", exact: true }).click();
   await section.getByText("更新偏好已保存。", { exact: true }).waitFor();
   const stale = await page.evaluate(() =>
@@ -150,7 +162,12 @@ try {
   const second = await windowEvent;
   await second.getByRole("heading", { name: "Codex Coco", exact: true }).waitFor();
   await second.getByRole("navigation").getByRole("button", { name: "设置", exact: true }).click();
-  assert.equal(await second.getByLabel("后台检查间隔（小时）", { exact: true }).inputValue(), "4");
+  assert.equal(
+    await second
+      .getByRole("switch", { name: "自动检查更新", exact: true })
+      .getAttribute("aria-checked"),
+    "true",
+  );
   const popupEvent = application.waitForEvent("window");
   await application.evaluate(({ Menu }) =>
     Menu.getApplicationMenu()
@@ -172,8 +189,10 @@ try {
   await application.close();
   await launch();
   assert.equal(
-    await session.page.getByLabel("后台检查间隔（小时）", { exact: true }).inputValue(),
-    "4",
+    await session.page
+      .getByRole("switch", { name: "自动检查更新", exact: true })
+      .getAttribute("aria-checked"),
+    "true",
   );
   assert.equal(await session.application.evaluate(() => globalThis.updateQaRequests.length), 0);
   await session.application.close();
@@ -208,12 +227,89 @@ try {
         await readFile(join(directory, "diagnostics", file), "utf8"),
       ),
     );
+  // Only the UI action transport is synthetic here; host consent/cancellation is covered by contracts.
+  await session.application.evaluate(({ ipcMain, BrowserWindow }) => {
+    globalThis.updateQaActions = [];
+    let state = {
+      revision: 0,
+      preferences: { intervalHours: 24 },
+      currentVersion: "0.1.0-preview.2",
+      phase: "available",
+      reason: null,
+      installSupported: true,
+      availableVersion: "0.1.0-preview.3",
+      releaseUrl: "https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.3",
+      progress: null,
+      checkedAt: Date.now(),
+    };
+    const publish = () => {
+      for (const window of BrowserWindow.getAllWindows())
+        window.webContents.send("codex-coco:updates-changed", state);
+    };
+    ipcMain.removeHandler("codex-coco:update-action");
+    ipcMain.handle("codex-coco:update-action", (_event, input) => {
+      globalThis.updateQaActions.push(input);
+      state = {
+        ...state,
+        phase: input.action === "cancel" ? "available" : "downloading",
+        progress: input.action === "cancel" ? null : 17,
+      };
+      publish();
+      return { ok: true, value: state };
+    });
+    publish();
+  });
+  await session.page
+    .getByRole("navigation")
+    .getByRole("button", { name: "外观", exact: true })
+    .click();
+  await session.page.getByText("Codex Coco 0.1.0-preview.3 可用", { exact: true }).waitFor();
+  await session.page.setViewportSize({ width: 720, height: 800 });
+  const noticeBox = await session.page
+    .getByRole("alert")
+    .filter({ hasText: "Codex Coco 0.1.0-preview.3 可用" })
+    .boundingBox();
+  const contentBox = await session.page.locator(".desktop-content").boundingBox();
+  assert(
+    noticeBox.y >= contentBox.y &&
+      noticeBox.y + noticeBox.height <= contentBox.y + contentBox.height,
+    "Update prompt remains in the viewport after navigation from a scrolled page",
+  );
+  await session.page.screenshot({
+    path: join(output, "one-click-update-notice.png"),
+    scale: "css",
+  });
+  await session.page.getByRole("button", { name: "更新并重启", exact: true }).click();
+  await session.page.getByText("正在下载更新 17%", { exact: true }).waitFor();
+  assert.equal(await session.page.getByRole("dialog").count(), 0);
+  await session.page.getByRole("button", { name: "取消更新", exact: true }).click();
+  await session.page.getByText("Codex Coco 0.1.0-preview.3 可用", { exact: true }).waitFor();
+  assert.deepEqual(await session.application.evaluate(() => globalThis.updateQaActions), [
+    { action: "update", confirmed: true },
+    { action: "cancel" },
+  ]);
+  assert.deepEqual(session.errors, []);
+  await session.application.close();
+  await rm(join(directory, "updates.json"), { force: true });
+  await launch();
+  await session.application.evaluate(() => {
+    globalThis.updateQaMode = "available";
+  });
+  await session.page.getByText("发现可用版本", { exact: true }).waitFor({ timeout: 15000 });
+  assert.equal(await session.application.evaluate(() => globalThis.updateQaRequests.length), 1);
+  assert.equal(
+    (await session.page.evaluate(() => window.codexCoco.updates())).value.preferences.intervalHours,
+    24,
+  );
+  assert.deepEqual(session.errors, []);
   console.log(
     JSON.stringify(
       {
         ok: true,
         packaged,
-        noDefaultNetwork: true,
+        automaticMetadataOnlyCheck: true,
+        explicitManualMode: true,
+        crossPageOneClickConsent: true,
         githubReleaseDetection: true,
         noRelease: true,
         unsignedChecksAndNativeBoundary: true,

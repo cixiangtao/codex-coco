@@ -14,7 +14,7 @@ Codex Coco 将用量、外观和系统偏好放进一个 Electron 应用，为�
 
 在 [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1) 下载 macOS arm64 的 DMG 或 ZIP，核对 SHA256SUMS.txt 后，将 Codex Coco.app 移到 Applications。若提示“Apple 无法验证 Codex Coco”，先关闭提示，再到 **系统设置 → 隐私与安全性 → 仍要打开**，最后确认 **打开**。长期自签名不能消除这个首次打开提示。详见 [安装指南](apps/desktop/resources/INSTALL.txt) 和 [Apple 官方说明](https://support.apple.com/102445)，无需安装根证书或关闭全局 Gatekeeper。
 
-本预览版不进入正式更新频道，预览更新需手动下载。免费长期自签名身份、验证范围与日常发行流程见 [发行说明](docs/releases.md)。
+已发布的 preview.1 需要手动升级一次。新版已在本地接入自动检查、提示和一键下载安装并重启；预览版接收预览版与稳定版，稳定版只接收稳定版。免费长期自签名身份、验证范围与日常发行流程见 [发行说明](docs/releases.md)。
 
 ## 当前能力
 
@@ -108,7 +108,7 @@ native/widget/   WidgetKit 源码与接入说明
 
 默认配置位于 `~/Library/Application Support/Codex Coco/foundation/`；开发与验证可用 `CODEX_COCO_DATA_DIR` 隔离。设置和旧应用数据不混用，不读取两个旧仓库的配置。诊断只保存固定事件、耗时、错误码和关联 ID，排除原始异常、配置、账号、模型回答与私有路径。没有遥测或云同步。
 
-应用更新固定使用本仓库 GitHub Releases，默认手动检查；后台检查只查版本，不自动下载或安装。源码仓库位于 [GitHub](https://github.com/cixiangtao/codex-coco)，当前已有自签名 Pre-release，尚无正式稳定版。Widget 共享默认关闭，实际原生扩展注册步骤见 [native/widget](native/widget/README.md)。
+应用更新固定使用本仓库 GitHub Releases，新安装默认启动后及每天检查，可关闭；后台检查只查版本，点击“更新并重启”才下载、校验并重启，普通退出不自动安装。源码仓库位于 [GitHub](https://github.com/cixiangtao/codex-coco)，当前已有自签名 Pre-release，尚无正式稳定版。Widget 共享默认关闭，实际原生扩展注册步骤见 [native/widget](native/widget/README.md)。
 
 ## 验证和后续
 

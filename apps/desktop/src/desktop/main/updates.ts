@@ -1,7 +1,12 @@
 import { app, net, shell } from "electron";
 import identity from "../../../resources/signing/identity.json";
 import { readGithubRelease } from "../../application/github-releases";
-import { updateRepository, releasesUrl, releaseCheckSchema } from "../../contracts/updates";
+import {
+  releasesUrl,
+  releaseCheckSchema,
+  isPreviewVersion,
+  type ReleaseCheck,
+} from "../../contracts/updates";
 import type { MacUpdater } from "electron-updater";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -13,6 +18,7 @@ const exec = promisify(execFile);
 export function createNativeUpdateEngine(directory: string): UpdateEngine {
   let updater: MacUpdater | undefined;
   let errorListener: (() => void) | undefined;
+  let selected: ReleaseCheck | null = null;
   const get = async () => {
     if (updater) return updater;
     await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -54,20 +60,31 @@ export function createNativeUpdateEngine(directory: string): UpdateEngine {
         return false;
       }
     },
-    check: (signal) =>
-      readGithubRelease(
+    check: async (signal) => {
+      selected = null;
+      selected = await readGithubRelease(
         (input, init) => net.fetch(input instanceof URL ? input.toString() : input, init),
         app.getVersion(),
         signal,
-      ),
+      );
+      return selected;
+    },
     openRelease: async (url) => {
       if (url !== releasesUrl && !releaseCheckSchema.shape.releaseUrl.safeParse(url).success)
         throw new Error("INVALID_RELEASE_URL");
       await shell.openExternal(url);
     },
     download: async (version, signal, progress) => {
+      if (!selected?.available || selected.version !== version) throw new Error("RELEASE_CHANGED");
       const engine = await get();
-      engine.setFeedURL({ provider: "github", ...updateRepository, private: false });
+      engine.allowPrerelease = isPreviewVersion(version);
+      // Pin the consented release; a newer publication cannot switch the download underneath it.
+      engine.setFeedURL({
+        provider: "generic",
+        url: selected.releaseUrl.replace("/tag/", "/download/") + "/",
+        channel: isPreviewVersion(version) ? "preview" : "latest",
+        useMultipleRangeRequest: false,
+      });
       const checked = await engine.checkForUpdates();
       signal.throwIfAborted();
       // A release changed after the prompt: require a new explicit check rather than downloading a different version.

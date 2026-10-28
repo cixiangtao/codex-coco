@@ -76,18 +76,21 @@ export class ApplicationUpdates {
       }
     }
   }
-  private schedule() {
+  private schedule(startup = false) {
     clearTimeout(this.timer);
     if (
       !this.stopped &&
       this.state.preferences.intervalHours &&
       this.state.reason !== "SETTINGS_UNAVAILABLE"
     )
-      this.timer = setTimeout(() => {
-        if (!this.pending && !["downloaded", "installing"].includes(this.state.phase))
-          this.begin("check");
-        else this.schedule();
-      }, this.state.preferences.intervalHours * 3600_000);
+      this.timer = setTimeout(
+        () => {
+          if (!this.pending && !["downloaded", "installing"].includes(this.state.phase))
+            this.begin("check");
+          else this.schedule();
+        },
+        startup ? 10_000 : this.state.preferences.intervalHours * 3600_000,
+      );
   }
   async load() {
     this.publish({ installSupported: await this.engine.supported() });
@@ -122,7 +125,7 @@ export class ApplicationUpdates {
       let preferences: UpdatePreferences;
       if (stored.version === 1) {
         legacy.parse(stored.preferences);
-        preferences = { ...updateDefaults };
+        preferences = { intervalHours: 0 };
       } else preferences = updatePreferencesSchema.parse(stored.preferences);
       this.publish({
         revision: Number(stored.revision),
@@ -141,7 +144,7 @@ export class ApplicationUpdates {
           reason: this.state.phase === "installing" ? "INSTALL_FAILED" : "DOWNLOAD_FAILED",
         });
     });
-    this.schedule();
+    this.schedule(true);
   }
   async save(input: unknown) {
     if (this.stopped) throw new SettingsError("SETTINGS_UNAVAILABLE", "应用正在退出。");
@@ -184,7 +187,7 @@ export class ApplicationUpdates {
         checkedAt: null,
         progress: null,
       });
-      this.schedule();
+      this.schedule(true);
       return this.snapshot();
     } finally {
       this.saving = false;
@@ -248,23 +251,7 @@ export class ApplicationUpdates {
     if (action === "install") {
       if (this.state.phase !== "downloaded")
         throw new SettingsError("INVALID_INPUT", "尚无校验完成的更新包。");
-      clearTimeout(this.timer);
-      this.publish({ phase: "installing", reason: null });
-      this.pending = (async () => {
-        try {
-          if (!(await this.engine.supported())) {
-            this.publish({
-              phase: "unsupported",
-              reason: "SIGNED_INSTALL_REQUIRED",
-              installSupported: false,
-            });
-            return;
-          }
-          if (!this.stopped) this.engine.install();
-        } catch {
-          this.publish({ phase: "error", reason: "INSTALL_FAILED" });
-        }
-      })();
+      this.pending = this.installDownloaded();
       try {
         await this.pending;
       } finally {
@@ -277,12 +264,30 @@ export class ApplicationUpdates {
       throw new SettingsError("CONFLICT", "更新包已下载，请确认安装或重新打开应用后再检查。");
     if (this.state.reason === "SETTINGS_UNAVAILABLE")
       throw new SettingsError("SETTINGS_UNAVAILABLE", "请先恢复更新设置。");
-    if (action === "download" && !this.available)
+    if ((action === "download" || action === "update") && !this.available)
       throw new SettingsError("INVALID_INPUT", "请先检查可用版本。");
-    this.begin(action);
+    this.begin(action === "update" ? "download" : action, action === "update");
     return this.snapshot();
   }
-  private begin(action: "check" | "download") {
+  /** This method is reached only through explicit install or one-click update consent. */
+  private async installDownloaded() {
+    clearTimeout(this.timer);
+    this.publish({ phase: "installing", reason: null });
+    try {
+      if (!(await this.engine.supported())) {
+        this.publish({
+          phase: "unsupported",
+          reason: "SIGNED_INSTALL_REQUIRED",
+          installSupported: false,
+        });
+        return;
+      }
+      if (!this.stopped) this.engine.install();
+    } catch {
+      if (!this.stopped) this.publish({ phase: "error", reason: "INSTALL_FAILED" });
+    }
+  }
+  private begin(action: "check" | "download", installAfterDownload = false) {
     clearTimeout(this.timer);
     const controller = new AbortController();
     this.controller = controller;
@@ -328,6 +333,7 @@ export class ApplicationUpdates {
           });
           controller.signal.throwIfAborted();
           this.publish({ phase: "downloaded", progress: 100 });
+          if (installAfterDownload && !this.stopped) await this.installDownloaded();
         }
       } catch {
         if (!this.stopped)

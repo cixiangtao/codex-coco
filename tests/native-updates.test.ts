@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import identity from "../apps/desktop/resources/signing/identity.json";
-import { releasesUrl, updateRepository } from "../apps/desktop/src/contracts/updates";
+import { releasesUrl } from "../apps/desktop/src/contracts/updates";
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
@@ -14,10 +14,12 @@ const mocks = vi.hoisted(() => ({
   packaged: false,
   signatureValid: true,
   signatureCheck: vi.fn(),
+  version: "0.1.0-dev.1",
+  instances: [] as { allowPrerelease: boolean }[],
 }));
 vi.mock("../apps/desktop/node_modules/electron", () => ({
   app: {
-    getVersion: () => "0.1.0-dev.1",
+    getVersion: () => mocks.version,
     get isPackaged() {
       return mocks.packaged;
     },
@@ -38,6 +40,10 @@ vi.mock("node:child_process", () => ({
 }));
 vi.mock("../apps/desktop/node_modules/electron-updater", () => ({
   MacUpdater: class {
+    allowPrerelease = false;
+    constructor() {
+      mocks.instances.push(this);
+    }
     setFeedURL = mocks.feed;
     checkForUpdates = mocks.check;
     downloadUpdate = mocks.download;
@@ -54,6 +60,8 @@ afterEach(async () => {
   vi.clearAllMocks();
   mocks.packaged = false;
   mocks.signatureValid = true;
+  mocks.version = "0.1.0-dev.1";
+  mocks.instances.length = 0;
   await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 async function engine() {
@@ -77,9 +85,13 @@ it("uses anonymous GitHub metadata even in development and rejects arbitrary bro
   await port.openRelease(releasesUrl);
   expect(mocks.open).toHaveBeenCalledWith(releasesUrl);
 });
-it("uses the public GitHub provider and refuses changed or missing versions before downloading", async () => {
+it("pins the checked GitHub release and refuses changed or missing metadata before downloading", async () => {
   const port = await engine();
   const signal = new AbortController().signal;
+  mocks.fetch.mockResolvedValue(
+    new Response(JSON.stringify({ tag_name: "v0.2.0", draft: false, prerelease: false })),
+  );
+  await port.check(signal);
   for (const result of [
     null,
     { isUpdateAvailable: false, updateInfo: { version: "0.2.0" } },
@@ -92,13 +104,39 @@ it("uses the public GitHub provider and refuses changed or missing versions befo
   }
   expect(mocks.download).not.toHaveBeenCalled();
   expect(mocks.feed).toHaveBeenCalledWith({
-    provider: "github",
-    ...updateRepository,
-    private: false,
+    provider: "generic",
+    url: `${releasesUrl}/download/v0.2.0/`,
+    channel: "latest",
+    useMultipleRangeRequest: false,
   });
   mocks.check.mockResolvedValue({ isUpdateAvailable: true, updateInfo: { version: "0.2.0" } });
   await port.download("0.2.0", signal, () => undefined);
   expect(mocks.download).toHaveBeenCalledTimes(1);
+});
+
+it("downloads preview metadata from exactly the selected tag and permits a later stable release", async () => {
+  mocks.version = "0.1.0-preview.1";
+  mocks.fetch.mockImplementation(
+    async () =>
+      new Response(
+        JSON.stringify([{ tag_name: "0.1.0-preview.2", draft: false, prerelease: true }]),
+      ),
+  );
+  const port = await engine();
+  const signal = new AbortController().signal;
+  await port.check(signal);
+  mocks.check.mockResolvedValue({
+    isUpdateAvailable: true,
+    updateInfo: { version: "0.1.0-preview.2" },
+  });
+  await port.download("0.1.0-preview.2", signal, () => undefined);
+  expect(mocks.feed).toHaveBeenLastCalledWith({
+    provider: "generic",
+    url: `${releasesUrl}/download/0.1.0-preview.2/`,
+    channel: "preview",
+    useMultipleRangeRequest: false,
+  });
+  expect(mocks.instances[0]?.allowPrerelease).toBe(true);
 });
 
 it("requires the pinned certificate and bundle identifier without requiring an Apple Team ID", async () => {

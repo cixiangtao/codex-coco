@@ -1,14 +1,16 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, copyFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createUpdateInfo } from "./release-update-info.mjs";
 const pkg = JSON.parse(await readFile("apps/desktop/package.json", "utf8"));
 const pin = JSON.parse(await readFile("apps/desktop/resources/signing/identity.json", "utf8"));
-const directory = "apps/desktop/release/publish";
+const source = process.argv[2] ?? "apps/desktop/release";
+const directory = join(source, "publish");
 await mkdir(directory, { recursive: true });
 const names = ["dmg", "zip"].map(
   (ext) => `Codex-Coco-${pkg.version}-macOS-arm64-self-signed.${ext}`,
 );
-for (const name of names) await copyFile(join("apps/desktop/release", name), join(directory, name));
+for (const name of names) await copyFile(join(source, name), join(directory, name));
 await copyFile(
   "work/release/THIRD_PARTY_LICENSES.txt",
   join(directory, "THIRD_PARTY_LICENSES.txt"),
@@ -20,7 +22,7 @@ await writeFile(
       version: pkg.version,
       commit: process.env.GITHUB_SHA,
       architecture: "arm64",
-      signing: "self-signed",
+      signing: process.env.GITHUB_ACTIONS === "true" ? "self-signed" : "local-unsigned-test",
       certificateSha256: pin.sha256,
       notarized: false,
     },
@@ -28,7 +30,12 @@ await writeFile(
     2,
   ) + "\n",
 );
-names.push("THIRD_PARTY_LICENSES.txt", "release-manifest.json");
+const zipName = names[1];
+await writeFile(
+  join(directory, "preview-mac.yml"),
+  createUpdateInfo(pkg.version, zipName, await readFile(join(directory, zipName))),
+);
+names.push("THIRD_PARTY_LICENSES.txt", "release-manifest.json", "preview-mac.yml");
 const sums = [];
 for (const name of names)
   sums.push(
@@ -37,4 +44,4 @@ for (const name of names)
       .digest("hex")}  ${name}`,
   );
 await writeFile(join(directory, "SHA256SUMS.txt"), sums.join("\n") + "\n");
-console.log("Prepared DMG, ZIP, notices, source manifest and SHA-256 checksums.");
+console.log("Prepared DMG, ZIP, native update metadata, notices, source manifest and checksums.");

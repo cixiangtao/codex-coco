@@ -3,6 +3,7 @@ import { Button } from "@codex-coco/ui/components/button";
 import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
 import { ThemeProvider } from "@codex-coco/ui/theme";
 import { GlanceLayoutRecovery } from "./components/glance-layout-recovery";
+import { UpdateNotice } from "./components/update-notice";
 import { WindowShell } from "./shell/window-shell";
 import type { PageId } from "./shell/navigation";
 import { SettingsPage } from "./pages/settings-page";
@@ -40,6 +41,7 @@ export function App({ initialPage }: { initialPage: PageId }) {
           </Alert>
         )}
         <GlanceLayoutRecovery />
+        <UpdateNotice />
         <section className="desktop-page" aria-label="外观页面" hidden={page !== "appearance"}>
           <RegisteredModulePage moduleId="appearance" />
         </section>
