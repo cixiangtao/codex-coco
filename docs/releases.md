@@ -6,6 +6,8 @@ Routine releases leave `full_validation=false`: check, sign/package once, verify
 
 Set `full_validation=true` for the first signing identity and after certificate, Electron, updater or installer changes. This additionally builds two synthetic signed apps and checks actual replacement, wrong-signer rejection and resource-tampering rejection. It is not repeated for unrelated UI or business changes. No certificate is regenerated for an ordinary release.
 
+If publication alone fails, set `publish=true` and `verified_run` to the prior run ID. The workflow reuses its original immutable artifacts without rebuilding. It requires successful build and recipient jobs from this repository and workflow, a main-branch source commit in the current ancestry, matching version/certificate/source manifest, and exact artifact checksums. Existing tags and assets must match; conflicts are rejected.
+
 The root and desktop package manifests own the application version together. Preview versions use `X.Y.Z-preview.N`; the private UI package is not a separately published product. Prepare and commit the version and matching English release notes before dispatching. Actions tags the exact tested commit, uploads already inspected artifacts to a draft, then publishes it with `prerelease=true` and `latest=false`. It refuses conflicting tags or assets rather than overwriting them. Retry with identical inspected artifacts, or prepare a new preview version if a rebuilt archive differs.
 
 ## Free self-signed identity

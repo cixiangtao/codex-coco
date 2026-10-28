@@ -10,6 +10,8 @@ assert.equal(process.env.GITHUB_ACTIONS, "true");
 assert.equal(process.env.GITHUB_REPOSITORY, repository);
 assert.equal(process.env.GITHUB_REF, "refs/heads/main");
 assert.match(process.env.GITHUB_SHA ?? "", /^[a-f0-9]{40}$/);
+const sourceSha = process.env.CODEX_COCO_RELEASE_SOURCE_SHA ?? process.env.GITHUB_SHA;
+assert.match(sourceSha, /^[a-f0-9]{40}$/);
 const pkg = JSON.parse(await readFile("apps/desktop/package.json", "utf8"));
 assert.match(pkg.version, /^0\.\d+\.\d+-preview\.[1-9]\d*$/);
 assert.equal(JSON.parse(await readFile("package.json", "utf8")).version, pkg.version);
@@ -17,7 +19,7 @@ const tag = `v${pkg.version}`;
 const directory = "release-artifacts";
 const manifest = JSON.parse(await readFile(join(directory, "release-manifest.json"), "utf8"));
 assert.equal(manifest.version, pkg.version);
-assert.equal(manifest.commit, process.env.GITHUB_SHA);
+assert.equal(manifest.commit, sourceSha);
 assert.equal(manifest.signing, "self-signed");
 assert.equal(manifest.architecture, "arm64");
 assert.equal(manifest.notarized, false);
@@ -57,7 +59,7 @@ const api = async (path) => {
 const existingTag = await api(`git/ref/tags/${tag}`);
 if (existingTag) {
   assert.equal(existingTag.object.type, "commit");
-  assert.equal(existingTag.object.sha, process.env.GITHUB_SHA);
+  assert.equal(existingTag.object.sha, sourceSha);
 } else
   await gh([
     "api",
@@ -67,9 +69,12 @@ if (existingTag) {
     "-f",
     `ref=refs/tags/${tag}`,
     "-f",
-    `sha=${process.env.GITHUB_SHA}`,
+    `sha=${sourceSha}`,
   ]);
-let release = await api(`releases/tags/${tag}`);
+// Draft releases are intentionally absent from the by-tag REST endpoint.
+const findRelease = async () =>
+  (await api("releases?per_page=100")).find((value) => value.tag_name === tag) ?? null;
+let release = await findRelease();
 if (!release) {
   await gh([
     "release",
@@ -79,7 +84,7 @@ if (!release) {
     repository,
     "--verify-tag",
     "--target",
-    process.env.GITHUB_SHA,
+    sourceSha,
     "--draft",
     "--prerelease",
     "--latest=false",
@@ -88,7 +93,7 @@ if (!release) {
     "--notes-file",
     `docs/releases/${pkg.version}.md`,
   ]);
-  release = await api(`releases/tags/${tag}`);
+  release = await findRelease();
 }
 assert.equal(release.prerelease, true);
 for (const [name, hash] of hashes) {
@@ -119,7 +124,7 @@ if (release.draft)
     "--prerelease",
     "--latest=false",
   ]);
-const published = await api(`releases/tags/${tag}`);
+const published = await findRelease();
 assert.equal(published.draft, false);
 assert.equal(published.prerelease, true);
 for (const [name, hash] of hashes)
