@@ -1,0 +1,25 @@
+extends: ./electron-builder.yml
+artifactName: Codex-Coco-${version}-macOS-${arch}-self-signed.${ext}
+forceCodeSigning: true
+mac:
+  identity: Codex Coco Update Signing
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  notarize: false
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+publish: null
+extraResources:
+  - from: resources
+    to: codex-coco
+  - from: ../../LICENSE
+    to: codex-coco/LICENSE.txt
+  - from: ../../THIRD_PARTY_NOTICES.md
+    to: codex-coco/THIRD_PARTY_NOTICES.md
+  - from: ../../packages/ui/LICENSE.shadcn
+    to: codex-coco/licenses/shadcn.txt
+  - from: ../../work/release/THIRD_PARTY_LICENSES.txt
+    to: codex-coco/THIRD_PARTY_LICENSES.txt

@@ -71,3 +71,9 @@ image-size 2.0.4（MIT，Copyright © 2013-Present Aditya Yadav）仅在桌面�
 ## 自定义主色选色器
 
 UI 包使用 [react-colorful](https://github.com/omgovich/react-colorful) 5.8.1 的 HexColorPicker，采用 MIT，Copyright (c) 2020-present Vlad Shilov。完整许可保留于 resources/licenses/react-colorful.txt，随桌面资源分发。依赖版本锁定，仅在渲染器进行选色和键盘交互；Codex Coco 自行封装受控组件、主题样式、禁用状态与草稿保存流程，不复制上游源码。
+
+## 自签名发行参考
+
+2026-10-28 只读核对 BDIH-Launcher 提交 `eeff14d893554fb0226cb575da290b583bbf1cf3` 的 `scripts/createP12.sh`、签名 action 和更新测试入口，以及 Electron 44.9.2 所固定的 Squirrel.Mac 提交 `fffea30e4a339a7f7d69a3391314b72548d209bd` 的 SQRLCodeSignature.m。仅参考长期自签名身份、私钥保护与 designated requirement 连续性；本项目脚本独立实现，没有复制其源码或许可证内容，不改本机系统信任。发行方案见 docs/releases.md。
+
+发行时收集已安装生产依赖的完整许可文件，输出不包含本机路径。lazy-val 1.0.5 的 npm 包和上述源码提交 `b69ad4119f1b19bdab13c61ee2fcc88d46b89071` 均只声明 MIT，未附独立许可正文；补充文件明确记录其作者元数据与标准 MIT 条款，不虚构版权年份。

@@ -15,7 +15,7 @@ GitHub 的 [Release API 文档](https://docs.github.com/en/rest/releases/release
 
 ## 应用内下载与安装
 
-原生更新仍使用按需加载的 electron-updater 6.8.9 和 GitHub provider，固定相同 owner/repo。界面和后台都拒绝未签名应用自替换；签名版的下载与安装分别需要明确确认。
+原生更新仍使用按需加载的 electron-updater 6.8.9 和 GitHub provider，固定相同 owner/repo。界面和后台都拒绝未签名应用自替换；自签名发行版使用仓库固定证书和 bundle identifier 校验，不能用任意自签名代替。签名版的下载与安装分别需要明确确认。
 
 1. 检测到新版后确认下载。更新引擎重新读取 GitHub provider 的元数据，核对版本仍与用户确认的版本一致；变化或缺失时失败，要求重新检查，不下载另一版本。
 2. 由更新引擎执行 SHA-512 校验并公开进度。取消等待底层任务实际结束；provider 元数据请求期间取消需等待该请求结束，再阻止文件下载。
@@ -23,7 +23,7 @@ GitHub 的 [Release API 文档](https://docs.github.com/en/rest/releases/release
 
 正式更新 Release 需要 electron-builder 生成的 `latest-mac.yml` 和对应架构的签名 ZIP，版本必须匹配 Release 标签。DMG 可供首次手动安装，单独上传源码归档或 DMG 不构成原生自动更新链路。参见 [electron-builder 更新说明](https://www.electron.build/docs/features/auto-update/)。
 
-仓库已配置 GitHub 发布目标，但 `pnpm run pack` 仍使用 `--dir --publish never`，只生成本地未签名应用目录。当前没有签名、公证、Release 附件或正式发行流水线，本轮不会创建假 Release、上传包或配置 Apple 账号。未来可自动化的正式发布只由 GitHub Actions 执行。
+仓库已配置 GitHub 发布目标，但 `pnpm run pack` 仍使用 `--dir --publish never`，只生成本地未签名应用目录。免费自签名预览发行的准备与验证入口见 [发行说明](releases.md)。自签名不等于 Apple Developer ID 或公证。尚无公开发行附件，真实更新验收完成后再通过 GitHub Actions 发布预览。
 
 ## 配置、权限与隐私
 
