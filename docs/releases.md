@@ -20,6 +20,12 @@ The public certificate and fingerprint are committed in `apps/desktop/resources/
 
 GitHub Actions Secrets `COCO_SIGNING_P12` (Base64 PKCS#12) and `COCO_SIGNING_PASSWORD` contain the identity. They must never be committed, printed, pasted into chat, or exposed to pull requests. The public certificate is trusted for code signing only on the disposable GitHub runner. No trust settings or certificates are installed on the maintainer's Mac or end-user machines.
 
+## First-launch Gatekeeper warning
+
+A valid project signature does not make the publisher identified by Apple. The message “Apple could not verify Codex Coco is free of malware” is expected for this unnotarized preview, even when the bundle passes the pinned certificate check. A different free self-signed certificate cannot remove that warning.
+
+After checking the official download and SHA256SUMS.txt, move the app to Applications and try opening it once. Dismiss the warning, open **System Settings → Privacy & Security → Open Anyway**, then confirm **Open**. macOS saves an exception for the app. The [bilingual installation guide](../apps/desktop/resources/INSTALL.txt) is also included in new DMGs as Read Me First.txt. See [Apple's instructions](https://support.apple.com/102445). No root certificate installation or global Gatekeeper change is part of installation.
+
 ## Gates and artifacts
 
 The workflow uses a signing runner and a separate recipient runner that never receives the signing Secrets or trusts the certificate. It always runs the normal check, a self-signed DMG/ZIP build, signature and production-launch verification, worker regression, and SHA-256 artifact inspection. Full validation additionally exercises actual Squirrel.Mac two-version replacement and negative tests. The full desktop UI regression remains a separate `pnpm run verify:desktop` check for UI work; release packaging verifies its own signature, version, IPC startup and worker resources. Only the publish job has contents write permission. The local build always uses `--publish never`.

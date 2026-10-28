@@ -8,7 +8,7 @@ A Codex desktop companion, shaped around personal workflows.
 
 ## Download
 
-Get the macOS arm64 DMG or ZIP from [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1), verify SHA256SUMS.txt, and move Codex Coco.app to Applications. macOS may show an unidentified-developer prompt; follow [Apple's instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac) after verifying the download. No root certificate installation is required.
+Get the macOS arm64 DMG or ZIP from [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1), verify SHA256SUMS.txt, and move Codex Coco.app to Applications. If macOS says Apple could not verify Codex Coco, dismiss the alert, open **System Settings → Privacy & Security → Open Anyway**, then confirm **Open**. The self-signed identity does not remove this first-launch warning. See the [installation guide](apps/desktop/resources/INSTALL.txt) and [Apple's instructions](https://support.apple.com/102445). No root certificate installation or global Gatekeeper change is required.
 
 This preview is not part of the stable update channel. Preview updates are downloaded manually. See [release and signing details](docs/releases.md) for the free self-signed identity, build verification and release workflow.
 

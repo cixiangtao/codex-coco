@@ -1,0 +1,42 @@
+Codex Coco — macOS preview installation
+
+For Apple Silicon Macs (arm64).
+
+1. Download only from https://github.com/cixiangtao/codex-coco/releases
+   and compare the download with that release's SHA256SUMS.txt.
+2. Move Codex Coco.app to Applications before launching it.
+3. If macOS says Apple could not verify Codex Coco, dismiss the alert.
+4. Open System Settings > Privacy & Security. Scroll to Security and
+   click Open Anyway for Codex Coco, then confirm Open. macOS may ask
+   you to authenticate. The app is saved as an individual exception.
+
+This preview is self-signed, not Apple Developer ID signed or notarized.
+The signature checks the app's integrity and update identity; it does not
+make the developer verified by Apple. Re-signing with another free
+certificate will not remove the first-launch Gatekeeper warning.
+
+No root certificate installation or global Gatekeeper change is required.
+If macOS instead reports that the app is damaged or will harm your Mac,
+stop and check the download; those are different warnings.
+
+Apple's instructions: https://support.apple.com/102445
+
+────────────────────────────────────────────────────────────
+
+Codex Coco — macOS 预览版安装说明
+
+仅支持 Apple Silicon（arm64）。
+
+1. 从上面的 GitHub Releases 下载，并核对同一版本的 SHA256SUMS.txt。
+2. 将 Codex Coco.app 移到“应用程序”，再尝试打开一次。
+3. 若提示“Apple 无法验证 Codex Coco 是否包含恶意软件”，先关闭提示。
+4. 进入“系统设置 → 隐私与安全性”，向下找到“安全性”，针对 Codex Coco
+   点击“仍要打开”，再确认“打开”；系统可能要求验证身份。
+   macOS 会为这个应用保存单独的例外。
+
+本预览版使用长期自签名，没有 Apple Developer ID 或 Apple 公证。
+签名用于验证完整性及保持更新身份，不能消除 Apple 的首次打开提示。
+换一张免费证书也不能解决这个提示，无需安装根证书或关闭全局 Gatekeeper。
+
+如果提示的是“应用已损坏”或“将损坏你的电脑”，请停止并重新核对下载，
+这与“Apple 无法验证”是不同的问题。

@@ -10,7 +10,7 @@ Codex Coco 将用量、外观和系统偏好放进一个 Electron 应用，为�
 
 ## 下载
 
-在 [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1) 下载 macOS arm64 的 DMG 或 ZIP，核对 SHA256SUMS.txt 后，将 Codex Coco.app 移到 Applications。macOS 可能显示未知开发者提示，确认来源后按 [Apple 官方说明](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac) 操作，无需安装根证书。
+在 [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.1) 下载 macOS arm64 的 DMG 或 ZIP，核对 SHA256SUMS.txt 后，将 Codex Coco.app 移到 Applications。若提示“Apple 无法验证 Codex Coco”，先关闭提示，再到 **系统设置 → 隐私与安全性 → 仍要打开**，最后确认 **打开**。长期自签名不能消除这个首次打开提示。详见 [安装指南](apps/desktop/resources/INSTALL.txt) 和 [Apple 官方说明](https://support.apple.com/102445)，无需安装根证书或关闭全局 Gatekeeper。
 
 本预览版不进入正式更新频道，预览更新需手动下载。免费长期自签名身份、验证范围与日常发行流程见 [发行说明](docs/releases.md)。
 

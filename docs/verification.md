@@ -480,3 +480,9 @@ pnpm run pack 生成 apps/desktop/release/mac-arm64/Codex Coco.app。使用 Elec
 - 从公开 Release 重新下载 ZIP、校验和与来源清单，确认 ZIP SHA-256 为 `1cd7815f3933354f3f263f1052547ff50b5f06a19b8b60f36f27fa7079023440`，来源提交与公开证书匹配。解压后在本机临时数据中通过完整固定证书验证、arm64、实际启动、版本 0.1.0-preview.1 和更新 IPC（installSupported=true、idle）；无 renderer 错误。没有安装到 Applications、修改钥匙串或操作真实账号与 Codex。
 - 日常发布默认 `full_validation=false`，保留 check、实际签名包、独立收件启动与 worker 校验；首次或证书/Electron/updater/installer 变更再运行两版本实验。发布失败可用 `verified_run` 复用已验证产物，依赖下载使用 pnpm 缓存。
 - 完整桌面 UI 回归独立保留，不计作本次通过项：云端曾因屏幕高度与固定窗口高度断言不符失败，本机尝试又遇到 tooltip hover 超时。未放宽既有 UI 断言，未声称本轮完整 verify:packaged 通过。预览版不进入稳定更新频道，需手动下载；完整产品跨版本更新与 Widget 注册仍待后续验收。
+
+## 首次安装提示与引导（2026-10-28）
+
+- 用户报告“Apple 无法验证”提示。只读检查本机 Applications 中的 0.1.0-preview.1：完整固定证书与 bundle ID 验证通过，Gatekeeper 评估拒绝。自签名身份连续性与 Apple 开发者验证/公证是不同条件；没有通过换免费证书消除提示，也没有修改本机信任、隔离属性或 Gatekeeper。
+- 英文主 README、中文 README 与发行文档明确给出“尝试打开 → 系统设置 → 隐私与安全性 → 仍要打开 → 打开”。新增中英文 INSTALL.txt，并在新 DMG 根目录放置 Read Me First.txt。
+- 使用预览打包配置构建本地 DMG，显式覆盖为不签名、仅本地的 Codex-Coco-local-icon-check.dmg，未使用私钥或上传发行附件。只读挂载后核对安装说明全文、Applications 链接与应用图标，均通过并卸载临时卷。

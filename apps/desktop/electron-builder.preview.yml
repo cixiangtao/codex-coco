@@ -13,6 +13,25 @@ mac:
     - target: zip
       arch: [arm64]
 publish: null
+dmg:
+  backgroundColor: "#F5F5EF"
+  window:
+    width: 540
+    height: 460
+  iconSize: 96
+  contents:
+    - x: 130
+      y: 180
+      type: file
+    - x: 410
+      y: 180
+      type: link
+      path: /Applications
+    - x: 270
+      y: 310
+      type: file
+      path: resources/INSTALL.txt
+      name: Read Me First.txt
 extraResources:
   - from: resources
     to: codex-coco
