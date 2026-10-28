@@ -9,6 +9,7 @@ import { createServer } from "node:http";
 const exec = promisify(execFile);
 const appRequire = createRequire(resolve("apps/desktop/package.json"));
 const { build, Platform, Arch } = appRequire("electron-builder");
+const electronDist = dirname(dirname(dirname(dirname(appRequire("electron")))));
 const pin = JSON.parse(await readFile("apps/desktop/resources/signing/identity.json", "utf8"));
 const root = await mkdtemp(join(tmpdir(), "codex-coco-native-update-"));
 const control = join(root, "control.json");
@@ -64,7 +65,7 @@ async function make(version) {
       appId: "dev.codex-coco.update-probe",
       productName: appName,
       electronVersion: appRequire("electron/package.json").version,
-      electronDist: join(dirname(appRequire.resolve("electron/package.json")), "dist"),
+      electronDist,
       directories: { output },
       files: ["main.cjs", "package.json"],
       extraResources: [{ from: "probe.txt", to: "probe.txt" }],
