@@ -2,11 +2,15 @@
 
 Codex Coco uses one manually dispatched [Preview release workflow](../.github/workflows/preview-release.yml). A source push never publishes. `publish=false` builds and verifies only; `publish=true` additionally creates a GitHub Pre-release after every gate succeeds. Only the default branch of cixiangtao/codex-coco is accepted.
 
+Routine releases leave `full_validation=false`: check, sign/package once, verify the app and worker resources, launch the same artifact on a separate recipient runner, then publish. Dependency downloads use the pnpm store cache.
+
+Set `full_validation=true` for the first signing identity and after certificate, Electron, updater or installer changes. This additionally builds two synthetic signed apps and checks actual replacement, wrong-signer rejection and resource-tampering rejection. It is not repeated for unrelated UI or business changes. No certificate is regenerated for an ordinary release.
+
 The root and desktop package manifests own the application version together. Preview versions use `X.Y.Z-preview.N`; the private UI package is not a separately published product. Prepare and commit the version and matching English release notes before dispatching. Actions tags the exact tested commit, uploads already inspected artifacts to a draft, then publishes it with `prerelease=true` and `latest=false`. It refuses conflicting tags or assets rather than overwriting them. Retry with identical inspected artifacts, or prepare a new preview version if a rebuilt archive differs.
 
 ## Free self-signed identity
 
-A project-owned RSA code-signing certificate provides update identity continuity without an Apple Developer membership. No Apple timestamp service is used (`timestamp=none`). This is separate from Developer ID and notarization: users still receive macOS first-launch checks. Ad-hoc signing alone is not the update identity.
+A project-owned RSA code-signing certificate provides update identity continuity without an Apple Developer membership. No Apple timestamp service is used (`timestamp=none`). Preview packaging disables Hardened Runtime and notarization; it is not equivalent to an Apple Developer ID distribution. macOS first-launch checks still apply. Ad-hoc signing alone is not the update identity.
 
 The public certificate and fingerprint are committed in `apps/desktop/resources/signing/`. The application verifies the complete bundle and requires this certificate and the expected bundle identifier. It does not accept any arbitrary self-signed app or a missing signature. Squirrel.Mac continues to verify downloaded bundles against the running app's designated requirement.
 
@@ -16,7 +20,7 @@ GitHub Actions Secrets `COCO_SIGNING_P12` (Base64 PKCS#12) and `COCO_SIGNING_PAS
 
 ## Gates and artifacts
 
-The workflow uses a signing runner and a separate recipient runner that never receives the signing Secrets or trusts the certificate. It runs the normal check, actual Squirrel.Mac two-version replacement and negative tests, a self-signed DMG/ZIP build, signature and production-launch verification, desktop/worker regression, and SHA-256 artifact inspection. Only the publish job has contents write permission. The local build always uses `--publish never`.
+The workflow uses a signing runner and a separate recipient runner that never receives the signing Secrets or trusts the certificate. It always runs the normal check, a self-signed DMG/ZIP build, signature and production-launch verification, desktop/worker regression, and SHA-256 artifact inspection. Full validation additionally exercises actual Squirrel.Mac two-version replacement and negative tests. Only the publish job has contents write permission. The local build always uses `--publish never`.
 
 The release contains arm64 DMG/ZIP, production dependency notices, a source/signing manifest and SHA256SUMS.txt. Electron's own license notices remain in the bundle; project, asset and shadcn notices are also included. There is no paid Apple certificate, notarization, npm publication, separate update server, or automatically released stable version.
 
