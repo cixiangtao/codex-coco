@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-radius",
+        "value": "3px",
+        "createdAt": "2026-10-28T09:52:42.449Z",
+        "reason": "DESIGN.md explicitly assigns rounded.plot to chart top corners; existing glance-mini-chart uses that documented shape."
+      }
+    ]
+  }
+}
