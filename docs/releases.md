@@ -16,7 +16,7 @@ GitHub Actions Secrets `COCO_SIGNING_P12` (Base64 PKCS#12) and `COCO_SIGNING_PAS
 
 ## Gates and artifacts
 
-The workflow runs the normal check, actual Squirrel.Mac two-version replacement and negative tests, a self-signed DMG/ZIP build, signature and production-launch verification, desktop/worker regression, and SHA-256 artifact inspection. Only the publish job has contents write permission. The local build always uses `--publish never`.
+The workflow uses a signing runner and a separate recipient runner that never receives the signing Secrets or trusts the certificate. It runs the normal check, actual Squirrel.Mac two-version replacement and negative tests, a self-signed DMG/ZIP build, signature and production-launch verification, desktop/worker regression, and SHA-256 artifact inspection. Only the publish job has contents write permission. The local build always uses `--publish never`.
 
 The release contains arm64 DMG/ZIP, production dependency notices, a source/signing manifest and SHA256SUMS.txt. Electron's own license notices remain in the bundle; project, asset and shadcn notices are also included. There is no paid Apple certificate, notarization, npm publication, separate update server, or automatically released stable version.
 

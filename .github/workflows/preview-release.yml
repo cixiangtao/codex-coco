@@ -36,8 +36,8 @@ jobs:
         env:
           COCO_SIGNING_P12: ${{ secrets.COCO_SIGNING_P12 }}
           COCO_SIGNING_PASSWORD: ${{ secrets.COCO_SIGNING_PASSWORD }}
-      - name: Verify real Squirrel replacement and rejection cases
-        run: node scripts/verify-self-signed-updates.mjs
+      - name: Build signed native verification fixtures
+        run: node scripts/verify-self-signed-updates.mjs --build-only
       - name: Build self-signed distribution
         run: |
           node scripts/release-licenses.mjs
@@ -50,6 +50,12 @@ jobs:
       - run: node scripts/prepare-release-artifacts.mjs
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          name: native-update-probes
+          path: work/native-probes/*.zip
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
           name: codex-coco-preview
           path: apps/desktop/release/publish/*
           if-no-files-found: error
@@ -60,9 +66,38 @@ jobs:
           security delete-keychain "$RUNNER_TEMP/codex-coco-signing/signing.keychain-db" || true
           rm -rf "$RUNNER_TEMP/codex-coco-signing"
 
+  verify:
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-update-probes
+          path: work/native-probes
+      - name: Verify real replacement without a trusted certificate
+        run: node scripts/verify-self-signed-updates.mjs --verify-only
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: codex-coco-preview
+          path: release-artifacts
+      - name: Verify production app on the recipient runner
+        run: |
+          mkdir -p apps/desktop/release/mac-arm64
+          ditto -x -k release-artifacts/*-self-signed.zip apps/desktop/release/mac-arm64
+          node scripts/verify-release-signature.mjs
+
   publish:
     if: inputs.publish
-    needs: build
+    needs: [build, verify]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
