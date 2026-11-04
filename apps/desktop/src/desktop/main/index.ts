@@ -222,11 +222,28 @@ function probeAppearance() {
   }
 }
 const windowStarts = new Map<number, number>();
+const glanceVisibility = new Map<
+  BrowserWindow,
+  { visible: boolean; monitor: ReturnType<typeof setInterval> | undefined }
+>();
 let store: SettingsStore;
 let quitting = false;
 
-function publishGlanceVisibility(window: BrowserWindow, visible: boolean) {
-  if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+/** Explicit window actions and native events share one visibility transition and monitor. */
+function syncGlanceVisibility(window: BrowserWindow, visible: boolean, replay = false) {
+  const state = glanceVisibility.get(window);
+  if (!state || window.isDestroyed()) return;
+  const changed = state.visible !== visible;
+  if (changed) {
+    state.visible = visible;
+    clearInterval(state.monitor);
+    state.monitor = undefined;
+    if (visible) {
+      probeAppearance();
+      state.monitor = setInterval(probeAppearance, 10_000);
+    }
+  }
+  if ((!changed && !replay) || window.webContents.isDestroyed()) return;
   try {
     window.webContents.send(channels.glanceVisibilityChanged, visible);
   } catch {
@@ -277,19 +294,13 @@ function createWindow(context: WindowContext = { kind: "main", page: "appearance
   windows.set(contentsId, win);
   contexts.set(contentsId, context);
   if (context.kind === "glance") {
-    // macOS panels may keep document.visibilityState="visible" after a native hide.
-    let monitor: ReturnType<typeof setInterval> | undefined;
-    win.on("show", () => {
-      publishGlanceVisibility(win, true);
-      probeAppearance();
-      clearInterval(monitor);
-      monitor = setInterval(probeAppearance, 10_000);
+    glanceVisibility.set(win, { visible: false, monitor: undefined });
+    win.on("show", () => syncGlanceVisibility(win, win.isVisible()));
+    win.on("hide", () => syncGlanceVisibility(win, win.isVisible()));
+    win.on("closed", () => {
+      clearInterval(glanceVisibility.get(win)?.monitor);
+      glanceVisibility.delete(win);
     });
-    win.on("hide", () => {
-      clearInterval(monitor);
-      publishGlanceVisibility(win, false);
-    });
-    win.on("closed", () => clearInterval(monitor));
   }
   if (context.kind === "main")
     win.on("focus", () => {
@@ -567,12 +578,17 @@ function registerIpc() {
     if (!trusted(event)) return;
     const window = windows.get(event.sender.id)!;
     const context = contexts.get(event.sender.id)!;
-    if (context.kind === "glance") publishGlanceVisibility(window, window.isVisible());
     const began = windowStarts.get(event.sender.id);
-    if (began === undefined) return;
+    if (began === undefined) {
+      if (context.kind === "glance") syncGlanceVisibility(window, window.isVisible(), true);
+      return;
+    }
     windowStarts.delete(event.sender.id);
-    if (context.kind === "glance") menuBar?.rendererReady(window);
-    else {
+    if (context.kind === "glance") {
+      menuBar?.rendererReady(window);
+      // Replaying after readiness also covers a renderer that subscribed after the native event.
+      syncGlanceVisibility(window, window.isVisible(), true);
+    } else {
       window.webContents.send(channels.navigate, context.page);
       window.show();
     }
@@ -621,6 +637,7 @@ async function start() {
   registerIpc();
   menuBar = new MenuBarController({
     createGlance: () => createWindow({ kind: "glance" }),
+    visibilityChanged: syncGlanceVisibility,
     openMain,
     quit: () => app.quit(),
     unavailable: () =>

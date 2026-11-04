@@ -8,6 +8,7 @@ import { createTrayIcon } from "./tray-icon";
 
 interface MenuBarOptions {
   createGlance(): BrowserWindow;
+  visibilityChanged(window: BrowserWindow, visible: boolean): void;
   openMain(page?: MainPage): void;
   quit(): void;
   unavailable(): void;
@@ -123,8 +124,10 @@ export class MenuBarController {
   }
   hide() {
     this.wanted = false;
-    if (this.popover && !this.popover.isDestroyed() && this.popover.isVisible())
-      this.popover.hide();
+    const window = this.popover;
+    if (!window || window.isDestroyed()) return;
+    if (window.isVisible()) window.hide();
+    if (!window.isDestroyed()) this.options.visibilityChanged(window, window.isVisible());
   }
   private position(window: BrowserWindow) {
     const bounds = this.tray?.getBounds();
@@ -142,6 +145,8 @@ export class MenuBarController {
     this.position(window);
     window.show();
     window.focus();
+    // macOS panels can change visibility without emitting native show/hide events.
+    if (!window.isDestroyed()) this.options.visibilityChanged(window, window.isVisible());
   }
   dispose() {
     this.disposed = true;

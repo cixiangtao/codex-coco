@@ -24,7 +24,15 @@ async function nativeVisible(application, page, expected) {
   const window = await application.browserWindow(page);
   const deadline = Date.now() + 8000;
   while (Date.now() < deadline) {
-    if ((await window.evaluate((win) => win.isVisible())) === expected) return;
+    if ((await window.evaluate((win) => win.isVisible())) === expected) {
+      await page.waitForFunction(
+        (visible) =>
+          document.querySelector(".glance-shell")?.getAttribute("data-visible") === String(visible),
+        expected,
+        { polling: 50, timeout: 8000 },
+      );
+      return;
+    }
     await new Promise((resume) => setTimeout(resume, 30));
   }
   assert.fail(`Popover visibility did not become ${expected}`);
