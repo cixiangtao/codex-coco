@@ -406,13 +406,16 @@ try {
     null,
     { timeout: 40_000 },
   );
-  await popup.getByText("布景已应用到 1 个窗口。", { exact: true }).waitFor();
   // Launching the target can move native focus and close the panel. Reopen it for visual evidence.
   await application.browserWindow(popup).then((win) =>
     win.evaluate((win) => {
       win.show();
       win.focus();
     }),
+  );
+  assert.equal(
+    await popup.getByRole("button", { name: "打开外观", exact: true }).getAttribute("title"),
+    "布景已应用到 1 个窗口。",
   );
   await delay(200);
   await popup.screenshot({
