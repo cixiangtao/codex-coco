@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-27T07:44:00.140188+00:00",
+  "generatedAt": "2026-11-04T03:48:04.118782+00:00",
   "title": "Design System: Codex Coco",
   "extensions": {
     "colorMeta": {
@@ -72,7 +72,7 @@
     "typographyMeta": {
       "title": {
         "displayName": "页面标题",
-        "purpose": "普通页面标题；主窗口用量标题可见且为 23px，速览以公开账号标签作为身份标题。"
+        "purpose": "普通页面标题；主窗口用量标题可见，速览按信息块显示分类标题，账号以列表上方的紧凑两行呈现。"
       },
       "body": {
         "displayName": "系统正文",
@@ -108,7 +108,7 @@
       },
       "summary": {
         "displayName": "速览计数",
-        "purpose": "速览核心计数；tokens 在统计组标题统一声明。"
+        "purpose": "紧凑摘要计数的基础字级；当前悬浮窗今日消耗使用全宽横行，7 天和 30 天使用 summary-glance，单位与读数同行。"
       },
       "instrument-small": {
         "displayName": "小圆环读数",
@@ -127,8 +127,16 @@
         "purpose": "SettingsGroup 的 legend，12px / 550。"
       },
       "instrument-glance": {
-        "displayName": "速览圆环读数",
-        "purpose": "速览额度环的局部20px字级。"
+        "displayName": "保留的速览圆环字级",
+        "purpose": "原速览圆环的局部字级；当前悬浮窗额度改用 quota-glance 与横向进度条，主窗口继续使用圆环。"
+      },
+      "quota-glance": {
+        "displayName": "速览额度读数",
+        "purpose": "组合额度 Card 中右对齐的真实百分比；窗口名称与相对恢复时间靠左，横向进度条占满可用宽度。"
+      },
+      "summary-glance": {
+        "displayName": "速览近期消耗",
+        "purpose": "7 天和 30 天半宽 Card 的计数；tokens 单位、来源及完整性退后一级，今日消耗采用独立的全宽横行。"
       }
     },
     "shadows": [
@@ -151,13 +159,18 @@
         "name": "data-tooltip",
         "value": "0 4px 20px color-mix(in srgb, var(--foreground) 14%, transparent)",
         "purpose": "结构化每日计数悬浮信息卡。"
+      },
+      {
+        "name": "glance-drag-overlay",
+        "value": "0 8px 24px color-mix(in srgb, var(--foreground) 18%, transparent)",
+        "purpose": "仅拖动中的 Card 预览使用，静止速览卡片保持无阴影。"
       }
     ],
     "motion": [
       {
         "name": "standard",
         "value": "220ms",
-        "purpose": "共享状态、开关轨道与滑块、速览开合过渡。"
+        "purpose": "共享状态、开关轨道与滑块、横向额度条及速览开合过渡；减少动态偏好禁用非必要过渡。"
       },
       {
         "name": "ring",
@@ -173,6 +186,16 @@
         "name": "glance-offset",
         "value": "translateY(-5px)",
         "purpose": "速览隐藏状态的短距离位移。"
+      },
+      {
+        "name": "glance-reorder",
+        "value": "160ms",
+        "purpose": "卡片拖动时相邻位置的让位动画；松手立即放置并保存，减少动态偏好关闭位移。"
+      },
+      {
+        "name": "glance-actions",
+        "value": "120ms ease-out",
+        "purpose": "次要跳转、详情与手柄在悬停或键盘聚焦时显现；无悬停设备直接显示。"
       }
     ],
     "breakpoints": [
@@ -183,6 +206,10 @@
       {
         "name": "appearance-stacked",
         "value": "900px"
+      },
+      {
+        "name": "glance-container-single-column",
+        "value": "280px"
       }
     ]
   },
@@ -257,7 +284,7 @@
       "name": "功能卡片",
       "kind": "card",
       "refersTo": "card",
-      "description": "18px 圆角和默认内距；compact 内距 12px。Box 不承担表面。",
+      "description": "18px 圆角和默认内距；compact 内距 12px。速览采用 12–14px 内距与无阴影表面，额度两窗口组合一张 Card，其余信息块独立成卡；Box 不承担表面。",
       "html": "<section class=\"ds-card\"><header class=\"ds-card-header\"><h3 class=\"ds-card-title\">每日用量</h3></header><p class=\"ds-card-description\">按日查看本机计数与来源</p><div class=\"ds-card-body\">来源与完整性由真实数据提供。</div></section>",
       "css": ".ds-card{display:flex;flex-direction:column;gap:12px;min-width:0;padding:var(--surface-inset,18px);border-radius:var(--radius-card,18px);background:var(--card,#fff);color:var(--foreground,#202020);box-shadow:var(--shadow-card,0 2px 12px color-mix(in srgb,var(--foreground,#202020) 4%,transparent));font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif}.ds-card-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.ds-card-title{margin:0;font-size:13px;font-weight:600;line-height:1.5}.ds-card-description{margin:0;color:var(--muted-foreground,#626262);font-size:12px}.ds-card-body{font-size:12px}"
     },
@@ -265,9 +292,16 @@
       "name": "剩余额度圆环",
       "kind": "custom",
       "refersTo": "progress-ring",
-      "description": "112px 默认、92px 小尺寸；示例仅演示几何，未知值不输出 meter。",
+      "description": "主窗口使用默认与小尺寸圆环；悬浮窗额度使用 ProgressMeter 横条。示例仅演示几何，未知值不输出 meter。",
       "html": "<div class=\"ds-ring\"><meter class=\"ds-sr\" min=\"0\" max=\"100\" value=\"75\" aria-label=\"示例剩余额度\">75%</meter><svg viewBox=\"0 0 100 100\" aria-hidden=\"true\"><circle class=\"ds-track\" cx=\"50\" cy=\"50\" r=\"42\"/><circle class=\"ds-value\" cx=\"50\" cy=\"50\" r=\"42\" pathLength=\"100\" stroke-dasharray=\"100 100\" stroke-dashoffset=\"25\"/></svg><div class=\"ds-ring-label\" aria-hidden=\"true\"><strong>75%</strong><span>示例剩余</span></div></div>",
       "css": ".ds-ring{position:relative;width:112px;height:112px;color:var(--foreground,#202020);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif}.ds-ring svg{width:100%;height:100%;transform:rotate(-90deg);overflow:visible}.ds-ring circle{fill:none;stroke-width:7}.ds-track{stroke:color-mix(in srgb,var(--data-primary,#7464df) 16%,transparent)}.ds-value{stroke:var(--data-primary,#7464df);stroke-linecap:round}.ds-ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-variant-numeric:tabular-nums;line-height:1.3}.ds-ring-label strong{font-size:25px;font-weight:650;letter-spacing:-.035em}.ds-ring-label span{font-size:11px;opacity:.8}.ds-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}"
+    },
+    {
+      "name": "额度横向进度条",
+      "kind": "custom",
+      "description": "悬浮窗组合额度 Card 内的全宽 ProgressMeter，百分比右对齐；原生 meter 保留真实零值语义，未知值不输出 meter。示例只演示几何。",
+      "html": "<div class=\"ds-quota\"><div class=\"ds-quota-heading\"><span>示例剩余额度</span><strong>75<span>%</span></strong></div><div class=\"ds-meter\"><meter class=\"ds-meter-sr\" min=\"0\" max=\"100\" value=\"75\" aria-label=\"示例剩余额度\" aria-valuetext=\"剩余 75%\">75%</meter><span aria-hidden=\"true\" style=\"transform:scaleX(.75)\"></span></div></div>",
+      "css": ".ds-quota{display:flex;flex-direction:column;gap:7px;min-width:0;width:100%;color:var(--foreground,#202020);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",\"PingFang SC\",sans-serif}.ds-quota-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.ds-quota-heading>span{font-size:12px;font-weight:550;line-height:1.5}.ds-quota-heading strong{font-size:27px;font-weight:650;letter-spacing:-.025em;line-height:1.15;font-variant-numeric:tabular-nums;white-space:nowrap}.ds-quota-heading strong>span{font-size:15px;margin-left:2px;font-weight:500;color:var(--muted-foreground,#626262)}.ds-meter{height:5px;width:100%;overflow:hidden;border-radius:999px;background:var(--muted,#f0f0f0)}.ds-meter>span[aria-hidden]{display:block;height:100%;width:100%;border-radius:inherit;background:var(--data-primary,#7464df);transform-origin:left;transition:transform var(--motion-standard,220ms) var(--ease-out,cubic-bezier(.16,1,.3,1))}.ds-meter-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}@media(prefers-reduced-motion:reduce){.ds-meter>span[aria-hidden]{transition:none}}"
     },
     {
       "name": "功能标签页",
