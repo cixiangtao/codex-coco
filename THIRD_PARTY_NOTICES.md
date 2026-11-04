@@ -8,6 +8,10 @@ packages/ui/src/components 中的基础组件由 shadcn CLI 4.22.1 从 [shadcn/u
 
 类名合并使用 [shadcn-ui/cn](https://github.com/shadcn-ui/cn) 的 cn npm 包，当前锁定 0.5.0，按随包 MIT 许可使用。UI 包不再直接依赖 clsx 和 tailwind-merge；其他依赖仍可能间接使用 clsx。
 
+## 悬浮窗卡片拖动
+
+使用 [dnd-kit](https://github.com/clauderic/dnd-kit) 发布的 `@dnd-kit/core` 6.3.1、`@dnd-kit/sortable` 10.0.0 与 `@dnd-kit/utilities` 3.2.2，按各自随包 MIT 许可使用。实现按官方 [Sortable](https://dndkit.com/legacy/presets/sortable/overview/) 与 [DragOverlay](https://dndkit.com/legacy/api-documentation/draggable/drag-overlay/) 文档接入指针传感器、可滚动单列与独立预览；公开数据、权限、保存、键盘与取消合同由本项目维护。用户提供的原 codex-usage 截图仅用于参考信息层级，未复制其界面代码或图片资产。
+
 ## 原型历史来源
 
 已归档并移除的原型曾参考 [codex-usage](https://github.com/cixiangtao/codex-usage) 提交 b33578383a35b0f9d5d67fc67fbf98309b7702f5，及 [codex-skin](https://github.com/cixiangtao/codex-skin) 提交 9b88ab8a72417b9a69ac4dea1abda4f4a990c354。旧运行时和测试没有恢复到本轮新实现。
