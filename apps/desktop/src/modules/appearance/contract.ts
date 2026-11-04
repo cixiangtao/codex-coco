@@ -26,6 +26,7 @@ export const appearanceLookSchema = z.strictObject({
 });
 export const appearanceConfigSchema = appearanceLookSchema.extend({
   portMode: z.enum(["fixed", "auto"]).default("fixed"),
+  connectOnEnable: z.boolean().default(true),
   restoreOnEnable: z.boolean().default(false),
   presets: z
     .array(
@@ -50,6 +51,7 @@ export type AppearanceConfig = z.infer<typeof appearanceConfigSchema>;
 export const appearanceDefaults: AppearanceConfig = {
   port: 9229,
   portMode: "fixed",
+  connectOnEnable: true,
   restoreOnEnable: false,
   presets: [],
   wallpaper: { enabled: false, image: null, fit: "cover", x: 50, y: 50, transparency: 1 },

@@ -26,12 +26,14 @@ export interface AppearanceDependencies {
   thumbnail?(id: string): Promise<string | null>;
   connection?: AppearanceConnection;
   launcher?: AppearanceLauncher;
+  /** Native consent for the one-time startup connection; cancellation must close the prompt. */
+  confirmRestart?(signal: AbortSignal): Promise<boolean>;
   gallery?: {
     list(signal: AbortSignal): Promise<GalleryItem[]>;
     remove(id: string): Promise<void>;
   };
 }
-/** Owns only Codex Coco styles. Enabling never launches, restarts or modifies another app. */
+/** Owns Codex Coco styles and prepares the selected app once per enabled lifetime. */
 export function createAppearanceModule(dependencies: AppearanceDependencies): BuiltinModule {
   const assets = new AppearanceAssets(dependencies.directory);
   const connection = dependencies.connection ?? createAppearanceConnection();
@@ -39,10 +41,13 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
     id: "appearance",
     title: "外观",
     config: {
-      version: 2,
+      version: 3,
       defaults: appearanceDefaults,
       schema: appearanceConfigSchema,
-      migrations: { 1: (value) => appearanceConfigSchema.parse(value) },
+      migrations: {
+        1: (value) => appearanceConfigSchema.parse(value),
+        2: (value) => appearanceConfigSchema.parse(value),
+      },
     },
     state: appearanceResultSchema.nullable(),
     operations: Object.fromEntries(
@@ -60,6 +65,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
         "choose-application",
         "launch-application",
         "restart-application",
+        "connect-on-enable",
       ].map((name) => [
         name,
         {
@@ -68,7 +74,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             ? assetInputSchema
             : emptyAppearanceInput,
           output: appearanceResultSchema,
-          timeoutMs: ["choose-application", "import-image"].includes(name)
+          timeoutMs: ["choose-application", "import-image", "connect-on-enable"].includes(name)
             ? 300_000
             : ["launch-application", "restart-application"].includes(name)
               ? 60_000
@@ -89,7 +95,9 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
       let connectionStatus: AppearanceResult["connection"] = "unchecked";
       let detectedPort: number | null = null;
       let gallery: GalleryItem[] = [];
-      let restoring = appearanceConfigSchema.parse(host.configuration()).restoreOnEnable;
+      const initialConfig = appearanceConfigSchema.parse(host.configuration());
+      let startupPending = initialConfig.connectOnEnable && Boolean(dependencies.launcher?.probe);
+      let restoring = !startupPending && initialConfig.restoreOnEnable;
       let appliedConfig: AppearanceConfig | null = restoring
         ? appearanceConfigSchema.parse(host.configuration())
         : null;
@@ -120,6 +128,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             "remove",
             "launch-application",
             "restart-application",
+            "connect-on-enable",
           ].includes(currentOperation)
         )
           connectionFailure = next.reason;
@@ -166,11 +175,16 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
         },
         { once: true },
       );
-      const initialProbe = dependencies.launcher?.probe
-        ? setTimeout(() => {
-            if (!stopped && !signal.aborted) host.requestOperation("monitor", {});
-          }, 100)
-        : undefined;
+      let initialProbe: ReturnType<typeof setTimeout> | undefined;
+      const requestInitialConnection = () => {
+        if (stopped || signal.aborted) return;
+        if (!appearanceConfigSchema.parse(host.configuration()).connectOnEnable)
+          startupPending = false;
+        const operation = startupPending ? "connect-on-enable" : "monitor";
+        if (host.requestOperation(operation, {})) startupPending = false;
+        else initialProbe = setTimeout(requestInitialConnection, 100);
+      };
+      if (dependencies.launcher?.probe) initialProbe = setTimeout(requestInitialConnection, 100);
       schedule();
       return {
         state: () => published,
@@ -179,6 +193,11 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
           schedule();
         },
         execute: async (name, input, context) => {
+          const assertRunning = () => {
+            context.signal.throwIfAborted();
+            signal.throwIfAborted();
+            if (stopped) throw new Error("NOT_CONNECTED");
+          };
           currentOperation = name;
           const config =
             name === "sync" && appliedConfig
@@ -186,10 +205,49 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
               : appearanceConfigSchema.parse(context.config);
           let imported: string | null = null;
           const previousPort = port;
-          const launching = name === "launch-application" || name === "restart-application";
+          const automatic = name === "connect-on-enable";
+          let launching = name === "launch-application" || name === "restart-application";
+          let restart = name === "restart-application";
           let launchedPort: number | null = null;
           try {
+            assertRunning();
+            if (automatic && !config.connectOnEnable) return result();
+            if (["apply", "remove", "launch-application", "restart-application"].includes(name)) {
+              startupPending = false;
+              clearTimeout(initialProbe);
+            }
             if (dependencies.launcher) selected = await dependencies.launcher.selected();
+            assertRunning();
+            if (automatic) {
+              if (!selected || !dependencies.launcher?.probe) {
+                connectionStatus = "not-selected";
+                // Preserve the legacy opt-in for manually started CDP targets without a saved app.
+                restoring = config.restoreOnEnable;
+                appliedConfig = restoring ? config : null;
+                return result();
+              }
+              let process = await dependencies.launcher.probe(context.signal);
+              assertRunning();
+              if (process.running && process.debugPort === null) {
+                connectionStatus = "needs-restart";
+                const accepted = await dependencies.confirmRestart?.(context.signal);
+                assertRunning();
+                if (
+                  !accepted ||
+                  !appearanceConfigSchema.parse(host.configuration()).connectOnEnable
+                )
+                  return result();
+                // The user may have closed or relaunched Codex while deciding.
+                process = await dependencies.launcher.probe(context.signal);
+              }
+              assertRunning();
+              if (process.running && process.debugPort !== null) {
+                launchedPort = process.debugPort;
+              } else {
+                launching = true;
+                restart = process.running;
+              }
+            }
             if (name === "choose-application") {
               if (port !== null) throw new Error("REMOVE_FIRST");
               if (!dependencies.launcher) throw new Error("LAUNCH_FAILED");
@@ -237,7 +295,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
                   connectionFailure = null;
                 return result({ targets, connectedPort: candidate });
               } catch (error) {
-                context.signal.throwIfAborted();
+                assertRunning();
                 active = false;
                 count = 0;
                 detectedPort = null;
@@ -263,11 +321,8 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             }
             if (launching) {
               if (!dependencies.launcher) throw new Error("LAUNCH_FAILED");
-              const launched = await dependencies.launcher.launch(
-                config,
-                name === "restart-application",
-                context.signal,
-              );
+              const launched = await dependencies.launcher.launch(config, restart, context.signal);
+              assertRunning();
               // Only a successful native launch supersedes the old process and its styles.
               // A refused launch or quit must leave an existing applied scene intact.
               active = false;
@@ -276,27 +331,31 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
               port = null;
               appliedConfig = null;
               count = 0;
+              launchedPort = launched;
+            }
+            if (launchedPort !== null) {
               const until = Date.now() + 30_000;
               while (true) {
+                assertRunning();
                 try {
-                  count = await connection.inspect(launched, context.signal);
+                  count = await connection.inspect(launchedPort, context.signal);
+                  assertRunning();
                   break;
                 } catch {
-                  context.signal.throwIfAborted();
+                  assertRunning();
                   if (Date.now() > until) throw new Error("NOT_CONNECTED");
                   await new Promise((resolve) => setTimeout(resolve, 200));
                 }
               }
-              launchedPort = launched;
-              detectedPort = launched;
+              detectedPort = launchedPort;
               connectionStatus = "ready";
             }
             if (name === "import-image") {
               const path = await dependencies.pickImage();
-              context.signal.throwIfAborted();
+              assertRunning();
               if (!path) return result();
               imported = await assets.import(path);
-              context.signal.throwIfAborted();
+              assertRunning();
               await assets.bytes(imported);
               const preview = (await dependencies.thumbnail?.(imported)) ?? null;
               if (dependencies.thumbnail && !preview) throw new Error("IMAGE_INVALID");
@@ -349,10 +408,10 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
                 failures = 0;
                 return result();
               } catch {
-                context.signal.throwIfAborted();
+                assertRunning();
               }
             }
-            context.signal.throwIfAborted();
+            assertRunning();
             port = targetPort; // Retain ownership even if only some windows accept the style.
             appliedConfig = config;
             syncing = true;
@@ -369,7 +428,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
             if (error instanceof AppearanceDiscoveryError && previousPort === null) port = null;
             if (context.signal.aborted && port !== null && (!launching || launchedPort !== null))
               await remove(AbortSignal.timeout(2000));
-            context.signal.throwIfAborted();
+            assertRunning();
             const code = appearanceFailureSchema.safeParse(
               error instanceof Error ? error.message : "",
             );
@@ -392,6 +451,7 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
         },
         stop: async () => {
           stopped = true;
+          startupPending = false;
           clearTimeout(initialProbe);
           restoring = false;
           await remove(AbortSignal.timeout(2000));
@@ -424,13 +484,15 @@ export function createAppearanceModule(dependencies: AppearanceDependencies): Bu
                 : undefined
           : undefined;
       const pending =
-        snapshot.operation?.name === "restart-application"
-          ? "正在重启 Codex 并应用布景…"
-          : snapshot.operation?.name === "launch-application"
-            ? "正在启动 Codex 并应用布景…"
-            : snapshot.operation?.name === "apply"
-              ? "正在应用布景…"
-              : null;
+        snapshot.operation?.name === "connect-on-enable"
+          ? "正在连接 Codex 并恢复布景…"
+          : snapshot.operation?.name === "restart-application"
+            ? "正在重启 Codex 并应用布景…"
+            : snapshot.operation?.name === "launch-application"
+              ? "正在启动 Codex 并应用布景…"
+              : snapshot.operation?.name === "apply"
+                ? "正在应用布景…"
+                : null;
       return {
         ...(state.status === "error" && !busy ? { phase: "error" as const } : {}),
         ...(action ? { appearanceAction: action } : {}),

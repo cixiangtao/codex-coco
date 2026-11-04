@@ -65,16 +65,30 @@ export function AppearanceConnectionPanel({
           <FieldDescription>启动参数示例：--remote-debugging-port=9229。</FieldDescription>
         </SettingsRow>
         <SettingsRow>
-          <FieldLabel htmlFor="appearance-restore">Codex Coco 启用时恢复布景</FieldLabel>
+          <FieldLabel htmlFor="appearance-connect">启动时自动连接 Codex</FieldLabel>
           <Switch
-            id="appearance-restore"
-            checked={draft.restoreOnEnable}
-            onCheckedChange={(checked) => update({ ...draft, restoreOnEnable: checked })}
+            id="appearance-connect"
+            checked={draft.connectOnEnable}
+            onCheckedChange={(checked) => update({ ...draft, connectOnEnable: checked })}
           />
           <FieldDescription>
-            只重新连接已运行的目标；失败会退避，不自动启动或重启。
+            Codex Coco 启动或外观模块启用时，自动启动所选 Codex、开启端口并恢复已保存布景。
+            已有连接直接复用；运行中未开端口时只提示一次，确认后重启。保存后下次启动生效。
           </FieldDescription>
         </SettingsRow>
+        {!draft.connectOnEnable && (
+          <SettingsRow>
+            <FieldLabel htmlFor="appearance-restore">仅恢复已有连接的布景</FieldLabel>
+            <Switch
+              id="appearance-restore"
+              checked={draft.restoreOnEnable}
+              onCheckedChange={(checked) => update({ ...draft, restoreOnEnable: checked })}
+            />
+            <FieldDescription>
+              下次启动时只尝试恢复已有端口上的布景；不启动 Codex，也不提示重启。
+            </FieldDescription>
+          </SettingsRow>
+        )}
       </SettingsGroup>
       <SettingsGroup title="目标应用">
         <SettingsRow>

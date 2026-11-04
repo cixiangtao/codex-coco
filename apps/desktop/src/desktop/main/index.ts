@@ -15,6 +15,7 @@ import {
   Notification,
 } from "electron";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { Worker } from "node:worker_threads";
 import { DiagnosticLog } from "../../application/diagnostics";
 import { dirname, join, resolve, sep } from "node:path";
@@ -106,6 +107,40 @@ const definitions = registeredModules(
   () => new Worker(join(here, "foundation-worker.js"), { stdout: true, stderr: true }),
   {
     directory: join(app.getPath("userData"), "appearance-assets"),
+    confirmRestart: async (signal) => {
+      // Module restoration can precede the first window. A parent is required for
+      // macOS to close an asynchronous native prompt on cancellation or shutdown.
+      let parent: BrowserWindow | undefined;
+      while (!parent) {
+        signal.throwIfAborted();
+        parent = [...windows.values()].find(
+          (win) => !win.isDestroyed() && contexts.get(win.webContents.id)?.kind === "main",
+        );
+        if (!parent) await delay(50, undefined, { signal });
+      }
+      const closed = new AbortController();
+      const onClosed = () => closed.abort();
+      parent.once("closed", onClosed);
+      try {
+        signal.throwIfAborted();
+        parent.show();
+        const choice = await dialog.showMessageBox(parent, {
+          type: "question",
+          title: "连接 Codex",
+          message: "重启 Codex 以开启布景连接？",
+          detail:
+            "Codex 已在运行，但尚未开启本机连接端口。请先保存工作；确认后会等待 Codex 正常退出，再开启端口并恢复已保存布景。取消后保留当前 Codex，本次不会再次自动提示。",
+          buttons: ["取消", "重启并连接"],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true,
+          signal: AbortSignal.any([signal, closed.signal]),
+        });
+        return !signal.aborted && !closed.signal.aborted && choice.response === 1;
+      } finally {
+        parent.removeListener("closed", onClosed);
+      }
+    },
     launcher: createAppearanceLauncher({
       file: join(app.getPath("userData"), "appearance-launcher.json"),
       pick: async () => {

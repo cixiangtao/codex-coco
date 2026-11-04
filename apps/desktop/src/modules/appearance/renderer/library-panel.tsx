@@ -126,14 +126,17 @@ export function AppearanceLibraryPanel({
               variant="outline"
               disabled={busy || draft.presets.length >= 12 || !presetTitle.trim()}
               onClick={() => {
-                const { presets, portMode, restoreOnEnable, ...look } = draft;
-                void portMode;
-                void restoreOnEnable;
+                // Presets own only the scene; connection policies stay with the module.
+                const { port, wallpaper, main, sidebar } = draft;
                 update({
                   ...draft,
                   presets: [
-                    ...presets,
-                    { id: crypto.randomUUID(), title: presetTitle.trim(), look },
+                    ...draft.presets,
+                    {
+                      id: crypto.randomUUID(),
+                      title: presetTitle.trim(),
+                      look: { port, wallpaper, main, sidebar },
+                    },
                   ],
                 });
                 setPresetTitle("");

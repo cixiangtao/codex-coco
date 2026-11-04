@@ -5,6 +5,7 @@ import type { ModuleSnapshot } from "../../contracts/modules";
 import { acceptModuleSnapshot } from "../client/modules";
 
 const labels: Record<string, string> = {
+  "connect-on-enable": "自动连接 Codex",
   "launch-application": "启动并应用布景",
   "restart-application": "重启并应用布景",
   apply: "应用布景",

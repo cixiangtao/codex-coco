@@ -20,6 +20,14 @@ const pids = new Set();
 const packaged = process.argv.includes("--packaged");
 let session;
 const canonicalDirectory = await realpath(directory);
+const openSession = () =>
+  createDesktopSession(
+    join(directory, "desktop-data"),
+    { ...process.env, CODEX_COCO_FIXTURES: "0" },
+    packaged
+      ? join(root, "apps/desktop/release/mac-arm64/Codex Coco.app/Contents/MacOS/Codex Coco")
+      : undefined,
+  );
 async function waitForPage(page, predicate, argument, options = {}) {
   const deadline = Date.now() + (options.timeout ?? 10_000);
   do {
@@ -138,13 +146,7 @@ try {
     infoPath,
     (await readFile(infoPath, "utf8")).replace(bundleId, "com.openai.codex"),
   );
-  session = await createDesktopSession(
-    join(directory, "desktop-data"),
-    { ...process.env, CODEX_COCO_FIXTURES: "0" },
-    packaged
-      ? join(root, "apps/desktop/release/mac-arm64/Codex Coco.app/Contents/MacOS/Codex Coco")
-      : undefined,
-  );
+  session = await openSession();
   const { page, application, errors } = session;
   await page.getByRole("button", { name: "启用外观模块", exact: true }).click();
   await page.getByRole("tab", { name: "连接设置", exact: true }).click();
@@ -331,6 +333,38 @@ try {
     scale: "css",
   });
   await popup.evaluate(() => window.codexCoco.dismissGlance());
+  // Enabling with an ordinary running target asks once, and cancellation keeps it intact.
+  for (const enabled of [false, true]) {
+    const response = await page.evaluate(
+      (enabled) => window.codexCoco.enableModule({ moduleId: "appearance", enabled }),
+      enabled,
+    );
+    assert.equal(response.ok, true);
+  }
+  await waitForPage(page, async () => {
+    const module = (await window.codexCoco.modules()).value.find(
+      (entry) => entry.id === "appearance",
+    );
+    return (
+      module.operation?.name === "connect-on-enable" &&
+      !["running", "cancelling"].includes(module.operation.phase) &&
+      module.state?.connection === "needs-restart"
+    );
+  });
+  assert.equal(await application.evaluate(() => globalThis.__restartConfirmations), 2);
+  assert.deepEqual(
+    await markerValue(),
+    ordinaryTarget,
+    "Cancelling automatic connection does not quit or relaunch the ordinary target",
+  );
+  await observe();
+  await observe();
+  await delay(500);
+  assert.equal(
+    await application.evaluate(() => globalThis.__restartConfirmations),
+    2,
+    "Connection monitoring does not repeat a cancelled startup confirmation",
+  );
   await stopTarget();
   await delay(500);
   await rm(marker, { force: true });
@@ -446,6 +480,96 @@ try {
   assert.deepEqual(errors, []);
   await session.application.close();
   session = null;
+  await stopTarget();
+  await delay(500);
+  await rm(marker, { force: true });
+
+  // A real application restart restores the saved target and launches it without a button press.
+  session = await openSession();
+  const waitForAutomaticScene = async () => {
+    await waitForPage(
+      session.page,
+      async () => {
+        const module = (await window.codexCoco.modules()).value.find(
+          (entry) => entry.id === "appearance",
+        );
+        return (
+          module.state?.active === true &&
+          module.state.connection === "ready" &&
+          module.state.targets === 1 &&
+          !["running", "cancelling"].includes(module.operation?.phase)
+        );
+      },
+      null,
+      { timeout: 40_000 },
+    );
+  };
+  await waitForAutomaticScene();
+  const automaticProbe = await nativeProbe.probe(AbortSignal.timeout(10_000));
+  assert.equal(automaticProbe.running, true);
+  assert.ok(Number.isInteger(automaticProbe.debugPort));
+  await started(automaticProbe.debugPort);
+  const automaticTarget = await markerValue();
+  assert.ok(automaticTarget);
+  assert.deepEqual(session.errors, []);
+  await session.application.close();
+  session = null;
+
+  // Starting Codex Coco again reuses the existing CDP process and reapplies the saved scene.
+  session = await openSession();
+  await waitForAutomaticScene();
+  assert.deepEqual(
+    await markerValue(),
+    automaticTarget,
+    "Automatic connection reuses an existing debug target without restarting it",
+  );
+  await session.page
+    .getByRole("navigation", { name: "应用导航" })
+    .getByRole("button", { name: "外观", exact: true })
+    .click();
+  await session.page.getByRole("tab", { name: "连接设置", exact: true }).click();
+  const automaticSwitch = session.page.getByRole("switch", {
+    name: "启动时自动连接 Codex",
+    exact: true,
+  });
+  assert.equal(await automaticSwitch.isChecked(), true);
+  await session.page.screenshot({
+    path: join(output, "startup-connected.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+  await automaticSwitch.click();
+  await session.page.getByRole("button", { name: "仅保存配置", exact: true }).click();
+  await waitForPage(session.page, async () => {
+    const module = (await window.codexCoco.modules()).value.find(
+      (entry) => entry.id === "appearance",
+    );
+    return module.config.value.connectOnEnable === false;
+  });
+  assert.deepEqual(session.errors, []);
+  await session.application.close();
+  session = null;
+  await stopTarget();
+  await delay(500);
+  await rm(marker, { force: true });
+
+  // Saving the switch off persists across restarts and leaves the selected target stopped.
+  session = await openSession();
+  await waitForPage(session.page, async () => {
+    const module = (await window.codexCoco.modules()).value.find(
+      (entry) => entry.id === "appearance",
+    );
+    return module.config.value.connectOnEnable === false && module.state?.connection === "stopped";
+  });
+  await delay(3500);
+  assert.equal(await markerValue(), null, "Disabled startup connection must not launch a target");
+  assert.deepEqual(await nativeProbe.probe(AbortSignal.timeout(10_000)), {
+    running: false,
+    debugPort: null,
+  });
+  assert.deepEqual(session.errors, []);
+  await session.application.close();
+  session = null;
   console.log(
     JSON.stringify(
       {
@@ -462,6 +586,11 @@ try {
         ordinaryLaunchDetection: true,
         glanceRestartConsentCancellation: true,
         glanceLaunchAutomaticallyAppliesAndVerifies: true,
+        startupRestartConsentCancellation: true,
+        startupConfirmationDoesNotRepeat: true,
+        startupAutomaticallyLaunchesAndApplies: true,
+        startupReusesExistingDebugTarget: true,
+        disabledStartupPreferencePersists: true,
         realCodexUntouched: true,
       },
       null,
