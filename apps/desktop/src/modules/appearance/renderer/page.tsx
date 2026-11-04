@@ -20,13 +20,15 @@ import {
   type AppearanceConfig,
 } from "../contract";
 
-import { type Layer, type AppearanceLaunchFeedback } from "./editor-types";
+import { labels, type Layer, type AppearanceLaunchFeedback } from "./editor-types";
 import { AppearanceLayerEditor } from "./layer-editor";
-import { AppearanceLibraryPanel } from "./library-panel";
+import { AppearancePresetPanel } from "./library-panel";
 import { AppearanceConnectionPanel } from "./connection-panel";
 import { Box } from "@codex-coco/ui/components/box";
 import { Badge } from "@codex-coco/ui/components/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@codex-coco/ui/components/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
+import { AppearanceImagePicker } from "./image-picker";
+import { ArrowLeftIcon, ImagesIcon, Settings2Icon } from "lucide-react";
 /** Draft settings remain separate from applying a style to another application. */
 export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot }) {
   const config = appearanceConfigSchema.safeParse(snapshot.config.value);
@@ -42,7 +44,13 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [launchFeedback, setLaunchFeedback] = useState<AppearanceLaunchFeedback | null>(null);
   const [selectedLayer, setSelectedLayer] = useState<Layer>("main");
-  const [activeTab, setActiveTab] = useState("editor");
+  const [view, setView] = useState<"editor" | "connection">("editor");
+  const [presetsOpen, setPresetsOpen] = useState(false);
+  const [pickerLayer, setPickerLayer] = useState<Layer | null>(null);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [galleryError, setGalleryError] = useState<string | null>(null);
+  const [savedForLater, setSavedForLater] = useState(false);
+  const regionSelection = useRef<HTMLDivElement>(null);
   const currentDraft = useRef(draft);
   useEffect(() => {
     currentDraft.current = draft;
@@ -139,6 +147,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
           reason,
           applied: parsed.success && parsed.data.active,
         });
+        if (!reason) setSavedForLater(false);
         if (operation === "launch-application" && reason === "APP_RUNNING") setConfirmRestart(true);
       }
       if (!launching && !layer && response.value.operation) {
@@ -153,12 +162,14 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
           setMessage("操作未完成，请重试。");
         else if (result.data.status === "error")
           setMessage(appearanceFailures[result.data.reason!]);
-        else if (operation === "apply")
+        else if (operation === "apply") {
+          setSavedForLater(false);
           setMessage(
             result.data.active ? "已应用当前布景。" : "所有图层已关闭，当前没有布景需要应用。",
           );
-        else if (operation === "remove") setMessage("布景已撤销。");
+        } else if (operation === "remove") setMessage("布景已撤销。");
         else if (operation === "verify") setMessage("布景验证通过。");
+        else if (operation === "remove-image") setMessage("图片副本已删除，原始文件保持不变。");
       }
       if (layer && response.value.operation) {
         const completed = await waitForModuleOperation(
@@ -209,6 +220,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
       }
       acceptModuleSnapshot(response.value);
       setBaseRevision(response.value.config.revision);
+      setSavedForLater(true);
       if (savedVersion === editVersion.current) setDirty(false);
       if (apply) await run("apply");
       else setMessage("布景配置已保存。");
@@ -217,6 +229,37 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
     } finally {
       setPending(false);
     }
+  }
+  async function loadGallery() {
+    setGalleryLoading(true);
+    setGalleryError(null);
+    setPending(true);
+    try {
+      const response = await window.codexCoco.runModuleOperation({
+        moduleId: "appearance",
+        operation: "list-gallery",
+        input: {},
+      });
+      if (!response.ok || !response.value.operation) throw new Error("GALLERY_FAILED");
+      acceptModuleSnapshot(response.value);
+      const completed = await waitForModuleOperation(
+        "appearance",
+        response.value.operation.id,
+        30_000,
+      );
+      const parsed = appearanceResultSchema.safeParse(completed.result);
+      if (completed.phase !== "succeeded" || !parsed.success || parsed.data.status !== "ready")
+        throw new Error("GALLERY_FAILED");
+    } catch {
+      setGalleryError("图片库未能载入，请重试，或从本机导入图片。");
+    } finally {
+      setGalleryLoading(false);
+      setPending(false);
+    }
+  }
+  function openImagePicker() {
+    setPickerLayer(selectedLayer);
+    void loadGallery();
   }
   async function enable() {
     setPending(true);
@@ -237,55 +280,61 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
     <Box gap="lg" className="appearance-page">
       <header className="desktop-page-heading appearance-heading">
         <div>
-          <h2>外观</h2>
-          <p>壁纸、主面板与侧栏布景</p>
+          <h2>{view === "editor" ? "外观" : "连接设置"}</h2>
+          <p>
+            {view === "editor"
+              ? "选择区域，让 Codex 换个样子。"
+              : "管理 Codex 应用、启动偏好与本机连接。"}
+          </p>
         </div>
-        <PinBlockButton id="appearance.status" />
-        <Badge tone={dirty ? "warning" : result?.active ? "success" : "neutral"}>
-          {dirty ? "有未保存修改" : result?.active ? "已应用" : enabled ? "未应用布景" : "已停用"}
-        </Badge>
-      </header>
-      {message && <output aria-live="polite">{message}</output>}
-      {enabled &&
-        result &&
-        !result.active &&
-        ["not-selected", "stopped", "needs-restart", "unavailable"].includes(result.connection) && (
-          <Alert aria-label="布景连接状态">
-            <AlertTitle>
-              {result.connection === "needs-restart"
-                ? "重启 Codex 后即可应用布景"
-                : result.connection === "stopped"
-                  ? "启动 Codex 并应用布景"
-                  : result.connection === "not-selected"
-                    ? "先选择 Codex 应用"
-                    : "Codex 连接暂不可用"}
-            </AlertTitle>
-            <AlertDescription>
-              <p>
-                {dirty
-                  ? "有未保存修改，请先保存；快捷启动使用已保存设置。"
-                  : "启动或重启完成后会自动应用已保存布景。"}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy || dirty}
-                onClick={() => {
-                  if (result.connection === "needs-restart") setConfirmRestart(true);
-                  else if (result.connection === "stopped") {
-                    void run("launch-application");
-                  } else setActiveTab("connection");
-                }}
-              >
-                {result.connection === "needs-restart"
-                  ? "重启并应用布景"
-                  : result.connection === "stopped"
-                    ? "启动并应用布景"
-                    : "打开连接设置"}
+        <div className="appearance-heading-actions">
+          {view === "editor" ? (
+            <>
+              <PinBlockButton id="appearance.status" />
+              <Button variant="ghost" onClick={() => setView("connection")}>
+                <Settings2Icon />
+                连接设置
               </Button>
-            </AlertDescription>
-          </Alert>
-        )}
+            </>
+          ) : (
+            <Button variant="ghost" onClick={() => setView("editor")}>
+              <ArrowLeftIcon />
+              返回布景编辑
+            </Button>
+          )}
+        </div>
+      </header>
+      {enabled && view === "editor" && (
+        <div className="appearance-connection-strip" aria-label="布景连接状态">
+          <div>
+            <Badge tone={result?.active ? "success" : "neutral"}>
+              {result?.active
+                ? "Codex 中已有布景"
+                : result?.connection === "ready"
+                  ? "Codex 已连接"
+                  : "等待连接 Codex"}
+            </Badge>
+            <span>
+              {result?.active
+                ? "编辑后保存并应用，才会更新当前效果。"
+                : result?.connection === "needs-restart"
+                  ? "Codex 需要重启后才能连接。"
+                  : result?.connection === "stopped"
+                    ? "Codex 尚未运行，可先完成布景编辑。"
+                    : result?.connection === "not-selected"
+                      ? "可先编辑布景，再选择要连接的 Codex。"
+                      : result?.connection === "ready"
+                        ? "布景准备好后即可应用。"
+                        : "可先编辑布景，再检查本机连接。"}
+            </span>
+          </div>
+          {!result?.active && (
+            <Button variant="link" size="sm" onClick={() => setView("connection")}>
+              设置连接
+            </Button>
+          )}
+        </div>
+      )}
       {result?.status === "error" && (
         <Alert variant="destructive">
           <AlertTitle>布景操作未完成</AlertTitle>
@@ -297,8 +346,8 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
           <AlertTitle>布景尚未连接</AlertTitle>
           <AlertDescription>
             <p>
-              启用后可导入图片和检查本机连接。应用布景需要 Codex
-              已开启远程调试；启用不会自动启动或重启 Codex。
+              启用后可选择图片和连接
+              Codex。若已选择应用且开启自动连接，会尝试启动或恢复连接；需要重启时会先请你确认。
             </p>
             <Button
               disabled={busy || snapshot.phase !== "disabled"}
@@ -326,80 +375,140 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
           </AlertDescription>
         </Alert>
       )}
-      <Tabs
-        value={activeTab}
-        onValueChange={(value) => {
-          if (typeof value === "string") setActiveTab(value);
-        }}
-      >
-        <TabsList aria-label="外观功能">
-          <TabsTrigger value="editor">布景编辑</TabsTrigger>
-          <TabsTrigger value="library">图片与预设</TabsTrigger>
-          <TabsTrigger value="connection">连接设置</TabsTrigger>
-        </TabsList>
-        <TabsContent value="editor">
-          <div className="appearance-workspace">
-            <AppearancePreview
-              selected={selectedLayer}
-              onSelect={setSelectedLayer}
-              value={draft}
-              images={Object.fromEntries(
-                (["wallpaper", "main", "sidebar"] as const).map((layer) => [
-                  layer,
-                  (draft[layer].image ? previews[draft[layer].image] : undefined) ??
-                    result?.gallery.find((item) => item.id === draft[layer].image)?.preview,
-                ]),
-              )}
-              onChange={update}
-            />
-            <AppearanceLayerEditor
-              draft={draft}
-              layer={selectedLayer}
-              previews={previews}
-              enabled={enabled}
-              busy={busy}
-              update={update}
-              onImport={(layer) => {
-                void run("import-image", layer);
-              }}
-            />
-          </div>
+      <section hidden={view !== "editor"} className="appearance-editor-view" aria-label="布景编辑">
+        <div className="appearance-editor-toolbar">
+          <ToggleGroup
+            ref={regionSelection}
+            aria-label="预览定位图层"
+            variant="outline"
+            value={[selectedLayer]}
+            onValueChange={(items) => {
+              if (items[0] && Object.hasOwn(labels, items[0])) setSelectedLayer(items[0] as Layer);
+            }}
+          >
+            {(["wallpaper", "main", "sidebar"] as const).map((layer) => (
+              <ToggleGroupItem key={layer} value={layer}>
+                {labels[layer]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
           <Button
             variant="ghost"
-            className="appearance-library-link"
-            onClick={() => setActiveTab("library")}
+            aria-expanded={presetsOpen}
+            aria-controls="appearance-presets"
+            onClick={() => setPresetsOpen(!presetsOpen)}
           >
-            从图片库选择或载入预设
+            <ImagesIcon />
+            布景预设
           </Button>
-        </TabsContent>
-        <TabsContent value="library">
-          <AppearanceLibraryPanel
+        </div>
+        <div id="appearance-presets" hidden={!presetsOpen}>
+          <AppearancePresetPanel
             draft={draft}
             update={update}
-            enabled={enabled}
             busy={busy}
-            dirty={dirty}
-            result={result}
-            run={run}
-            libraryLayer={selectedLayer}
-            onSelect={setSelectedLayer}
+            onLoad={() => setPresetsOpen(false)}
           />
-        </TabsContent>
-        <TabsContent value="connection">
-          <AppearanceConnectionPanel
-            launchFeedback={launchFeedback}
+        </div>
+        <div className="appearance-workspace">
+          <AppearancePreview
+            selected={selectedLayer}
+            value={draft}
+            images={Object.fromEntries(
+              (["wallpaper", "main", "sidebar"] as const).map((layer) => [
+                layer,
+                (draft[layer].image ? previews[draft[layer].image] : undefined) ??
+                  result?.gallery.find((item) => item.id === draft[layer].image)?.preview,
+              ]),
+            )}
+            onChange={update}
+          />
+          <AppearanceLayerEditor
             draft={draft}
-            update={update}
+            layer={selectedLayer}
+            preview={
+              draft[selectedLayer].image
+                ? (previews[draft[selectedLayer].image] ??
+                  result?.gallery.find((item) => item.id === draft[selectedLayer].image)?.preview)
+                : undefined
+            }
+            imageTitle={
+              result?.gallery.find((item) => item.id === draft[selectedLayer].image)?.title
+            }
             enabled={enabled}
             busy={busy}
-            dirty={dirty}
-            result={result}
-            run={run}
-            onRestart={() => setConfirmRestart(true)}
+            update={update}
+            onChoose={openImagePicker}
+            onImport={(layer) => {
+              void run("import-image", layer);
+            }}
           />
-        </TabsContent>
-      </Tabs>
+        </div>
+      </section>
+      <section hidden={view !== "connection"} aria-label="连接设置">
+        <AppearanceConnectionPanel
+          launchFeedback={launchFeedback}
+          draft={draft}
+          update={update}
+          enabled={enabled}
+          busy={busy}
+          dirty={dirty}
+          result={result}
+          run={run}
+          onRestart={() => setConfirmRestart(true)}
+        />
+      </section>
+      <AppearanceImagePicker
+        open={pickerLayer !== null}
+        returnFocus={() =>
+          regionSelection.current?.querySelector<HTMLElement>('button[aria-pressed="true"]') ?? null
+        }
+        onOpenChange={(open) => {
+          if (!open) setPickerLayer(null);
+        }}
+        layer={pickerLayer ?? selectedLayer}
+        selectedImage={draft[pickerLayer ?? selectedLayer].image}
+        gallery={result?.gallery ?? []}
+        loading={galleryLoading}
+        error={galleryError}
+        busy={busy}
+        onRetry={() => {
+          void loadGallery();
+        }}
+        onSelect={(item) => {
+          if (!pickerLayer) return;
+          const latest = currentDraft.current;
+          update({
+            ...latest,
+            [pickerLayer]: { ...latest[pickerLayer], image: item.id, enabled: true },
+          });
+          setPreviews((previous) => ({ ...previous, [item.id]: item.preview }));
+          setPickerLayer(null);
+        }}
+        onImport={() => {
+          const layer = pickerLayer;
+          setPickerLayer(null);
+          if (layer) void run("import-image", layer);
+        }}
+        canRemove={!dirty}
+        onRemove={(id) => {
+          setPickerLayer(null);
+          void run("remove-image", undefined, { id });
+        }}
+      />
       <footer className="appearance-save-bar">
+        <div className="appearance-draft-status">
+          <Badge tone={dirty ? "warning" : "neutral"}>
+            {dirty ? "有未保存修改" : savedForLater ? "已保存，待应用" : "配置已保存"}
+          </Badge>
+          <span>
+            {dirty
+              ? "修改只在本地预览中，尚未更新 Codex。"
+              : savedForLater
+                ? "Codex 保持原有效果，可继续应用。"
+                : "选图和调节只改变草稿。"}
+          </span>
+        </div>
         <div className="appearance-save-actions">
           <Button
             disabled={!enabled || busy || conflict}
@@ -429,6 +538,7 @@ export default function AppearancePage({ snapshot }: { snapshot: ModuleSnapshot 
             放弃修改
           </Button>
         </div>
+        {message && <output aria-live="polite">{message}</output>}
         <output aria-live="polite">
           {busy
             ? "正在处理布景…"

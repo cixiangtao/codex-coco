@@ -2,131 +2,38 @@ import { useState } from "react";
 import { Box } from "@codex-coco/ui/components/box";
 import { Button } from "@codex-coco/ui/components/button";
 import { Input } from "@codex-coco/ui/components/input";
-import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
 import { SettingsGroup, SettingsRow } from "@codex-coco/ui/components/settings-group";
 import { FieldLabel, FieldDescription } from "@codex-coco/ui/components/field";
-import type { AppearanceConfig, AppearanceResult } from "../contract";
-import { labels, type Layer, type AppearanceRun } from "./editor-types";
+import type { AppearanceConfig } from "../contract";
 
-export function AppearanceLibraryPanel({
-  draft,
-  update,
-  enabled,
-  busy,
-  dirty,
-  result,
-  run,
-  libraryLayer,
-  onSelect,
-}: {
+interface AppearancePresetPanelProps {
   draft: AppearanceConfig;
   update(value: AppearanceConfig): void;
-  enabled: boolean;
   busy: boolean;
-  dirty: boolean;
-  result: AppearanceResult | null;
-  run: AppearanceRun;
-  libraryLayer: Layer;
-  onSelect(layer: Layer): void;
-}) {
+  onLoad?(): void;
+}
+
+/** Preset edits belong to the page draft; loading a scene keeps connection preferences intact. */
+export function AppearancePresetPanel({ draft, update, busy, onLoad }: AppearancePresetPanelProps) {
   const [presetTitle, setPresetTitle] = useState("");
+  const atLimit = draft.presets.length >= 12;
   return (
-    <Box gap="lg">
-      <SettingsGroup
-        title="图片库"
-        aria-label="布景图片库"
-        description="将图片放到当前选择的图层，应用前可继续调整。"
-      >
-        <SettingsRow>
-          <FieldLabel>图库应用图层</FieldLabel>
-          <ToggleGroup
-            aria-label="图库应用图层"
-            variant="outline"
-            value={[libraryLayer]}
-            onValueChange={(items) => {
-              if (items[0] && Object.hasOwn(labels, items[0])) onSelect(items[0] as Layer);
-            }}
-          >
-            {(["wallpaper", "main", "sidebar"] as const).map((layer) => (
-              <ToggleGroupItem key={layer} value={layer}>
-                {labels[layer]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </SettingsRow>
-        <SettingsRow layout="stacked">
-          <FieldLabel>可用图片</FieldLabel>
-          <Button
-            variant="outline"
-            disabled={!enabled || busy}
-            onClick={() => {
-              void run("list-gallery");
-            }}
-          >
-            载入图片库
-          </Button>
-          {!result?.gallery.length && (
-            <p className="appearance-library-empty">
-              {enabled
-                ? "载入内置图片与已导入副本，或在布景编辑中导入图片。"
-                : "启用外观模块后可载入图片库。"}
-            </p>
-          )}
-          <div className="appearance-gallery-grid">
-            {result?.gallery.map((item) => (
-              <div key={item.id} className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  className="appearance-gallery-image"
-                  aria-pressed={draft[libraryLayer].image === item.id}
-                  disabled={busy}
-                  onClick={() => {
-                    update({
-                      ...draft,
-                      [libraryLayer]: { ...draft[libraryLayer], enabled: true, image: item.id },
-                    });
-                  }}
-                >
-                  <img src={item.preview} alt={item.title} className="h-24 w-full object-contain" />
-                  <span>{item.title}</span>
-                </button>
-                {!item.builtin && (
-                  <Button
-                    variant="ghost"
-                    disabled={busy || dirty}
-                    onClick={() => {
-                      void run("remove-image", undefined, { id: item.id });
-                    }}
-                  >
-                    删除图片副本
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        </SettingsRow>
-      </SettingsGroup>
-      <SettingsGroup
-        title="布景预设"
-        aria-label="布景预设"
-        description="最多保存 12 组。预设与图层配置一起保存，载入后需明确应用。"
-      >
+    <Box gap="lg" className="appearance-preset-panel">
+      <SettingsGroup title="收藏当前布景" description="预设记录壁纸、主面板和侧栏的完整组合。">
         <SettingsRow layout="stacked">
           <FieldLabel htmlFor="appearance-preset-title">预设名称</FieldLabel>
-          <div className="flex flex-wrap gap-3">
+          <div className="appearance-preset-create">
             <Input
               id="appearance-preset-title"
-              aria-label="预设名称"
-              placeholder="预设名称"
+              placeholder="为这套布景取个名字"
               value={presetTitle}
               maxLength={60}
               onChange={(event) => setPresetTitle(event.target.value)}
             />
             <Button
               variant="outline"
-              disabled={busy || draft.presets.length >= 12 || !presetTitle.trim()}
+              disabled={busy || atLimit || !presetTitle.trim()}
               onClick={() => {
-                // Presets own only the scene; connection policies stay with the module.
                 const { port, wallpaper, main, sidebar } = draft;
                 update({
                   ...draft,
@@ -142,39 +49,60 @@ export function AppearanceLibraryPanel({
                 setPresetTitle("");
               }}
             >
-              保存为预设
+              加入预设
             </Button>
           </div>
-          <FieldDescription>保存当前三层组合，之后可以再次载入。</FieldDescription>
+          <FieldDescription>
+            {atLimit
+              ? "已达到 12 组上限，可先删除不再使用的预设。"
+              : "加入和删除先保留在草稿中，点击页面底部的保存按钮后生效。"}
+          </FieldDescription>
         </SettingsRow>
-        {draft.presets.map((preset) => (
-          <SettingsRow key={preset.id}>
-            <FieldLabel>{preset.title}</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => {
-                  update({ ...draft, ...preset.look, port: draft.port });
-                }}
-              >
-                载入预设
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={busy}
-                onClick={() =>
-                  update({
-                    ...draft,
-                    presets: draft.presets.filter((item) => item.id !== preset.id),
-                  })
-                }
-              >
-                删除预设
-              </Button>
-            </div>
+      </SettingsGroup>
+      <SettingsGroup
+        title={`我的预设 · ${draft.presets.length}/12`}
+        aria-label="布景预设"
+        description="载入会替换当前三个区域的草稿；保存并应用后才会修改 Codex。"
+      >
+        {draft.presets.length === 0 ? (
+          <SettingsRow layout="stacked">
+            <p className="appearance-library-empty">
+              还没有预设。调好一套喜欢的布景后，可以在这里收藏。
+            </p>
           </SettingsRow>
-        ))}
+        ) : (
+          draft.presets.map((preset) => (
+            <SettingsRow key={preset.id}>
+              <FieldLabel>{preset.title}</FieldLabel>
+              <div className="appearance-preset-actions">
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  aria-label={`载入预设：${preset.title}`}
+                  onClick={() => {
+                    update({ ...draft, ...preset.look, port: draft.port });
+                    onLoad?.();
+                  }}
+                >
+                  载入
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  aria-label={`删除预设：${preset.title}`}
+                  onClick={() =>
+                    update({
+                      ...draft,
+                      presets: draft.presets.filter((item) => item.id !== preset.id),
+                    })
+                  }
+                >
+                  删除
+                </Button>
+              </div>
+            </SettingsRow>
+          ))
+        )}
       </SettingsGroup>
     </Box>
   );

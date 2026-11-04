@@ -10,28 +10,34 @@ import { labels, type Layer } from "./editor-types";
 export function AppearanceLayerEditor({
   draft,
   layer,
-  previews,
+  preview,
+  imageTitle,
   enabled,
   busy,
   update,
   onImport,
+  onChoose,
 }: {
   draft: AppearanceConfig;
   layer: Layer;
-  previews: Record<string, string>;
+  preview: string | undefined;
+  imageTitle: string | undefined;
   enabled: boolean;
   busy: boolean;
   update(value: AppearanceConfig): void;
   onImport(layer: Layer): void;
+  onChoose(): void;
 }) {
   return (
     <SettingsGroup
       title={labels[layer]}
       className="appearance-layer-editor"
-      description="调整当前图层，保存后再应用。"
+      description={
+        draft[layer].enabled ? "选图与参数只影响当前区域。" : "当前区域已关闭，选图后会自动开启。"
+      }
     >
       <SettingsRow>
-        <FieldLabel htmlFor={`appearance-${layer}-enabled`}>启用图层</FieldLabel>
+        <FieldLabel htmlFor={`appearance-${layer}-enabled`}>显示这个区域的布景</FieldLabel>
         <Switch
           id={`appearance-${layer}-enabled`}
           checked={draft[layer].enabled}
@@ -41,39 +47,49 @@ export function AppearanceLayerEditor({
         />
       </SettingsRow>
       <SettingsRow layout="stacked">
-        <FieldLabel>图层图片</FieldLabel>
-        <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="appearance-image-choice"
+          disabled={!enabled || busy}
+          aria-label={`选择${labels[layer]}图片`}
+          onClick={onChoose}
+        >
+          <div className="appearance-image-thumbnail">
+            {preview ? (
+              <img src={preview} alt={`${labels[layer]}图片预览`} />
+            ) : (
+              <span>{draft[layer].image ? "图片预览" : "选择图片"}</span>
+            )}
+          </div>
+          <span className="appearance-image-caption">
+            <strong>
+              {draft[layer].image ? (imageTitle ?? "已选图片") : "为这个区域添加图片"}
+            </strong>
+            <span>{draft[layer].image ? "更换图片" : "浏览内置图片与已导入图片"}</span>
+          </span>
+        </button>
+        <div className="appearance-image-actions">
           <Button
-            variant="outline"
+            variant="ghost"
+            size="sm"
             disabled={!enabled || busy}
-            onClick={() => {
-              onImport(layer);
-            }}
+            onClick={() => onImport(layer)}
           >
             导入{labels[layer]}
           </Button>
-          <span className="text-muted-foreground">
-            {draft[layer].image ? "已选择图片" : "未选择图片"}
-          </span>
           {draft[layer].image && (
             <Button
               variant="ghost"
+              size="sm"
               disabled={busy}
-              onClick={() => {
-                update({ ...draft, [layer]: { ...draft[layer], image: null } });
-              }}
+              onClick={() =>
+                update({ ...draft, [layer]: { ...draft[layer], image: null, enabled: false } })
+              }
             >
               清除图片
             </Button>
           )}
         </div>
-        {draft[layer].image && previews[draft[layer].image] && (
-          <img
-            src={previews[draft[layer].image!]}
-            alt={`${labels[layer]}图片预览`}
-            className="appearance-selected-image"
-          />
-        )}
       </SettingsRow>
       <div className="appearance-layer-fields grid grid-cols-2">
         {(["x", "y"] as const).map((axis) => (
@@ -143,7 +159,10 @@ export function AppearanceLayerEditor({
           ).map(({ key, title, min, max, step }) => (
             <SettingsRow layout="stacked" key={key}>
               <FieldLabel htmlFor={`${layer}-${key}`}>
-                {title} {draft[layer][key]}
+                {title}{" "}
+                {key === "opacity"
+                  ? `${Math.round(draft[layer][key] * 100)}%`
+                  : `${draft[layer][key]} px`}
               </FieldLabel>
               <Input
                 id={`${layer}-${key}`}

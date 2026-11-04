@@ -149,7 +149,7 @@ try {
   session = await openSession();
   const { page, application, errors } = session;
   await page.getByRole("button", { name: "启用外观模块", exact: true }).click();
-  await page.getByRole("tab", { name: "连接设置", exact: true }).click();
+  await page.getByRole("button", { name: "连接设置", exact: true }).click();
   const launchButton = page.getByRole("button", { name: "启动所选应用", exact: true });
   const feedback = page.getByRole("alert", { name: "Codex 启动状态", exact: true });
   await launchButton.click();
@@ -310,21 +310,16 @@ try {
       .code,
     "FORBIDDEN",
   );
-  // Main-window permission probes may focus it and dismiss the native popover.
-  const popupWindow = await application.browserWindow(popup);
-  if (!(await popupWindow.evaluate((window) => window.isVisible()))) {
-    await application.evaluate(({ Menu }) =>
-      Menu.getApplicationMenu()
-        .items.flatMap((item) => item.submenu?.items ?? [])
-        .find((item) => item.label === "显示或收起速览")
-        .click(),
-    );
-  }
-  await popupWindow.evaluate((window) => {
-    window.show();
-    window.focus();
-  });
-  await popup.waitForFunction(
+  // Permission probes can dismiss the native panel; reopen through the application's lifecycle.
+  await popup.evaluate(() => window.codexCoco.dismissGlance());
+  await application.evaluate(({ Menu }) =>
+    Menu.getApplicationMenu()
+      .items.flatMap((item) => item.submenu?.items ?? [])
+      .find((item) => item.label === "显示或收起速览")
+      .click(),
+  );
+  await waitForPage(
+    popup,
     () => document.querySelector(".glance-shell")?.getAttribute("data-visible") === "true",
   );
   await popup.screenshot({
@@ -470,7 +465,7 @@ try {
   ).state;
   assert.equal(launchedState.targets, 1);
   assert.equal(launchedState.active, true);
-  await page.getByRole("tab", { name: "布景编辑", exact: true }).click();
+  await page.getByRole("button", { name: "返回布景编辑", exact: true }).click();
   await page.getByRole("heading", { name: "外观", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({
     path: join(output, "glance-launch-main-state.png"),
@@ -527,7 +522,7 @@ try {
     .getByRole("navigation", { name: "应用导航" })
     .getByRole("button", { name: "外观", exact: true })
     .click();
-  await session.page.getByRole("tab", { name: "连接设置", exact: true }).click();
+  await session.page.getByRole("button", { name: "连接设置", exact: true }).click();
   const automaticSwitch = session.page.getByRole("switch", {
     name: "启动时自动连接 Codex",
     exact: true,

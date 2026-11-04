@@ -1,6 +1,5 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- Two-axis positioning has separate native ranges below. */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { ToggleGroup, ToggleGroupItem } from "@codex-coco/ui/components/toggle-group";
 import {
   Card,
   CardHeader,
@@ -18,13 +17,11 @@ export function AppearancePreview({
   images,
   onChange,
   selected,
-  onSelect,
 }: {
   value: AppearanceConfig;
   images: Partial<Record<Layer, string>>;
   onChange(value: AppearanceConfig): void;
   selected: Layer;
-  onSelect(layer: Layer): void;
 }) {
   const [scale, setScale] = useState(0.5);
   const root = useRef<HTMLDivElement>(null);
@@ -47,6 +44,9 @@ export function AppearancePreview({
     observer.observe(root.current);
     return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    drag.current = null;
+  }, [selected]);
   const layerStyle = (layer: Layer): CSSProperties => ({
     backgroundImage: value[layer].enabled && images[layer] ? `url("${images[layer]}")` : "none",
     backgroundSize: layer === "wallpaper" ? value.wallpaper.fit : `${value[layer].size}px auto`,
@@ -69,29 +69,12 @@ export function AppearancePreview({
     <Card className="appearance-preview-card" aria-label="布景交互预览">
       <CardHeader>
         <div>
-          <CardTitle>本地布景预览</CardTitle>
-          <CardDescription>选择图层，在对应区域拖动定位。</CardDescription>
+          <CardTitle>布景预览</CardTitle>
+          <CardDescription>正在编辑{labels[selected]}</CardDescription>
         </div>
         <Badge>草稿预览</Badge>
       </CardHeader>
       <CardContent className="appearance-preview-content">
-        <ToggleGroup
-          aria-label="预览定位图层"
-          variant="outline"
-          value={[selected]}
-          onValueChange={(items) => {
-            if (items[0] && Object.hasOwn(labels, items[0])) {
-              drag.current = null;
-              onSelect(items[0] as Layer);
-            }
-          }}
-        >
-          {(["wallpaper", "main", "sidebar"] as const).map((layer) => (
-            <ToggleGroupItem key={layer} value={layer}>
-              {labels[layer]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
         <div
           ref={root}
           role="slider"
@@ -101,7 +84,7 @@ export function AppearancePreview({
           aria-valuemax={100}
           aria-valuenow={value[selected].x}
           aria-valuetext={`水平 ${value[selected].x}%，垂直 ${value[selected].y}%`}
-          className="relative touch-none overflow-hidden rounded-xl border outline-offset-4"
+          className="appearance-preview-canvas relative touch-none overflow-hidden rounded-xl border outline-offset-4"
           style={{ aspectRatio: `${geometry.width}/${geometry.height}` }}
           onPointerDown={(event) => {
             if (event.button !== 0) return;
@@ -172,6 +155,7 @@ export function AppearancePreview({
                 surfaces.current.wallpaper = el;
               }}
               data-preview-surface="wallpaper"
+              data-selected={selected === "wallpaper"}
               className="absolute inset-0"
               style={layerStyle("wallpaper")}
             />
@@ -181,6 +165,7 @@ export function AppearancePreview({
                 surfaces.current.sidebar = el;
               }}
               data-preview-surface="sidebar"
+              data-selected={selected === "sidebar"}
               className="absolute bottom-0 overflow-hidden border-r"
               style={{
                 left: geometry.rail,
@@ -205,6 +190,7 @@ export function AppearancePreview({
                 surfaces.current.main = el;
               }}
               data-preview-surface="main"
+              data-selected={selected === "main"}
               className="absolute bottom-0 right-0 overflow-hidden rounded-tl-xl"
               style={{
                 left: geometry.rail + geometry.sidebar,
@@ -218,8 +204,7 @@ export function AppearancePreview({
           </div>
         </div>
         <p className="appearance-preview-note">
-          在{labels[selected]}区域内拖动或使用方向键定位。预览模拟 1000 × 620
-          窗口，图片宽度和模糊同比缩放；实际效果随目标窗口大小变化。保存并应用后才修改 Codex。
+          在描边区域拖动图片，或聚焦预览后用方向键微调。实际效果随 Codex 窗口大小变化。
         </p>
       </CardContent>
     </Card>

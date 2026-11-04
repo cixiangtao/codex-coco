@@ -33,63 +33,6 @@ export function AppearanceConnectionPanel({
 }) {
   return (
     <Box gap="lg" aria-label="Codex 启动与恢复">
-      <SettingsGroup
-        title="本机连接"
-        description="仅连接本机 127.0.0.1。更换端口或目标前，请先撤销旧布景。"
-      >
-        <SettingsRow>
-          <FieldLabel>调试端口方式</FieldLabel>
-          <ToggleGroup
-            aria-label="调试端口方式"
-            variant="outline"
-            value={[draft.portMode]}
-            onValueChange={(items) => {
-              if (items[0] === "auto" || items[0] === "fixed")
-                update({ ...draft, portMode: items[0] });
-            }}
-          >
-            <ToggleGroupItem value="fixed">固定端口</ToggleGroupItem>
-            <ToggleGroupItem value="auto">自动分配</ToggleGroupItem>
-          </ToggleGroup>
-        </SettingsRow>
-        <SettingsRow>
-          <FieldLabel htmlFor="appearance-port">Codex 本机调试端口</FieldLabel>
-          <Input
-            id="appearance-port"
-            type="number"
-            min={1024}
-            max={65535}
-            value={Number.isNaN(draft.port) ? "" : draft.port}
-            onChange={(e) => update({ ...draft, port: e.target.valueAsNumber })}
-          />
-          <FieldDescription>启动参数示例：--remote-debugging-port=9229。</FieldDescription>
-        </SettingsRow>
-        <SettingsRow>
-          <FieldLabel htmlFor="appearance-connect">启动时自动连接 Codex</FieldLabel>
-          <Switch
-            id="appearance-connect"
-            checked={draft.connectOnEnable}
-            onCheckedChange={(checked) => update({ ...draft, connectOnEnable: checked })}
-          />
-          <FieldDescription>
-            Codex Coco 启动或外观模块启用时，自动启动所选 Codex、开启端口并恢复已保存布景。
-            已有连接直接复用；运行中未开端口时只提示一次，确认后重启。保存后下次启动生效。
-          </FieldDescription>
-        </SettingsRow>
-        {!draft.connectOnEnable && (
-          <SettingsRow>
-            <FieldLabel htmlFor="appearance-restore">仅恢复已有连接的布景</FieldLabel>
-            <Switch
-              id="appearance-restore"
-              checked={draft.restoreOnEnable}
-              onCheckedChange={(checked) => update({ ...draft, restoreOnEnable: checked })}
-            />
-            <FieldDescription>
-              下次启动时只尝试恢复已有端口上的布景；不启动 Codex，也不提示重启。
-            </FieldDescription>
-          </SettingsRow>
-        )}
-      </SettingsGroup>
       <SettingsGroup title="目标应用">
         <SettingsRow>
           <FieldLabel>Codex 应用</FieldLabel>
@@ -205,6 +148,72 @@ export function AppearanceConnectionPanel({
           </div>
         </SettingsRow>
       </SettingsGroup>
+      <SettingsGroup title="启动偏好" description="偏好经底部保存后，在下次启动或启用时生效。">
+        <SettingsRow>
+          <FieldLabel htmlFor="appearance-connect">启动时自动连接 Codex</FieldLabel>
+          <Switch
+            id="appearance-connect"
+            checked={draft.connectOnEnable}
+            onCheckedChange={(checked) => update({ ...draft, connectOnEnable: checked })}
+          />
+          <FieldDescription>
+            Codex Coco 启动或外观模块启用时，自动启动所选 Codex、开启端口并恢复已保存布景。
+            已有连接直接复用；运行中未开端口时只提示一次，确认后重启。保存后下次启动生效。
+          </FieldDescription>
+        </SettingsRow>
+        {!draft.connectOnEnable && (
+          <SettingsRow>
+            <FieldLabel htmlFor="appearance-restore">仅恢复已有连接的布景</FieldLabel>
+            <Switch
+              id="appearance-restore"
+              checked={draft.restoreOnEnable}
+              onCheckedChange={(checked) => update({ ...draft, restoreOnEnable: checked })}
+            />
+            <FieldDescription>
+              下次启动时只尝试恢复已有端口上的布景；不启动 Codex，也不提示重启。
+            </FieldDescription>
+          </SettingsRow>
+        )}
+      </SettingsGroup>
+      <details className="appearance-advanced-connection">
+        <summary>高级连接设置</summary>
+        <SettingsGroup
+          title="本机调试端口"
+          description="仅连接本机。更换端口或目标前，请先撤销旧布景。"
+        >
+          <SettingsRow>
+            <FieldLabel>调试端口方式</FieldLabel>
+            <ToggleGroup
+              aria-label="调试端口方式"
+              variant="outline"
+              value={[draft.portMode]}
+              onValueChange={(items) => {
+                if (items[0] === "auto" || items[0] === "fixed")
+                  update({ ...draft, portMode: items[0] });
+              }}
+            >
+              <ToggleGroupItem value="fixed">固定端口</ToggleGroupItem>
+              <ToggleGroupItem value="auto">自动分配</ToggleGroupItem>
+            </ToggleGroup>
+          </SettingsRow>
+          {draft.portMode === "fixed" && (
+            <SettingsRow>
+              <FieldLabel htmlFor="appearance-port">Codex 本机调试端口</FieldLabel>
+              <Input
+                id="appearance-port"
+                type="number"
+                min={1024}
+                max={65535}
+                value={Number.isNaN(draft.port) ? "" : draft.port}
+                onChange={(e) => update({ ...draft, port: e.target.valueAsNumber })}
+              />
+              <FieldDescription>
+                连接已手动开启调试的 Codex，或在下次启动时使用此端口。
+              </FieldDescription>
+            </SettingsRow>
+          )}
+        </SettingsGroup>
+      </details>
     </Box>
   );
 }
