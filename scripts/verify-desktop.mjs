@@ -130,6 +130,38 @@ export async function verifyDesktopSession(session) {
   await nav.getByRole("button", { name: "模块管理", exact: true }).click();
   await page.getByRole("heading", { name: "已接入的模块", exact: true }).waitFor();
   await nav.getByRole("button", { name: "设置", exact: true }).click();
+  const settings = page.getByRole("region", { name: "设置页面", exact: true });
+  const settingsTabs = settings.getByRole("tablist", { name: "设置分类", exact: true });
+  const settingsLabels = ["窗口外观", "系统与菜单栏", "应用更新", "关于"];
+  async function selectSettingsTab(label) {
+    await settingsTabs.getByRole("tab", { name: label, exact: true }).click();
+    await settings.getByRole("tabpanel", { name: label, exact: true }).waitFor();
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('.settings-page [role="tabpanel"]:not([hidden])').length === 1,
+    );
+  }
+  assert.deepEqual(await settingsTabs.getByRole("tab").allTextContents(), settingsLabels);
+  assert.equal(await settings.getByRole("tabpanel").count(), 1);
+  assert.equal(
+    await settings.getByRole("tabpanel", { name: "窗口外观", exact: true }).isVisible(),
+    true,
+  );
+  const themeTab = settingsTabs.getByRole("tab", { name: "窗口外观", exact: true });
+  await themeTab.focus();
+  await page.keyboard.press("ArrowRight");
+  assert.equal(
+    await settingsTabs
+      .getByRole("tab", { name: "系统与菜单栏", exact: true })
+      .evaluate((element) => element === document.activeElement),
+    true,
+  );
+  await page.keyboard.press("Enter");
+  await settings.getByRole("tabpanel", { name: "系统与菜单栏", exact: true }).waitFor();
+  assert.equal(await settings.getByRole("tabpanel").count(), 1);
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Enter");
+  await settings.getByRole("tabpanel", { name: "窗口外观", exact: true }).waitFor();
   assert.equal(
     await page.getByRole("button", { name: "保存主题", exact: true }).isDisabled(),
     true,
@@ -255,6 +287,15 @@ export async function verifyDesktopSession(session) {
     "#000000",
   );
   await color.fill("invalid");
+  const beforeTabSwitch = await saved(page);
+  for (const label of settingsLabels.slice(1)) {
+    await selectSettingsTab(label);
+    assert.equal(await settings.getByRole("tabpanel").count(), 1);
+    assert.equal(await settings.getByRole("button", { name: "保存主题", exact: true }).count(), 0);
+  }
+  await themeTab.click();
+  assert.equal(await color.inputValue(), "invalid", "Settings tabs retain an invalid theme draft");
+  assert.deepEqual(await saved(page), beforeTabSwitch, "Tab switches never persist the theme");
   await nav.getByRole("button", { name: "外观", exact: true }).click();
   await page.getByText("布景尚未连接", { exact: true }).waitFor();
   await nav.getByRole("button", { name: "设置", exact: true }).click();
@@ -289,6 +330,14 @@ export async function verifyDesktopSession(session) {
   await color.fill("#335dd8");
   await page.getByRole("button", { name: "保存主题", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "主题已保存" }).waitFor();
+  for (const [index, label] of settingsLabels.entries()) {
+    await selectSettingsTab(label);
+    await page.screenshot({
+      path: join(output, `settings-tab-${index}-dark.png`),
+      scale: "css",
+      animations: "disabled",
+    });
+  }
   await page.getByRole("button", { name: "关于 Codex Coco", exact: true }).click();
   await page.getByRole("dialog").waitFor();
   assert.equal(
@@ -314,6 +363,8 @@ export async function verifyDesktopSession(session) {
       .evaluate((element) => element === document.activeElement),
     true,
   );
+
+  await themeTab.click();
 
   console.log("QA: multiple windows");
   const newWindow = application.waitForEvent("window");
@@ -364,6 +415,23 @@ export async function verifyDesktopSession(session) {
     scale: "css",
     animations: "disabled",
   });
+  for (const [index, label] of settingsLabels.entries()) {
+    const tab = settingsTabs.getByRole("tab", { name: label, exact: true });
+    await selectSettingsTab(label);
+    assert.equal(await settings.getByRole("tabpanel").count(), 1);
+    const bounds = await tab.boundingBox();
+    assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 720);
+    assert.equal(
+      await settings.evaluate((element) => element.scrollWidth > element.clientWidth),
+      false,
+      `${label} must fit the compact window`,
+    );
+    await page.screenshot({
+      path: join(output, `settings-tab-${index}-compact.png`),
+      scale: "css",
+      animations: "disabled",
+    });
+  }
   await nav.getByRole("button", { name: "外观", exact: true }).click();
   await page.screenshot({
     path: join(output, "appearance.png"),
@@ -400,6 +468,7 @@ export async function verifyDesktopSession(session) {
   assert.equal(await primary(reopened), "#335dd8");
   return {
     initialBounds,
+    settingsTabs: { keyboardNavigation: true, themeDraftPreserved: true, compactLayout: true },
     screenshots: [
       "light.png",
       "dark-dialog.png",

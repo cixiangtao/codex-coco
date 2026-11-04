@@ -34,6 +34,7 @@ async function launch() {
     .getByRole("navigation")
     .getByRole("button", { name: "设置", exact: true })
     .click();
+  await session.page.getByRole("tab", { name: "应用更新", exact: true }).click();
   // Replace transport, not the host or renderer. No GitHub requests or external browser launches occur.
   await session.application.evaluate(({ net, shell }) => {
     globalThis.updateQaRequests = [];
@@ -145,7 +146,23 @@ try {
     scale: "css",
     animations: "disabled",
   });
-  await section.getByRole("switch", { name: "自动检查更新", exact: true }).click();
+  const savedBeforeDraft = (await page.evaluate(() => window.codexCoco.updates())).value;
+  const automaticSwitch = section.getByRole("switch", { name: "自动检查更新", exact: true });
+  await automaticSwitch.click();
+  await page.getByRole("tab", { name: "窗口外观", exact: true }).click();
+  assert.equal(await automaticSwitch.isVisible(), false);
+  await page.getByRole("tab", { name: "应用更新", exact: true }).click();
+  assert.equal(await automaticSwitch.isChecked(), true);
+  const afterTabSwitch = (await page.evaluate(() => window.codexCoco.updates())).value;
+  assert.equal(afterTabSwitch.revision, savedBeforeDraft.revision);
+  assert.deepEqual(
+    afterTabSwitch.preferences,
+    savedBeforeDraft.preferences,
+    "Switching settings tabs retains the update draft without saving it",
+  );
+  await section.getByRole("button", { name: "取消更新偏好修改", exact: true }).click();
+  assert.equal(await automaticSwitch.isChecked(), false);
+  await automaticSwitch.click();
   await section.getByRole("button", { name: "保存更新偏好", exact: true }).click();
   await section.getByText("更新偏好已保存。", { exact: true }).waitFor();
   const stale = await page.evaluate(() =>
@@ -162,6 +179,7 @@ try {
   const second = await windowEvent;
   await second.getByRole("heading", { name: "Codex Coco", exact: true }).waitFor();
   await second.getByRole("navigation").getByRole("button", { name: "设置", exact: true }).click();
+  await second.getByRole("tab", { name: "应用更新", exact: true }).click();
   assert.equal(
     await second
       .getByRole("switch", { name: "自动检查更新", exact: true })
@@ -316,6 +334,7 @@ try {
         cancellationAndRecovery: true,
         restrictedReleaseNavigation: true,
         multiWindowPreferences: true,
+        settingsTabDraftRetention: true,
         restartPersistence: true,
         corruptBackupRecovery: true,
         glanceReadAndWriteDenied: true,

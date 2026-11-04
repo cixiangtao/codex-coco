@@ -83,21 +83,32 @@ try {
     process.getBuiltinModule("node:module").syncBuiltinESMExports();
   });
   await page.getByRole("navigation").getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByRole("tab", { name: "系统与菜单栏", exact: true }).click();
   await page.getByRole("button", { name: "启用系统与菜单栏", exact: true }).click();
   await delay(800);
   assert.equal((await native(application)).loginCalls, 0);
+  const savedBeforeDraft = await page.evaluate(
+    async () =>
+      (await window.codexCoco.modules()).value.find((module) => module.id === "desktop-tools")
+        .config,
+  );
   const animationSwitch = page.getByRole("switch", { name: "播放图标动画", exact: true });
   const originalAnimation = await animationSwitch.isChecked();
   await animationSwitch.focus();
   await page.keyboard.press("Space");
   assert.equal(await animationSwitch.isChecked(), !originalAnimation);
-  assert.equal(
-    (
-      await page.evaluate(async () =>
-        (await window.codexCoco.modules()).value.find((m) => m.id === "desktop-tools"),
-      )
-    ).config.value.animate,
-    originalAnimation,
+  await page.getByRole("tab", { name: "窗口外观", exact: true }).click();
+  assert.equal(await animationSwitch.isVisible(), false);
+  await page.getByRole("tab", { name: "系统与菜单栏", exact: true }).click();
+  assert.equal(await animationSwitch.isChecked(), !originalAnimation);
+  assert.deepEqual(
+    await page.evaluate(
+      async () =>
+        (await window.codexCoco.modules()).value.find((module) => module.id === "desktop-tools")
+          .config,
+    ),
+    savedBeforeDraft,
+    "Switching settings tabs retains the system draft without saving it",
   );
   await page.screenshot({
     path: join(settingsOutput, "system-behavior-light.png"),
@@ -241,6 +252,7 @@ try {
         licensedFrames121: true,
         staticWithoutCpu: true,
         animationAndCpu: true,
+        settingsTabDraftRetention: true,
         systemLoginIntercepted: true,
         noLoginOnSaveOrDisable: true,
         customGif: true,
