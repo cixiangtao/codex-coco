@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Layers3, RefreshCw, Settings2, X } from "lucide-react";
+import { ArrowUpRight, GripVertical, Layers3, RefreshCw, Settings2, X } from "lucide-react";
 import { Box } from "@codex-coco/ui/components/box";
-import { GlanceBoard } from "../components/glance-board";
+import { GlanceBoard, GlanceBlockCard } from "../components/glance-board";
 import { GlanceReorder } from "../components/glance-reorder";
 import { Skeleton } from "@codex-coco/ui/components/skeleton";
 import { Button } from "@codex-coco/ui/components/button";
@@ -155,13 +155,37 @@ export function GlancePage() {
               <Skeleton className="h-16" />
             </Box>
           ) : (
-            <GlanceReorder snapshot={summary.snapshot} visible={visible} busy={busy}>
-              {(layout) => (
+            <GlanceReorder
+              snapshot={summary.snapshot}
+              visible={visible}
+              busy={busy}
+              renderOverlay={(id, snapshot) => (
+                <GlanceBlockCard
+                  id={id}
+                  snapshot={snapshot}
+                  now={now}
+                  onOpen={() => {}}
+                  onAppearanceAction={() => {}}
+                  handle={
+                    <Button
+                      className="glance-drag-handle"
+                      variant="ghost"
+                      size="icon-xs"
+                      tabIndex={-1}
+                      aria-label="正在拖动卡片"
+                    >
+                      <GripVertical />
+                    </Button>
+                  }
+                />
+              )}
+            >
+              {(layout, snapshot) => (
                 <GlanceBoard
                   onAppearanceAction={(action) => {
                     void appearanceAction(action);
                   }}
-                  snapshot={summary.snapshot!}
+                  snapshot={snapshot}
                   layout={layout}
                   now={now}
                   busy={busy}

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { createDesktopSession } from "./verify-desktop.mjs";
+import { dragCardTo } from "./glance-drag.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const directory = await mkdtemp(join(tmpdir(), "codex-coco-ui-"));
@@ -48,6 +49,7 @@ for (let index = 0; index < 30; index++) {
   );
 }
 let session;
+let popup;
 async function snapshot() {
   return session.page.evaluate(async () =>
     (await window.codexCoco.modules()).value.find((module) => module.id === "usage"),
@@ -69,6 +71,12 @@ async function toggle() {
       .find((item) => item.label === "显示或收起速览")
       .click(),
   );
+  if (popup)
+    await popup.waitForFunction(
+      () =>
+        document.querySelector(".glance-shell")?.dataset.visible === "true" &&
+        getComputedStyle(document.querySelector(".glance-shell")).opacity === "1",
+    );
 }
 async function capture(page, name) {
   await page.screenshot({
@@ -269,57 +277,75 @@ try {
 
   const popupEvent = application.waitForEvent("window");
   await toggle();
-  const popup = await popupEvent;
+  popup = await popupEvent;
+  popup.setDefaultTimeout(8000);
   await popup.waitForFunction(() => {
     const shell = document.querySelector(".glance-shell");
     return shell && getComputedStyle(shell).opacity === "1";
   });
   assert.equal(await popup.getByRole("meter").count(), 2);
   assert.equal(await popup.getByRole("meter").first().getAttribute("value"), "75");
-  const summariesVisible = await popup.evaluate(() => {
-    const viewport = document.querySelector(".glance-content").getBoundingClientRect();
-    return {
-      bottom: viewport.bottom,
-      items: [...document.querySelectorAll(".glance-item")].map((node) => ({
-        title: node.getAttribute("aria-label"),
-        bottom: node.getBoundingClientRect().bottom,
+  const cardGeometry = await popup
+    .locator(".glance-card-list > [data-sort-id]")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        id: node.dataset.sortId,
+        cards: node.querySelectorAll('[data-slot="card"]').length,
+        width: node.getBoundingClientRect().width,
+        cardWidth: node.firstElementChild.getBoundingClientRect().width,
       })),
-    };
-  });
+    );
+  assert.equal(cardGeometry.length, 7);
+  assert(
+    cardGeometry.every((entry) => entry.cards === 1 && Math.abs(entry.width - entry.cardWidth) < 1),
+    "Every selected block is exactly one complete Card and drag target",
+  );
   assert.equal(await popup.locator("[data-sort-handle]").count(), 7);
   assert.equal(await popup.getByRole("button", { name: "调整速览顺序", exact: true }).count(), 0);
   await capture(popup, "glance-light");
+  const mainAction = await popup
+    .getByRole("button", { name: "打开主窗口", exact: true })
+    .boundingBox();
   assert(
-    summariesVisible.items.every((item) => item.bottom <= summariesVisible.bottom),
-    `Ordinary summaries fit below the core quota overview: ${JSON.stringify(summariesVisible)}`,
+    mainAction.y + mainAction.height <= 520,
+    "The main-window action stays visible while individual Cards scroll",
   );
   await assertFits(popup);
-  // The real data cells are drag targets; no editor or manual completion is involved.
+  // Whole Cards are drag targets; changing their order never regroups their contents.
   const originalOrder = (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value
     .blocks;
   const today = popup.locator('[data-sort-handle="usage.today"]');
   const week = popup.locator('[data-sort-id="usage.week"]');
-  const weekBox = await week.boundingBox();
-  await today.dragTo(week, { targetPosition: { x: weekBox.width - 3, y: weekBox.height / 2 } });
+  const todayNode = await popup.locator('[data-sort-id="usage.today"]').elementHandle();
+  const { scrollTop } = await dragCardTo(popup, today, week);
   await popup.waitForFunction(
     () =>
       document.querySelector(".glance-reorder")?.getAttribute("aria-busy") === "false" &&
-      document
-        .querySelector(".glance-token-grid > div:first-child")
-        ?.getAttribute("data-sort-id") === "usage.week",
+      [...document.querySelectorAll(".glance-card-list > [data-sort-id]")].find((node) =>
+        ["usage.today", "usage.week", "usage.month"].includes(node.dataset.sortId),
+      )?.dataset.sortId === "usage.week",
   );
   const directOrder = (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value
     .blocks;
   assert.deepEqual(directOrder.slice(2, 5), ["usage.week", "usage.today", "usage.month"]);
+  assert(
+    await todayNode.evaluate((node) => node.isConnected),
+    "Saving preserves the original Card node instead of replaying its entrance",
+  );
+  assert.equal(
+    await popup.locator(".glance-content").evaluate((node) => node.scrollTop),
+    scrollTop,
+    "A pointer save does not scroll back to the drag handle",
+  );
   assert.equal(await popup.getByRole("meter").count(), 2);
   await capture(popup, "glance-inline-drag");
   await today.press("ArrowUp");
   await popup.waitForFunction(
     () =>
       document.querySelector(".glance-reorder")?.getAttribute("aria-busy") === "false" &&
-      document
-        .querySelector(".glance-token-grid > div:first-child")
-        ?.getAttribute("data-sort-id") === "usage.today",
+      [...document.querySelectorAll(".glance-card-list > [data-sort-id]")].find((node) =>
+        ["usage.today", "usage.week", "usage.month"].includes(node.dataset.sortId),
+      )?.dataset.sortId === "usage.today",
   );
   assert.deepEqual(
     (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value.blocks,
@@ -405,7 +431,8 @@ try {
   assert.equal(await page.getByRole("meter").count(), 4);
   await toggle();
   await popup.getByRole("meter").nth(3).waitFor({ state: "attached" });
-  assert.equal(await popup.locator(".glance-capacity-groups > section").count(), 2);
+  assert.equal(await popup.locator(".glance-quota-block").count(), 2);
+  assert.equal(await popup.locator(".glance-capacity-groups > section").count(), 4);
   assert.equal(await popup.locator('[data-sort-handle="usage.primary"]').count(), 1);
   assert.equal(await popup.locator('[data-sort-handle="usage.secondary"]').count(), 1);
   await popup.getByText("恢复时间未知", { exact: true }).waitFor();
@@ -417,7 +444,10 @@ try {
   await writeFile(mode, "primary-only");
   await refresh();
   await toggle();
-  await popup.getByText("其他额度窗口 · 暂无数据", { exact: true }).waitFor();
+  await popup
+    .locator('[data-sort-id="usage.secondary"]')
+    .getByText("暂无数据", { exact: true })
+    .waitFor();
   assert.equal(await popup.locator('[data-sort-handle="usage.primary"]').count(), 1);
   assert.equal(await popup.locator('[data-sort-handle="usage.secondary"]').count(), 1);
   assert.equal(await popup.getByRole("meter").count(), 1);

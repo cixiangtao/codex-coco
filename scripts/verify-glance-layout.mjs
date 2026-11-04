@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createDesktopSession } from "./verify-desktop.mjs";
+import { beginCardDrag, dragCardTo } from "./glance-drag.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const directory = await mkdtemp(join(tmpdir(), "codex-coco-glance-layout-"));
 const data = join(directory, "data");
@@ -145,6 +146,7 @@ try {
       .click(),
   );
   const popup = await popupEvent;
+  popup.setDefaultTimeout(8000);
   assert.equal(
     await popup.evaluate(() => {
       const off = window.codexCoco.onGlanceVisibilityChanged(() => {});
@@ -230,7 +232,7 @@ try {
   assert.equal(await popup.getByRole("button", { name: "调整速览顺序", exact: true }).count(), 0);
   const primaryHandle = popup.getByRole("button", { name: "拖动主要额度窗口排序", exact: true });
   const todayBlock = popup.locator('[data-sort-id="usage.today"]');
-  await primaryHandle.dragTo(todayBlock, { targetPosition: { x: 80, y: 24 } });
+  await dragCardTo(popup, primaryHandle, todayBlock);
   const dragged = ["usage.secondary", "usage.today", "usage.primary", ...fullBlocks.slice(3)];
   await waitSaved(dragged);
   await primaryHandle.press("ArrowUp");
@@ -320,18 +322,12 @@ try {
   await primaryHandle.press("Home");
   const homeOrder = ["usage.primary", ...reordered.filter((id) => id !== "usage.primary")];
   await waitSaved(homeOrder);
-  // Dropping nowhere and a native drag cancellation never write a new revision.
+  // Dropping nowhere and a pointer drag cancellation never write a new revision.
   const cancelRevision = (await read(page)).value.revision;
-  await primaryHandle.dragTo(popup.locator(".glance-toolbar"));
+  await dragCardTo(popup, primaryHandle, popup.locator(".glance-toolbar"));
   assert.equal((await read(page)).value.revision, cancelRevision);
   assert.deepEqual(await order(), homeOrder);
-  await primaryHandle.scrollIntoViewIfNeeded();
-  const dragStart = await primaryHandle.boundingBox();
-  await popup.mouse.move(dragStart.x + dragStart.width / 2, dragStart.y + dragStart.height / 2);
-  await popup.mouse.down();
-  await popup.mouse.move(dragStart.x + dragStart.width / 2, dragStart.y + dragStart.height + 12, {
-    steps: 4,
-  });
+  await beginCardDrag(popup, primaryHandle);
   await popup.locator('[data-sort-id="usage.primary"][data-dragging="true"]').waitFor();
   await popup.keyboard.press("Escape");
   await popup.mouse.up();
@@ -340,8 +336,50 @@ try {
   assert.equal(
     (await read(page)).value.revision,
     cancelRevision,
-    "Escape during a native drag does not persist",
+    "Escape during a pointer drag does not persist",
   );
+  // Holding at the scroll edge moves the viewport without distorting or persisting the Card.
+  await beginCardDrag(popup, primaryHandle);
+  const viewport = await popup.locator(".glance-content").boundingBox();
+  const scrollBefore = await popup.locator(".glance-content").evaluate((node) => node.scrollTop);
+  await popup.mouse.move(viewport.x + viewport.width / 2, viewport.y + viewport.height - 6, {
+    steps: 12,
+  });
+  await popup.waitForFunction(
+    (before) => document.querySelector(".glance-content").scrollTop > before + 30,
+    scrollBefore,
+  );
+  const edgePreview = await popup.locator("[data-drag-overlay]").boundingBox();
+  assert(
+    edgePreview.x >= viewport.x &&
+      edgePreview.x + edgePreview.width <= viewport.x + viewport.width + 1,
+    "Edge dragging never clips the Card horizontally",
+  );
+  assert(
+    edgePreview.y >= viewport.y - 1 &&
+      edgePreview.y + edgePreview.height <= viewport.y + viewport.height + 1,
+    "The preview stays clear of the fixed toolbar and footer",
+  );
+  await popup.screenshot({ path: join(output, "popup-drag-active.png"), scale: "css" });
+  await popup.keyboard.press("Escape");
+  await popup.mouse.up();
+  assert.equal((await read(page)).value.revision, cancelRevision);
+  assert.equal(await popup.locator("[data-drag-overlay]").count(), 0);
+  // Reduced motion disables neighbor travel, and a click is not a reorder.
+  await popup.emulateMedia({ reducedMotion: "reduce" });
+  await beginCardDrag(popup, primaryHandle);
+  assert(
+    await popup
+      .locator("[data-sort-id]")
+      .evaluateAll((nodes) =>
+        nodes.every((node) => getComputedStyle(node).transitionProperty === "none"),
+      ),
+  );
+  await popup.keyboard.press("Escape");
+  await popup.mouse.up();
+  await popup.emulateMedia({ reducedMotion: "no-preference" });
+  await primaryHandle.click();
+  assert.equal((await read(page)).value.revision, cancelRevision);
   // A failed automatic save retains the visible order and exposes inline retry/recovery.
   const layoutPath = join(data, "glance-layout.json");
   await rename(layoutPath, `${layoutPath}.qa`);
@@ -379,6 +417,13 @@ try {
   assert.equal(await popup.getByRole("button", { name: "重试保存", exact: true }).count(), 0);
   await popup.getByRole("button", { name: "载入最新顺序", exact: true }).click();
   assert.deepEqual(await order(), fullBlocks.slice(0, -1));
+  // A live selection change cancels the old gesture instead of writing its stale membership.
+  await beginCardDrag(popup, primaryHandle);
+  const concurrentDuringDrag = await setBlocks([...fullBlocks.slice(0, -1)].reverse());
+  await popup.locator("[data-drag-overlay]").waitFor({ state: "detached" });
+  await popup.mouse.up();
+  assert.equal((await read(page)).value.revision, concurrentDuringDrag.revision);
+  await setBlocks(fullBlocks.slice(0, -1));
   // Native blur hides the panel; a completed move has already been persisted.
   await application.evaluate(({ app }) => app.focus({ steal: true }));
   await nativePopup.evaluate((window) => {
@@ -393,6 +438,8 @@ try {
     );
     await new Promise((resolve) => setTimeout(resolve, 30));
   }
+  const beforeHiddenDrag = (await read(page)).value.revision;
+  await beginCardDrag(popup, primaryHandle);
   await window.evaluate((window) => {
     window.show();
     window.focus();
@@ -403,7 +450,10 @@ try {
     { polling: 50 },
   );
   assert.equal(await nativePopup.evaluate((window) => window.isVisible()), false);
+  await popup.mouse.up();
   await ensurePopupVisible();
+  assert.equal((await read(page)).value.revision, beforeHiddenDrag);
+  assert.equal(await popup.locator("[data-drag-overlay]").count(), 0);
   assert.deepEqual(await order(), fullBlocks.slice(0, -1));
   assert.deepEqual((await read(page)).value.value.blocks, fullBlocks.slice(0, -1));
   const visibilityEvents = await popup.evaluate(() => window.__glanceVisibility);
@@ -462,7 +512,9 @@ try {
         conflictProtection: true,
         sourcePinning: true,
         restrictedPanelReordering: true,
-        nativeDragAndKeyboard: true,
+        wholeCardPointerDragAndKeyboard: true,
+        exactPreviewGeometryAndGrabOffset: true,
+        edgeScrollReducedMotionAndInterruptedDrag: true,
         inlineAutoSaveCancelBlurAndConflict: true,
         persistenceFailureRetry: true,
         restartAndRecovery: true,

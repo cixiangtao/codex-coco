@@ -1,4 +1,24 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type Modifier,
+} from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@codex-coco/ui/components/button";
@@ -19,23 +39,39 @@ interface Order {
 }
 interface Drag extends Order {
   id: GlanceBlockId;
-}
-interface Drop {
-  id: GlanceBlockId;
-  after: boolean;
+  snapshot: GlanceSnapshot;
 }
 interface ReorderContext {
   blocks: GlanceBlockId[];
   disabled: boolean;
   dragging: Drag | null;
-  drop: Drop | null;
-  start(id: GlanceBlockId): void;
-  stop(): void;
-  over(drop: Drop): void;
-  commit(drop: Drop): void;
+  reducedMotion: boolean;
   move(id: GlanceBlockId, index: number): void;
 }
 const ReorderContext = createContext<ReorderContext | null>(null);
+const motionQuery = "(prefers-reduced-motion: reduce)";
+const subscribeMotion = (listener: () => void) => {
+  const query = window.matchMedia(motionQuery);
+  query.addEventListener("change", listener);
+  return () => query.removeEventListener("change", listener);
+};
+const reducedMotionSnapshot = () => window.matchMedia(motionQuery).matches;
+
+/** Full-width Cards move vertically and stay above the fixed footer while edge scrolling. */
+const keepCardInViewport: Modifier = ({ transform, draggingNodeRect, scrollableAncestorRects }) => {
+  const viewport = scrollableAncestorRects[0];
+  if (!draggingNodeRect || !viewport || draggingNodeRect.height > viewport.height)
+    return { ...transform, x: 0 };
+  return {
+    ...transform,
+    x: 0,
+    y: Math.min(
+      Math.max(transform.y, viewport.top - draggingNodeRect.top),
+      viewport.bottom - draggingNodeRect.bottom,
+    ),
+  };
+};
+const overlayModifiers = [keepCardInViewport];
 
 /** Saves completed inline moves through the popover's permutation-only IPC, never module operations. */
 export function GlanceReorder({
@@ -43,15 +79,22 @@ export function GlanceReorder({
   visible,
   busy,
   children,
+  renderOverlay,
 }: {
   snapshot: GlanceSnapshot;
   visible: boolean;
   busy: boolean;
-  children(layout: GlanceLayout): ReactNode;
+  children(layout: GlanceLayout, snapshot: GlanceSnapshot): ReactNode;
+  renderOverlay(id: GlanceBlockId, snapshot: GlanceSnapshot): ReactNode;
 }) {
   const [draft, setDraft] = useState<Order | null>(null);
-  const [dragging, setDragging] = useState<Drag | null>(null);
-  const [drop, setDrop] = useState<Drop | null>(null);
+  const [drag, setDragging] = useState<Drag | null>(null);
+  const dragging =
+    drag && visible && !busy && snapshot.layoutEditable && drag.revision === snapshot.layoutRevision
+      ? drag
+      : null;
+  const reducedMotion = useSyncExternalStore(subscribeMotion, reducedMotionSnapshot);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [announcement, setAnnouncement] = useState("");
@@ -71,16 +114,19 @@ export function GlanceReorder({
     conflict ||
     snapshot.layoutEditable !== true ||
     blocks.length < 2;
+  const interactionAllowed = useRef(false);
+  useEffect(() => {
+    interactionAllowed.current = !disabled;
+  }, [disabled]);
   const stop = () => {
     setDragging(null);
-    setDrop(null);
   };
   useEffect(
     () =>
       window.codexCoco.onGlanceVisibilityChanged((visible) => {
         if (visible) return;
+        interactionAllowed.current = false;
         setDragging(null);
-        setDrop(null);
         if (!saving.current) {
           setDraft(null);
           setError("");
@@ -93,9 +139,7 @@ export function GlanceReorder({
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      event.stopImmediatePropagation();
-      setDragging(null);
-      setDrop(null);
+      // The sensor receives Escape next; the window-level dismiss handler must ignore it.
     };
     window.addEventListener("keydown", escape, true);
     return () => window.removeEventListener("keydown", escape, true);
@@ -142,7 +186,7 @@ export function GlanceReorder({
     }
   }
   const move = (id: GlanceBlockId, index: number, base?: Order) => {
-    if (disabled || saving.current) return;
+    if (disabled || !interactionAllowed.current || saving.current) return;
     const source = base ?? { revision: snapshot.layoutRevision ?? 0, blocks };
     if (source.revision !== snapshot.layoutRevision) {
       setAnnouncement("组合已更新，请按最新内容重新拖动。");
@@ -150,34 +194,36 @@ export function GlanceReorder({
     }
     const next = moveGlanceBlock(source.blocks, id, index);
     if (next.every((entry, position) => entry === source.blocks[position])) return;
-    focusAfterMove.current = id;
+    if (!base) focusAfterMove.current = id;
     void save({ revision: source.revision, blocks: next }, id);
   };
-  const context: ReorderContext = {
-    blocks,
-    disabled,
-    dragging,
-    drop,
-    start(id) {
-      if (!disabled) {
-        setDragging({ id, revision: snapshot.layoutRevision ?? 0, blocks: [...blocks] });
-        setDrop(null);
-      }
-    },
-    stop,
-    over(value) {
-      setDrop(dragging?.id === value.id ? null : value);
-    },
-    commit(value) {
-      if (dragging && dragging.id !== value.id) {
-        let target = dragging.blocks.indexOf(value.id) + (value.after ? 1 : 0);
-        if (dragging.blocks.indexOf(dragging.id) < target) target--;
-        move(dragging.id, target, dragging);
-      }
-      stop();
-    },
-    move,
+  // Constrain drops to the visible scroll viewport. Closest-center alone also accepts the toolbar.
+  const collisionDetection: CollisionDetection = (args) => {
+    const viewport = container.current?.closest(".glance-content")?.getBoundingClientRect();
+    const pointer = args.pointerCoordinates;
+    if (
+      !viewport ||
+      !pointer ||
+      pointer.x < viewport.left ||
+      pointer.x > viewport.right ||
+      pointer.y < viewport.top ||
+      pointer.y > viewport.bottom
+    )
+      return [];
+    return closestCenter({
+      ...args,
+      collisionRect: {
+        ...args.collisionRect,
+        left: pointer.x,
+        right: pointer.x,
+        top: pointer.y,
+        bottom: pointer.y,
+        width: 0,
+        height: 0,
+      },
+    });
   };
+  const context: ReorderContext = { blocks, disabled, dragging, reducedMotion, move };
   return (
     <div ref={container} className="glance-reorder" aria-busy={pending}>
       {(error || (conflict && !pending)) && (
@@ -216,9 +262,70 @@ export function GlanceReorder({
         </Alert>
       )}
       <p id="glance-order-help" className="sr-only">
-        拖动信息块手柄后自动保存；也可聚焦手柄，用上下方向键、Home 或 End 排序。
+        拖动卡片手柄，整张卡片移动，松手自动保存；Esc 取消。也可聚焦手柄，用上下方向键、Home 或 End
+        排序。
       </p>
-      <ReorderContext.Provider value={context}>{children({ blocks })}</ReorderContext.Provider>
+      <ReorderContext.Provider value={context}>
+        <DndContext
+          key={`${visible}:${busy}:${snapshot.layoutEditable}`}
+          sensors={sensors}
+          collisionDetection={collisionDetection}
+          autoScroll={{
+            enabled: dragging !== null,
+            canScroll: (element) => element.classList.contains("glance-content"),
+            threshold: { x: 0, y: 0.12 },
+          }}
+          accessibility={{
+            restoreFocus: false,
+            announcements: {
+              onDragStart: () => undefined,
+              onDragOver: () => undefined,
+              onDragEnd: () => undefined,
+              onDragCancel: () => undefined,
+            },
+          }}
+          onDragStart={({ active }) => {
+            if (disabled) return;
+            const id = active.id as GlanceBlockId;
+            setDragging({
+              id,
+              revision: snapshot.layoutRevision ?? 0,
+              blocks: [...blocks],
+              snapshot,
+            });
+            setAnnouncement(
+              `正在移动${glanceBlocks.find((block) => block.id === id)!.title}，Esc 取消。`,
+            );
+          }}
+          onDragCancel={() => {
+            stop();
+            setAnnouncement("已取消移动，顺序未改变。");
+          }}
+          onDragEnd={({ over }) => {
+            if (dragging && over)
+              move(dragging.id, dragging.blocks.indexOf(over.id as GlanceBlockId), dragging);
+            else setAnnouncement("已取消移动，顺序未改变。");
+            stop();
+          }}
+        >
+          <SortableContext items={blocks} strategy={verticalListSortingStrategy}>
+            {children({ blocks }, dragging?.snapshot ?? snapshot)}
+          </SortableContext>
+          {/* Synchronous optimistic placement avoids a second ghost flying back during IPC saves. */}
+          <DragOverlay
+            adjustScale={false}
+            dropAnimation={null}
+            modifiers={overlayModifiers}
+            zIndex={20}
+          >
+            {dragging && visible && !disabled && dragging.revision === snapshot.layoutRevision ? (
+              <div className="glance-card-overlay" data-drag-overlay inert aria-hidden="true">
+                {renderOverlay(dragging.id, dragging.snapshot)}
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      </ReorderContext.Provider>
       <output className="sr-only" aria-live="polite">
         {announcement}
       </output>
@@ -226,50 +333,49 @@ export function GlanceReorder({
   );
 }
 
-/** Keeps each real information block a drop target without making its links or data draggable. */
+/** The handle activates dragging; the complete Card provides its geometry and stable placeholder. */
 export function GlanceSortableBlock({
   id,
-  className,
   children,
-  tone,
-  sortable = true,
 }: {
   id: GlanceBlockId;
-  className?: string;
-  children: ReactNode | ((handle: ReactNode) => ReactNode);
-  tone?: string;
-  sortable?: boolean;
+  children(handle: ReactNode): ReactNode;
 }) {
-  const context = useContext(ReorderContext);
-  const order = sortable ? context : null;
+  const order = useContext(ReorderContext);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isSorting,
+  } = useSortable({
+    id,
+    disabled: !order || order.disabled,
+    transition: order?.reducedMotion
+      ? null
+      : { duration: 160, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+  });
   const title = glanceBlocks.find((block) => block.id === id)!.title;
   const index = order?.blocks.indexOf(id) ?? -1;
   const handle =
     order && order.blocks.length > 1 ? (
       <Button
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
         className="glance-drag-handle"
         variant="ghost"
         size="icon-xs"
         data-sort-handle={id}
         aria-label={`拖动${title}排序`}
-        title={`拖动${title}排序`}
+        title={`拖动整张卡片 · ${title}`}
         aria-describedby="glance-order-help"
         aria-description={`第 ${index + 1} 项，共 ${order.blocks.length} 项`}
         aria-keyshortcuts="ArrowUp ArrowDown Home End"
         disabled={order.disabled}
-        draggable={!order.disabled}
-        onDragStart={(event) => {
-          if (order.disabled) {
-            event.preventDefault();
-            return;
-          }
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("text/plain", id);
-          const block = event.currentTarget.closest("[data-sort-id]");
-          if (block) event.dataTransfer.setDragImage(block, 20, 20);
-          order.start(id);
-        }}
-        onDragEnd={order.stop}
         onKeyDown={(event) => {
           const target =
             event.key === "ArrowUp"
@@ -283,7 +389,7 @@ export function GlanceSortableBlock({
                     : null;
           if (target === null) return;
           event.preventDefault();
-          order.move(id, target);
+          if (!isSorting) order.move(id, target);
         }}
       >
         <GripVertical />
@@ -291,54 +397,16 @@ export function GlanceSortableBlock({
     ) : null;
   return (
     <div
-      className={cn(className, order && "glance-sortable")}
-      data-tone={tone}
-      data-sort-id={order ? id : undefined}
-      data-dragging={order?.dragging?.id === id}
-      data-drop={order?.drop?.id === id ? (order.drop.after ? "after" : "before") : undefined}
-      onDragOver={(event) => {
-        if (!order?.dragging || order.disabled) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const horizontal = event.currentTarget.parentElement?.matches(
-          ".glance-quota-grid, .glance-token-grid",
-        );
-        order.over({
-          id,
-          after: horizontal
-            ? event.clientX > bounds.left + bounds.width / 2
-            : event.clientY > bounds.top + bounds.height / 2,
-        });
-        const scroller = event.currentTarget.closest(".glance-content");
-        if (!scroller) return;
-        const viewport = scroller.getBoundingClientRect();
-        if (event.clientY < viewport.top + 28) scroller.scrollTop -= 12;
-        else if (event.clientY > viewport.bottom - 28) scroller.scrollTop += 12;
-      }}
-      onDrop={(event) => {
-        if (!order?.dragging || order.disabled) return;
-        event.preventDefault();
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const horizontal = event.currentTarget.parentElement?.matches(
-          ".glance-quota-grid, .glance-token-grid",
-        );
-        order.commit({
-          id,
-          after: horizontal
-            ? event.clientX > bounds.left + bounds.width / 2
-            : event.clientY > bounds.top + bounds.height / 2,
-        });
+      ref={setNodeRef}
+      className={cn("glance-sortable", isDragging && order?.dragging && "glance-card-placeholder")}
+      data-sort-id={id}
+      data-dragging={isDragging && !!order?.dragging}
+      style={{
+        transform: order?.dragging ? CSS.Translate.toString(transform) : undefined,
+        transition,
       }}
     >
-      {typeof children === "function" ? (
-        children(handle)
-      ) : (
-        <>
-          {children}
-          {handle}
-        </>
-      )}
+      {children(handle)}
     </div>
   );
 }

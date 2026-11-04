@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { formatTokens } from "../lib/token-format";
 import { ArrowUpRight, Palette, Activity, TriangleAlert } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@codex-coco/ui/components/card";
@@ -22,11 +23,13 @@ export function GlanceModule({
   busy,
   onOpen,
   onAppearanceAction,
+  handle,
 }: {
   item: GlanceItem;
   busy: boolean;
   onOpen(): void;
   onAppearanceAction?: ((action: AppearanceQuickAction) => void) | undefined;
+  handle?: ReactNode;
 }) {
   const statistics = item.phase === "error" ? [] : (item.metrics ?? []);
   return (
@@ -42,27 +45,30 @@ export function GlanceModule({
           )}
           <CardTitle>{item.title}</CardTitle>
         </div>
-        <Badge
-          tone={
-            item.phase === "error" ? "danger" : item.phase === "running" ? "success" : "neutral"
-          }
-        >
-          {item.busy ? "处理中" : phaseLabels[item.phase]}
-        </Badge>
-        {item.phase !== "error" && (
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`打开${item.title}`}
-            title={item.description}
-            disabled={busy}
-            onClick={() => {
-              onOpen();
-            }}
+        <div className="glance-card-actions">
+          <Badge
+            tone={
+              item.phase === "error" ? "danger" : item.phase === "running" ? "success" : "neutral"
+            }
           >
-            <ArrowUpRight />
-          </Button>
-        )}
+            {item.busy ? "处理中" : phaseLabels[item.phase]}
+          </Badge>
+          {item.phase !== "error" && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`打开${item.title}`}
+              title={item.description}
+              disabled={busy}
+              onClick={() => {
+                onOpen();
+              }}
+            >
+              <ArrowUpRight />
+            </Button>
+          )}
+          {handle}
+        </div>
       </CardHeader>
       {(item.phase === "error" || statistics.length > 0 || item.phase === "running") && (
         <CardContent>
