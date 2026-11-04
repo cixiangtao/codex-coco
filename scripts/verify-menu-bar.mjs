@@ -150,7 +150,7 @@ export async function verifyMenuBar(packagedExecutable) {
       assert(!JSON.stringify(exposed.summary).includes("PRIVATE_TEST_VALUE"));
       assert.deepEqual(exposed.events, []);
     }
-    await popup.getByRole("button", { name: "查看主要额度窗口", exact: true }).click();
+    await popup.getByRole("button", { name: "查看订阅额度", exact: true }).click();
     await nativeVisible(application, popup, false);
     await main.getByRole("heading", { name: "按需读取用量", exact: true }).waitFor();
     assert.equal(application.windows().length, 2, "Jumping must reuse the existing main window");
@@ -242,7 +242,7 @@ export async function verifyMenuBar(packagedExecutable) {
       ipcMain.handle("codex-coco:glance", () => value);
     }, last);
     await popup.getByRole("button", { name: "重新读取", exact: true }).click();
-    await popup.getByRole("heading", { name: "主要额度窗口", exact: true }).waitFor();
+    await popup.getByRole("heading", { name: "订阅额度", exact: true }).waitFor();
     console.log("QA: an older read cannot overwrite a newer pushed summary");
     await application.evaluate(({ ipcMain, BrowserWindow }, value) => {
       ipcMain.removeHandler("codex-coco:glance");

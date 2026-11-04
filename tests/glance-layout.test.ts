@@ -7,31 +7,69 @@ import {
   defaultGlanceLayout,
   glanceLayoutSchema,
   reorderGlanceLayoutSchema,
+  type GlanceBlockId,
 } from "../apps/desktop/src/contracts/glance-layout";
 import { glanceDetailSchema } from "../apps/desktop/src/contracts/glance";
-import { moveGlanceBlock } from "../apps/desktop/src/renderer/lib/glance-order";
+import { glanceCards, moveGlanceCard } from "../apps/desktop/src/renderer/lib/glance-order";
 
 describe("information blocks", () => {
-  it("moves selected blocks in either direction without losing or mutating a selection", () => {
+  it("moves whole Cards in either direction without losing or mutating a selection", () => {
     const blocks = defaultGlanceLayout.blocks;
     const original = [...blocks];
-    for (const id of blocks)
-      for (let index = 0; index < blocks.length; index++) {
-        const moved = moveGlanceBlock(blocks, id, index);
-        expect(moved[index]).toBe(id);
+    const cards = glanceCards(blocks);
+    for (const { id } of cards)
+      for (let index = 0; index < cards.length; index++) {
+        const moved = moveGlanceCard(blocks, id, index);
+        expect(glanceCards(moved)[index]!.id).toBe(id);
         expect([...moved].sort()).toEqual([...blocks].sort());
+        expect(moved.indexOf("usage.secondary")).toBe(moved.indexOf("usage.primary") + 1);
       }
     expect(blocks).toEqual(original);
-    expect(moveGlanceBlock(blocks, "usage.trend", 0)).toEqual(blocks);
-    expect(moveGlanceBlock(blocks, blocks[0]!, -1)).toEqual(blocks);
-    expect(moveGlanceBlock(blocks, blocks[0]!, 999).at(-1)).toBe(blocks[0]);
+    expect(moveGlanceCard(blocks, "usage.trend", 0)).toEqual(blocks);
+    expect(moveGlanceCard(blocks, "usage.quota", -1)).toEqual(blocks);
+    expect(moveGlanceCard(blocks, "usage.quota", 999).slice(-2)).toEqual([
+      "usage.primary",
+      "usage.secondary",
+    ]);
     for (const input of [
       { expectedRevision: 0, blocks: ["usage.today", "usage.today"] },
       { expectedRevision: 0, blocks: ["private.script"] },
+      { expectedRevision: 0, blocks: ["usage.quota"] },
       { expectedRevision: 0, blocks: [], value: {} },
       { expectedRevision: -1, blocks: [] },
     ])
       expect(reorderGlanceLayoutSchema.safeParse(input).success).toBe(false);
+  });
+  it("groups historical split windows at the first occurrence without rewriting a no-op", () => {
+    const blocks: GlanceBlockId[] = [
+      "usage.today",
+      "usage.secondary",
+      "usage.week",
+      "usage.primary",
+    ];
+    expect(glanceCards(blocks)).toEqual([
+      { id: "usage.today", blocks: ["usage.today"] },
+      { id: "usage.quota", blocks: ["usage.secondary", "usage.primary"] },
+      { id: "usage.week", blocks: ["usage.week"] },
+    ]);
+    expect(moveGlanceCard(blocks, "usage.quota", 1)).toEqual(blocks);
+    expect(moveGlanceCard(blocks, "usage.quota", 0)).toEqual([
+      "usage.secondary",
+      "usage.primary",
+      "usage.today",
+      "usage.week",
+    ]);
+  });
+  it("preserves individually selected windows while treating both windows as one drag target", () => {
+    for (const window of ["usage.primary", "usage.secondary"] as const) {
+      const blocks: GlanceBlockId[] = [window, "usage.today"];
+      expect(glanceCards(blocks)[0]).toEqual({ id: "usage.quota", blocks: [window] });
+      expect(moveGlanceCard(blocks, "usage.quota", 1)).toEqual(["usage.today", window]);
+    }
+    expect(glanceCards(["usage.primary", "usage.secondary"])).toEqual([
+      { id: "usage.quota", blocks: ["usage.primary", "usage.secondary"] },
+    ]);
+    expect(glanceLayoutSchema.safeParse({ blocks: ["usage.quota"] }).success).toBe(false);
   });
   it("limits popover writes to exact permutations and rejects concurrent selection changes", async () => {
     const directory = await mkdtemp(join(tmpdir(), "glance-reorder-"));

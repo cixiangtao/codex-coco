@@ -295,14 +295,90 @@ try {
         cardWidth: node.firstElementChild.getBoundingClientRect().width,
       })),
     );
-  assert.equal(cardGeometry.length, 7);
+  assert.equal(cardGeometry.length, 6);
   assert(
     cardGeometry.every((entry) => entry.cards === 1 && Math.abs(entry.width - entry.cardWidth) < 1),
-    "Every selected block is exactly one complete Card and drag target",
+    "Every drag target contains exactly one complete Card",
   );
-  assert.equal(await popup.locator("[data-sort-handle]").count(), 7);
+  assert.equal(await popup.locator("[data-sort-handle]").count(), 6);
   assert.equal(await popup.getByRole("button", { name: "调整速览顺序", exact: true }).count(), 0);
   await capture(popup, "glance-light");
+  // Both quota windows share one Card and divide its available width, then wrap when constrained.
+  const quotaGeometry = () =>
+    popup
+      .locator(".glance-quota-grid")
+      .first()
+      .evaluate((grid) => ({
+        width: grid.getBoundingClientRect().width,
+        gap: parseFloat(getComputedStyle(grid).columnGap),
+        windows: [...grid.children].map((node) => {
+          const { x, y, width } = node.getBoundingClientRect();
+          return { x, y, width };
+        }),
+      }));
+  const wide = await quotaGeometry();
+  assert.equal(wide.windows.length, 2);
+  assert(Math.abs(wide.windows[0].y - wide.windows[1].y) < 1);
+  assert(Math.abs(wide.windows[0].width - wide.windows[1].width) < 1);
+  assert(Math.abs(wide.windows[0].width + wide.windows[1].width + wide.gap - wide.width) < 1);
+  const nativePopup = await application.browserWindow(popup);
+  await nativePopup.evaluate((window) => window.setSize(280, 520));
+  await popup.waitForFunction(() => innerWidth === 280);
+  const narrow = await quotaGeometry();
+  assert(Math.abs(narrow.windows[0].x - narrow.windows[1].x) < 1);
+  assert(narrow.windows[1].y > narrow.windows[0].y);
+  assert(narrow.windows.every((entry) => Math.abs(entry.width - narrow.width) < 1));
+  await assertFits(popup);
+  await capture(popup, "glance-quota-narrow");
+  await nativePopup.evaluate((window) => window.setSize(360, 520));
+  await popup.waitForFunction(() => innerWidth === 360);
+  const originalSelection = (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value
+    .blocks;
+  const select = async (blocks) => {
+    const result = await page.evaluate(async (blocks) => {
+      const { value } = await window.codexCoco.glanceLayout();
+      return window.codexCoco.saveGlanceLayout({
+        expectedRevision: value.revision,
+        value: { blocks },
+      });
+    }, blocks);
+    assert.equal(result.ok, true);
+  };
+  await select(["usage.secondary"]);
+  await popup.waitForFunction(
+    () =>
+      document.querySelectorAll("[data-sort-id]").length === 1 &&
+      document.querySelectorAll(".glance-quota").length === 1,
+  );
+  const single = await quotaGeometry();
+  assert.equal(single.windows.length, 1);
+  assert(Math.abs(single.windows[0].width - single.width) < 1);
+  assert.equal(await popup.locator("[data-sort-handle]").count(), 0);
+  await capture(popup, "glance-quota-single");
+  await select(originalSelection);
+  await popup.locator('[data-sort-handle="usage.quota"]').waitFor();
+  const quotaHandle = popup.locator('[data-sort-handle="usage.quota"]');
+  await dragCardTo(popup, quotaHandle, popup.locator('[data-sort-id="usage.today"]'));
+  await popup.waitForFunction(
+    () =>
+      document.querySelector(".glance-reorder")?.getAttribute("aria-busy") === "false" &&
+      document.querySelector("[data-sort-id]")?.getAttribute("data-sort-id") === "usage.today",
+  );
+  assert.deepEqual(
+    (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value.blocks.slice(0, 3),
+    ["usage.today", "usage.primary", "usage.secondary"],
+  );
+  assert.equal(await popup.locator('[data-sort-id="usage.quota"]').getByRole("meter").count(), 2);
+  await quotaHandle.press("ArrowUp");
+  await popup.waitForFunction(
+    () =>
+      document.querySelector(".glance-reorder")?.getAttribute("aria-busy") === "false" &&
+      document.querySelector("[data-sort-id]")?.getAttribute("data-sort-id") === "usage.quota",
+  );
+  assert.deepEqual(
+    (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value.blocks,
+    originalSelection,
+  );
   const mainAction = await popup
     .getByRole("button", { name: "打开主窗口", exact: true })
     .boundingBox();
@@ -431,10 +507,12 @@ try {
   assert.equal(await page.getByRole("meter").count(), 4);
   await toggle();
   await popup.getByRole("meter").nth(3).waitFor({ state: "attached" });
-  assert.equal(await popup.locator(".glance-quota-block").count(), 2);
-  assert.equal(await popup.locator(".glance-capacity-groups > section").count(), 4);
-  assert.equal(await popup.locator('[data-sort-handle="usage.primary"]').count(), 1);
-  assert.equal(await popup.locator('[data-sort-handle="usage.secondary"]').count(), 1);
+  assert.equal(await popup.locator(".glance-quota-block").count(), 1);
+  assert.equal(await popup.locator(".glance-capacity-groups > section").count(), 2);
+  assert.equal(await popup.locator(".glance-quota").count(), 4);
+  assert.equal(await popup.locator('[data-sort-handle="usage.quota"]').count(), 1);
+  assert.equal(await popup.locator('[data-sort-handle="usage.primary"]').count(), 0);
+  assert.equal(await popup.locator('[data-sort-handle="usage.secondary"]').count(), 0);
   await popup.getByText("恢复时间未知", { exact: true }).waitFor();
   await popup.getByText("等待刷新确认", { exact: true }).waitFor();
   await assertFits(popup);
@@ -445,11 +523,12 @@ try {
   await refresh();
   await toggle();
   await popup
-    .locator('[data-sort-id="usage.secondary"]')
+    .locator('[data-quota-id="usage.secondary"]')
     .getByText("暂无数据", { exact: true })
     .waitFor();
-  assert.equal(await popup.locator('[data-sort-handle="usage.primary"]').count(), 1);
-  assert.equal(await popup.locator('[data-sort-handle="usage.secondary"]').count(), 1);
+  assert.equal(await popup.locator('[data-sort-handle="usage.quota"]').count(), 1);
+  assert.equal(await popup.locator('[data-sort-handle="usage.primary"]').count(), 0);
+  assert.equal(await popup.locator('[data-sort-handle="usage.secondary"]').count(), 0);
   assert.equal(await popup.getByRole("meter").count(), 1);
   await popup.keyboard.press("Escape");
   await page.bringToFront();

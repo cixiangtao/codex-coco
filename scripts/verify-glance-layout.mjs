@@ -208,6 +208,14 @@ try {
     assert.equal(result.ok, true);
     return result.value;
   };
+  const quotaIds = ["usage.primary", "usage.secondary"];
+  const cardOrder = (blocks) => [
+    ...new Set(blocks.map((id) => (quotaIds.includes(id) ? "usage.quota" : id))),
+  ];
+  await setBlocks(quotaIds);
+  await popup.locator('[data-sort-id="usage.quota"]').waitFor();
+  assert.equal(await popup.locator("[data-sort-id]").count(), 1);
+  assert.equal(await popup.locator("[data-sort-handle]").count(), 0);
   const reorderBase = await setBlocks(fullBlocks);
   const order = () =>
     popup
@@ -224,21 +232,21 @@ try {
           ),
         ) === JSON.stringify(blocks)
       );
-    }, blocks);
+    }, cardOrder(blocks));
     assert.deepEqual((await read(page)).value.value.blocks, blocks);
   };
-  await popup.locator('[data-sort-handle="usage.primary"]').waitFor();
-  assert.deepEqual(await order(), fullBlocks);
+  await popup.locator('[data-sort-handle="usage.quota"]').waitFor();
+  assert.deepEqual(await order(), cardOrder(fullBlocks));
   assert.equal(await popup.getByRole("button", { name: "调整速览顺序", exact: true }).count(), 0);
-  const primaryHandle = popup.getByRole("button", { name: "拖动主要额度窗口排序", exact: true });
+  const quotaHandle = popup.getByRole("button", { name: "拖动订阅额度排序", exact: true });
   const todayBlock = popup.locator('[data-sort-id="usage.today"]');
-  await dragCardTo(popup, primaryHandle, todayBlock);
-  const dragged = ["usage.secondary", "usage.today", "usage.primary", ...fullBlocks.slice(3)];
+  await dragCardTo(popup, quotaHandle, todayBlock);
+  const dragged = ["usage.today", ...quotaIds, ...fullBlocks.slice(3)];
   await waitSaved(dragged);
-  await primaryHandle.press("ArrowUp");
-  const reordered = ["usage.secondary", "usage.primary", ...fullBlocks.slice(2)];
+  await quotaHandle.press("ArrowUp");
+  const reordered = fullBlocks;
   await waitSaved(reordered);
-  assert.equal(await primaryHandle.evaluate((node) => node === document.activeElement), true);
+  assert.equal(await quotaHandle.evaluate((node) => node === document.activeElement), true);
   await popup.screenshot({
     path: join(output, "popup-order-light.png"),
     scale: "css",
@@ -258,7 +266,7 @@ try {
   };
   await theme({ ...previousTheme, mode: "dark", primaryColor: "#e54673" });
   await popup.waitForFunction(() => document.documentElement.dataset.theme === "dark");
-  assert.deepEqual(await order(), reordered);
+  assert.deepEqual(await order(), cardOrder(reordered));
   await popup.screenshot({
     path: join(output, "popup-order-dark.png"),
     scale: "css",
@@ -317,18 +325,18 @@ try {
     previousMode,
   );
   await ensurePopupVisible();
-  await primaryHandle.press("End");
-  await waitSaved([...reordered.filter((id) => id !== "usage.primary"), "usage.primary"]);
-  await primaryHandle.press("Home");
-  const homeOrder = ["usage.primary", ...reordered.filter((id) => id !== "usage.primary")];
+  await quotaHandle.press("End");
+  await waitSaved([...reordered.filter((id) => !quotaIds.includes(id)), ...quotaIds]);
+  await quotaHandle.press("Home");
+  const homeOrder = [...quotaIds, ...reordered.filter((id) => !quotaIds.includes(id))];
   await waitSaved(homeOrder);
   // Dropping nowhere and a pointer drag cancellation never write a new revision.
   const cancelRevision = (await read(page)).value.revision;
-  await dragCardTo(popup, primaryHandle, popup.locator(".glance-toolbar"));
+  await dragCardTo(popup, quotaHandle, popup.locator(".glance-toolbar"));
   assert.equal((await read(page)).value.revision, cancelRevision);
-  assert.deepEqual(await order(), homeOrder);
-  await beginCardDrag(popup, primaryHandle);
-  await popup.locator('[data-sort-id="usage.primary"][data-dragging="true"]').waitFor();
+  assert.deepEqual(await order(), cardOrder(homeOrder));
+  await beginCardDrag(popup, quotaHandle);
+  await popup.locator('[data-sort-id="usage.quota"][data-dragging="true"]').waitFor();
   await popup.keyboard.press("Escape");
   await popup.mouse.up();
   await popup.waitForFunction(() => !document.querySelector('[data-dragging="true"]'));
@@ -339,16 +347,36 @@ try {
     "Escape during a pointer drag does not persist",
   );
   // Holding at the scroll edge moves the viewport without distorting or persisting the Card.
-  await beginCardDrag(popup, primaryHandle);
+  await beginCardDrag(popup, quotaHandle);
   const viewport = await popup.locator(".glance-content").boundingBox();
   const scrollBefore = await popup.locator(".glance-content").evaluate((node) => node.scrollTop);
   await popup.mouse.move(viewport.x + viewport.width / 2, viewport.y + viewport.height - 6, {
     steps: 12,
   });
-  await popup.waitForFunction(
-    (before) => document.querySelector(".glance-content").scrollTop > before + 30,
-    scrollBefore,
-  );
+  try {
+    await popup.waitForFunction(
+      (before) => document.querySelector(".glance-content").scrollTop > before + 30,
+      scrollBefore,
+    );
+  } catch (error) {
+    console.log("QA edge scroll", {
+      scrollBefore,
+      viewport,
+      state: await popup.evaluate(() => {
+        const node = document.querySelector(".glance-content");
+        return {
+          scrollTop: node.scrollTop,
+          scrollHeight: node.scrollHeight,
+          clientHeight: node.clientHeight,
+          visible: document.querySelector(".glance-shell").dataset.visible,
+          overlay: document.querySelector("[data-drag-overlay]")?.getBoundingClientRect().toJSON(),
+          dragging: document.querySelector('[data-dragging="true"]')?.dataset.sortId,
+        };
+      }),
+    });
+    await popup.screenshot({ path: join(output, "edge-scroll-failure.png"), scale: "css" });
+    throw error;
+  }
   const edgePreview = await popup.locator("[data-drag-overlay]").boundingBox();
   assert(
     edgePreview.x >= viewport.x &&
@@ -367,7 +395,7 @@ try {
   assert.equal(await popup.locator("[data-drag-overlay]").count(), 0);
   // Reduced motion disables neighbor travel, and a click is not a reorder.
   await popup.emulateMedia({ reducedMotion: "reduce" });
-  await beginCardDrag(popup, primaryHandle);
+  await beginCardDrag(popup, quotaHandle);
   assert(
     await popup
       .locator("[data-sort-id]")
@@ -378,19 +406,19 @@ try {
   await popup.keyboard.press("Escape");
   await popup.mouse.up();
   await popup.emulateMedia({ reducedMotion: "no-preference" });
-  await primaryHandle.click();
+  await quotaHandle.click();
   assert.equal((await read(page)).value.revision, cancelRevision);
   // A failed automatic save retains the visible order and exposes inline retry/recovery.
   const layoutPath = join(data, "glance-layout.json");
   await rename(layoutPath, `${layoutPath}.qa`);
   await mkdir(layoutPath);
-  const retryOrder = [homeOrder[1], homeOrder[0], ...homeOrder.slice(2)];
+  const retryOrder = ["usage.today", ...quotaIds, ...homeOrder.slice(3)];
   try {
-    await primaryHandle.press("ArrowDown");
+    await quotaHandle.press("ArrowDown");
     await popup.getByText("顺序未能保存", { exact: true }).waitFor();
-    assert.deepEqual(await order(), retryOrder);
+    assert.deepEqual(await order(), cardOrder(retryOrder));
     assert.equal((await read(page)).value.revision, cancelRevision);
-    assert.equal(await primaryHandle.isDisabled(), true);
+    assert.equal(await quotaHandle.isDisabled(), true);
     await popup.screenshot({
       path: join(output, "popup-order-retry.png"),
       scale: "css",
@@ -406,7 +434,7 @@ try {
   await rename(layoutPath, `${layoutPath}.qa`);
   await mkdir(layoutPath);
   try {
-    await primaryHandle.press("ArrowDown");
+    await quotaHandle.press("ArrowDown");
     await popup.getByText("顺序未能保存", { exact: true }).waitFor();
   } finally {
     await rm(layoutPath, { recursive: true, force: true });
@@ -416,9 +444,9 @@ try {
   await popup.getByText("组合已在主窗口更新", { exact: true }).waitFor();
   assert.equal(await popup.getByRole("button", { name: "重试保存", exact: true }).count(), 0);
   await popup.getByRole("button", { name: "载入最新顺序", exact: true }).click();
-  assert.deepEqual(await order(), fullBlocks.slice(0, -1));
+  assert.deepEqual(await order(), cardOrder(fullBlocks.slice(0, -1)));
   // A live selection change cancels the old gesture instead of writing its stale membership.
-  await beginCardDrag(popup, primaryHandle);
+  await beginCardDrag(popup, quotaHandle);
   const concurrentDuringDrag = await setBlocks([...fullBlocks.slice(0, -1)].reverse());
   await popup.locator("[data-drag-overlay]").waitFor({ state: "detached" });
   await popup.mouse.up();
@@ -439,7 +467,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 30));
   }
   const beforeHiddenDrag = (await read(page)).value.revision;
-  await beginCardDrag(popup, primaryHandle);
+  await beginCardDrag(popup, quotaHandle);
   await window.evaluate((window) => {
     window.show();
     window.focus();
@@ -454,7 +482,7 @@ try {
   await ensurePopupVisible();
   assert.equal((await read(page)).value.revision, beforeHiddenDrag);
   assert.equal(await popup.locator("[data-drag-overlay]").count(), 0);
-  assert.deepEqual(await order(), fullBlocks.slice(0, -1));
+  assert.deepEqual(await order(), cardOrder(fullBlocks.slice(0, -1)));
   assert.deepEqual((await read(page)).value.value.blocks, fullBlocks.slice(0, -1));
   const visibilityEvents = await popup.evaluate(() => window.__glanceVisibility);
   assert(visibilityEvents.includes(false) && visibilityEvents.at(-1) === true);
@@ -464,7 +492,7 @@ try {
   await popup.waitForFunction(
     () => document.querySelector(".glance-shell")?.getAttribute("data-visible") === "true",
   );
-  await popup.locator('[data-sort-handle="usage.primary"]').waitFor();
+  await popup.locator('[data-sort-handle="usage.quota"]').waitFor();
   await setBlocks(["appearance.status"]);
   assert.equal(
     (await page.evaluate(() => window.codexCoco.modules())).value.every(

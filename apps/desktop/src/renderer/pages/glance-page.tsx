@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRight, GripVertical, Layers3, RefreshCw, Settings2, X } from "lucide-react";
 import { Box } from "@codex-coco/ui/components/box";
-import { GlanceBoard, GlanceBlockCard } from "../components/glance-board";
+import { GlanceBoard, GlanceCardView } from "../components/glance-board";
 import { GlanceReorder } from "../components/glance-reorder";
 import { Skeleton } from "@codex-coco/ui/components/skeleton";
 import { Button } from "@codex-coco/ui/components/button";
@@ -159,9 +159,9 @@ export function GlancePage() {
               snapshot={summary.snapshot}
               visible={visible}
               busy={busy}
-              renderOverlay={(id, snapshot) => (
-                <GlanceBlockCard
-                  id={id}
+              renderOverlay={(card, snapshot) => (
+                <GlanceCardView
+                  card={card}
                   snapshot={snapshot}
                   now={now}
                   onOpen={() => {}}

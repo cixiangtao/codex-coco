@@ -13,11 +13,11 @@ import {
   glanceBlocks,
   defaultGlanceLayout,
   type GlanceLayout,
-  type GlanceBlockId,
 } from "../../contracts/glance-layout";
 import type { MainPage } from "../../contracts/windows";
 import { GlanceModule } from "./glance-module";
-import { GlanceSortableBlock } from "./glance-reorder";
+import { GlanceSortableCard } from "./glance-reorder";
+import { glanceCards, glanceCardTitle, type GlanceCardDefinition } from "../lib/glance-order";
 import { formatTokens, formatExactTokens } from "../lib/token-format";
 import { freshnessLabel, recoveryLabel, shortDateTime } from "../lib/presentation-time";
 
@@ -29,25 +29,28 @@ interface BoardProps {
   onAppearanceAction?: ((action: AppearanceQuickAction) => void) | undefined;
 }
 
-/** One selected public block always owns one Card, including when its source is unavailable. */
-export function GlanceBlockCard({
-  id,
+/** Quota windows share one Card; other selected information blocks remain independent. */
+export function GlanceCardView({
+  card,
   snapshot,
   now,
   busy = false,
   onOpen,
   onAppearanceAction,
   handle,
-}: BoardProps & { id: GlanceBlockId; handle?: ReactNode }) {
-  const definition = glanceBlocks.find((block) => block.id === id)!;
+}: BoardProps & { card: GlanceCardDefinition; handle?: ReactNode }) {
+  const { id } = card;
+  const title = glanceCardTitle(id);
+  const definition = glanceBlocks.find((block) => block.id === card.blocks[0])!;
   const item = snapshot.items.find((entry) => entry.id === definition.moduleId);
-  const quota = id === "usage.primary" || id === "usage.secondary";
+  const quota = id === "usage.quota";
   const tokens = id === "usage.today" || id === "usage.week" || id === "usage.month";
   const metrics = quota
     ? (item?.metrics?.filter(
         (metric) =>
-          metric.id.endsWith(id === "usage.primary" ? ":primary" : ":secondary") &&
-          metric.progress !== undefined,
+          card.blocks.some((block) =>
+            metric.id.endsWith(block === "usage.primary" ? ":primary" : ":secondary"),
+          ) && metric.progress !== undefined,
       ) ?? [])
     : [];
   const metric = tokens
@@ -62,7 +65,7 @@ export function GlanceBlockCard({
     <Button
       variant="ghost"
       size="icon-xs"
-      aria-label={`查看${definition.title}`}
+      aria-label={`查看${title}`}
       disabled={busy}
       onClick={() => onOpen(definition.page)}
     >
@@ -88,9 +91,9 @@ export function GlanceBlockCard({
   }
   if (unavailable) {
     return (
-      <Card className="glance-block-unavailable" density="compact" aria-label={definition.title}>
+      <Card className="glance-block-unavailable" density="compact" aria-label={title}>
         <CardHeader>
-          <CardTitle>{definition.title}</CardTitle>
+          <CardTitle>{title}</CardTitle>
           {actions}
         </CardHeader>
         <CardContent>
@@ -106,41 +109,73 @@ export function GlanceBlockCard({
     );
   }
   if (quota) {
+    const groups = new Map<string, typeof metrics>();
+    for (const entry of metrics) {
+      const group = entry.group ?? "订阅额度";
+      groups.set(group, [...(groups.get(group) ?? []), entry]);
+    }
+    const windows = (["usage.primary", "usage.secondary"] as const).filter((window) =>
+      card.blocks.includes(window),
+    );
     return (
-      <Card className="glance-quota-block" density="compact" aria-label={definition.title}>
+      <Card className="glance-quota-block" density="compact" aria-label={title}>
         <CardHeader>
-          <CardTitle>{definition.title}</CardTitle>
+          <CardTitle>{title}</CardTitle>
           {actions}
         </CardHeader>
         <CardContent className="glance-capacity-groups">
-          {metrics.map((entry) => (
-            <section key={entry.id} className="glance-quota" aria-label={entry.label}>
-              <div className="glance-quota-copy">
-                <h4>{entry.label}</h4>
-                <span className="glance-quota-reset">
-                  <Clock3 aria-hidden="true" />
-                  {recoveryLabel(entry.resetsAt, now)}
-                </span>
-                {entry.resetsAt !== null && entry.resetsAt !== undefined && (
-                  <time dateTime={new Date(entry.resetsAt).toISOString()}>
-                    {shortDateTime(entry.resetsAt)}
-                  </time>
-                )}
+          {[...groups].map(([group, entries]) => (
+            <section key={group} className="glance-quota-group" aria-label={group}>
+              {groups.size > 1 && <p className="glance-group-title">{group}</p>}
+              <div className="glance-quota-grid">
+                {windows.map((window) => {
+                  const entry = entries.find((metric) =>
+                    metric.id.endsWith(window === "usage.primary" ? ":primary" : ":secondary"),
+                  );
+                  const label = entry?.label.startsWith(`${group} · `)
+                    ? entry.label.slice(group.length + 3)
+                    : (entry?.label ?? glanceBlocks.find((block) => block.id === window)!.title);
+                  return (
+                    <section
+                      key={window}
+                      className="glance-quota"
+                      data-quota-id={window}
+                      aria-label={label}
+                    >
+                      <h4>{label}</h4>
+                      {entry ? (
+                        <>
+                          <ProgressRing
+                            size="sm"
+                            value={entry.progress!}
+                            label={entry.label}
+                            valuePrefix="剩余"
+                            caption="剩余额度"
+                            tone={
+                              entry.progress! <= 5
+                                ? "warning"
+                                : window === "usage.secondary"
+                                  ? "success"
+                                  : "primary"
+                            }
+                          />
+                          <span className="glance-quota-reset">
+                            <Clock3 aria-hidden="true" />
+                            {recoveryLabel(entry.resetsAt, now)}
+                          </span>
+                          {entry.resetsAt !== null && entry.resetsAt !== undefined && (
+                            <time dateTime={new Date(entry.resetsAt).toISOString()}>
+                              {shortDateTime(entry.resetsAt)}
+                            </time>
+                          )}
+                        </>
+                      ) : (
+                        <p className="glance-quota-missing">暂无数据</p>
+                      )}
+                    </section>
+                  );
+                })}
               </div>
-              <ProgressRing
-                size="sm"
-                value={entry.progress!}
-                label={entry.label}
-                valuePrefix="剩余"
-                caption="剩余额度"
-                tone={
-                  entry.progress! <= 5
-                    ? "warning"
-                    : id === "usage.secondary"
-                      ? "success"
-                      : "primary"
-                }
-              />
             </section>
           ))}
         </CardContent>
@@ -149,9 +184,9 @@ export function GlanceBlockCard({
   }
   if (tokens) {
     return (
-      <Card className="glance-token-block" density="compact" aria-label={definition.title}>
+      <Card className="glance-token-block" density="compact" aria-label={title}>
         <CardHeader>
-          <CardTitle>{definition.title}</CardTitle>
+          <CardTitle>{title}</CardTitle>
           {actions}
         </CardHeader>
         <CardContent>
@@ -173,7 +208,7 @@ export function GlanceBlockCard({
   if (id === "usage.trend" && item.series) {
     const maximum = Math.max(1, ...item.series.points.map((point) => point.tokens));
     return (
-      <Card className="glance-trend-block" density="compact" aria-label={definition.title}>
+      <Card className="glance-trend-block" density="compact" aria-label={title}>
         <CardHeader>
           <CardTitle>
             <ChartNoAxesColumn aria-hidden="true" />
@@ -210,7 +245,7 @@ export function GlanceBlockCard({
   }
   const reset = item.metrics?.find((entry) => entry.id === "reset:available");
   return (
-    <Card className="glance-reset-block" density="compact" aria-label={definition.title}>
+    <Card className="glance-reset-block" density="compact" aria-label={title}>
       <CardHeader>
         <CardTitle>
           <Ticket aria-hidden="true" />
@@ -292,10 +327,10 @@ export function GlanceBoard({ layout, ...props }: BoardProps & { layout?: Glance
         </Card>
       )}
       <div className="glance-card-list">
-        {blocks.map((id) => (
-          <GlanceSortableBlock key={id} id={id}>
-            {(handle) => <GlanceBlockCard {...props} id={id} handle={handle} />}
-          </GlanceSortableBlock>
+        {glanceCards(blocks).map((card) => (
+          <GlanceSortableCard key={card.id} card={card}>
+            {(handle) => <GlanceCardView {...props} card={card} handle={handle} />}
+          </GlanceSortableCard>
         ))}
       </div>
     </div>

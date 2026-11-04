@@ -26,27 +26,32 @@ import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/a
 import type { GlanceSnapshot } from "../../contracts/glance";
 import {
   defaultGlanceLayout,
-  glanceBlocks,
   type GlanceBlockId,
   type GlanceLayout,
 } from "../../contracts/glance-layout";
 import { refreshGlance } from "../client/glance";
-import { moveGlanceBlock } from "../lib/glance-order";
+import {
+  glanceCards,
+  glanceCardTitle,
+  moveGlanceCard,
+  type GlanceCardId,
+  type GlanceCardDefinition,
+} from "../lib/glance-order";
 
 interface Order {
   revision: number;
   blocks: GlanceBlockId[];
 }
 interface Drag extends Order {
-  id: GlanceBlockId;
+  id: GlanceCardId;
   snapshot: GlanceSnapshot;
 }
 interface ReorderContext {
-  blocks: GlanceBlockId[];
+  cards: GlanceCardDefinition[];
   disabled: boolean;
   dragging: Drag | null;
   reducedMotion: boolean;
-  move(id: GlanceBlockId, index: number): void;
+  move(id: GlanceCardId, index: number): void;
 }
 const ReorderContext = createContext<ReorderContext | null>(null);
 const motionQuery = "(prefers-reduced-motion: reduce)";
@@ -85,7 +90,7 @@ export function GlanceReorder({
   visible: boolean;
   busy: boolean;
   children(layout: GlanceLayout, snapshot: GlanceSnapshot): ReactNode;
-  renderOverlay(id: GlanceBlockId, snapshot: GlanceSnapshot): ReactNode;
+  renderOverlay(card: GlanceCardDefinition, snapshot: GlanceSnapshot): ReactNode;
 }) {
   const [draft, setDraft] = useState<Order | null>(null);
   const [drag, setDragging] = useState<Drag | null>(null);
@@ -100,11 +105,12 @@ export function GlanceReorder({
   const [announcement, setAnnouncement] = useState("");
   const saving = useRef(false);
   const container = useRef<HTMLDivElement>(null);
-  const focusAfterMove = useRef<GlanceBlockId | null>(null);
+  const focusAfterMove = useRef<GlanceCardId | null>(null);
   // A successful move stays optimistic only until its public projection catches up.
   const activeDraft =
     draft && (pending || error || draft.revision > (snapshot.layoutRevision ?? -1)) ? draft : null;
   const blocks = activeDraft?.blocks ?? snapshot.layout?.blocks ?? defaultGlanceLayout.blocks;
+  const cards = glanceCards(blocks);
   const conflict = activeDraft !== null && activeDraft.revision !== snapshot.layoutRevision;
   const disabled =
     !visible ||
@@ -113,7 +119,7 @@ export function GlanceReorder({
     !!error ||
     conflict ||
     snapshot.layoutEditable !== true ||
-    blocks.length < 2;
+    cards.length < 2;
   const interactionAllowed = useRef(false);
   useEffect(() => {
     interactionAllowed.current = !disabled;
@@ -154,7 +160,7 @@ export function GlanceReorder({
     handle?.focus({ preventScroll: true });
     handle?.scrollIntoView({ block: "nearest" });
   }, [blocks, pending]);
-  async function save(order: Order, id?: GlanceBlockId) {
+  async function save(order: Order, id?: GlanceCardId) {
     if (saving.current) return;
     saving.current = true;
     setPending(true);
@@ -170,7 +176,7 @@ export function GlanceReorder({
         setDraft({ revision: result.value.revision, blocks: result.value.value.blocks });
         setAnnouncement(
           id
-            ? `${glanceBlocks.find((block) => block.id === id)!.title}已移至第 ${order.blocks.indexOf(id) + 1} 项，顺序已保存。`
+            ? `${glanceCardTitle(id)}已移至第 ${glanceCards(order.blocks).findIndex((card) => card.id === id) + 1} 张卡片，顺序已保存。`
             : "速览顺序已保存。",
         );
         await refreshGlance();
@@ -185,14 +191,14 @@ export function GlanceReorder({
       setPending(false);
     }
   }
-  const move = (id: GlanceBlockId, index: number, base?: Order) => {
+  const move = (id: GlanceCardId, index: number, base?: Order) => {
     if (disabled || !interactionAllowed.current || saving.current) return;
     const source = base ?? { revision: snapshot.layoutRevision ?? 0, blocks };
     if (source.revision !== snapshot.layoutRevision) {
       setAnnouncement("组合已更新，请按最新内容重新拖动。");
       return;
     }
-    const next = moveGlanceBlock(source.blocks, id, index);
+    const next = moveGlanceCard(source.blocks, id, index);
     if (next.every((entry, position) => entry === source.blocks[position])) return;
     if (!base) focusAfterMove.current = id;
     void save({ revision: source.revision, blocks: next }, id);
@@ -223,7 +229,7 @@ export function GlanceReorder({
       },
     });
   };
-  const context: ReorderContext = { blocks, disabled, dragging, reducedMotion, move };
+  const context: ReorderContext = { cards, disabled, dragging, reducedMotion, move };
   return (
     <div ref={container} className="glance-reorder" aria-busy={pending}>
       {(error || (conflict && !pending)) && (
@@ -286,16 +292,14 @@ export function GlanceReorder({
           }}
           onDragStart={({ active }) => {
             if (disabled) return;
-            const id = active.id as GlanceBlockId;
+            const id = active.id as GlanceCardId;
             setDragging({
               id,
               revision: snapshot.layoutRevision ?? 0,
               blocks: [...blocks],
               snapshot,
             });
-            setAnnouncement(
-              `正在移动${glanceBlocks.find((block) => block.id === id)!.title}，Esc 取消。`,
-            );
+            setAnnouncement(`正在移动${glanceCardTitle(id)}，Esc 取消。`);
           }}
           onDragCancel={() => {
             stop();
@@ -303,12 +307,19 @@ export function GlanceReorder({
           }}
           onDragEnd={({ over }) => {
             if (dragging && over)
-              move(dragging.id, dragging.blocks.indexOf(over.id as GlanceBlockId), dragging);
+              move(
+                dragging.id,
+                glanceCards(dragging.blocks).findIndex((card) => card.id === over.id),
+                dragging,
+              );
             else setAnnouncement("已取消移动，顺序未改变。");
             stop();
           }}
         >
-          <SortableContext items={blocks} strategy={verticalListSortingStrategy}>
+          <SortableContext
+            items={cards.map((card) => card.id)}
+            strategy={verticalListSortingStrategy}
+          >
             {children({ blocks }, dragging?.snapshot ?? snapshot)}
           </SortableContext>
           {/* Synchronous optimistic placement avoids a second ghost flying back during IPC saves. */}
@@ -320,7 +331,10 @@ export function GlanceReorder({
           >
             {dragging && visible && !disabled && dragging.revision === snapshot.layoutRevision ? (
               <div className="glance-card-overlay" data-drag-overlay inert aria-hidden="true">
-                {renderOverlay(dragging.id, dragging.snapshot)}
+                {renderOverlay(
+                  glanceCards(dragging.blocks).find((card) => card.id === dragging.id)!,
+                  dragging.snapshot,
+                )}
               </div>
             ) : null}
           </DragOverlay>
@@ -334,13 +348,14 @@ export function GlanceReorder({
 }
 
 /** The handle activates dragging; the complete Card provides its geometry and stable placeholder. */
-export function GlanceSortableBlock({
-  id,
+export function GlanceSortableCard({
+  card,
   children,
 }: {
-  id: GlanceBlockId;
+  card: GlanceCardDefinition;
   children(handle: ReactNode): ReactNode;
 }) {
+  const { id } = card;
   const order = useContext(ReorderContext);
   const {
     attributes,
@@ -358,10 +373,10 @@ export function GlanceSortableBlock({
       ? null
       : { duration: 160, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
   });
-  const title = glanceBlocks.find((block) => block.id === id)!.title;
-  const index = order?.blocks.indexOf(id) ?? -1;
+  const title = glanceCardTitle(id);
+  const index = order?.cards.findIndex((entry) => entry.id === id) ?? -1;
   const handle =
-    order && order.blocks.length > 1 ? (
+    order && order.cards.length > 1 ? (
       <Button
         ref={setActivatorNodeRef}
         {...attributes}
@@ -373,7 +388,7 @@ export function GlanceSortableBlock({
         aria-label={`拖动${title}排序`}
         title={`拖动整张卡片 · ${title}`}
         aria-describedby="glance-order-help"
-        aria-description={`第 ${index + 1} 项，共 ${order.blocks.length} 项`}
+        aria-description={`第 ${index + 1} 张卡片，共 ${order.cards.length} 张`}
         aria-keyshortcuts="ArrowUp ArrowDown Home End"
         disabled={order.disabled}
         onKeyDown={(event) => {
@@ -385,7 +400,7 @@ export function GlanceSortableBlock({
                 : event.key === "Home"
                   ? 0
                   : event.key === "End"
-                    ? order.blocks.length - 1
+                    ? order.cards.length - 1
                     : null;
           if (target === null) return;
           event.preventDefault();
@@ -400,6 +415,7 @@ export function GlanceSortableBlock({
       ref={setNodeRef}
       className={cn("glance-sortable", isDragging && order?.dragging && "glance-card-placeholder")}
       data-sort-id={id}
+      data-block-ids={card.blocks.join(",")}
       data-dragging={isDragging && !!order?.dragging}
       style={{
         transform: order?.dragging ? CSS.Translate.toString(transform) : undefined,
