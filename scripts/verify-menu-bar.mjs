@@ -263,6 +263,10 @@ export async function verifyMenuBar(packagedExecutable) {
       });
     }, last);
     await popup.getByRole("button", { name: "刷新速览", exact: true }).click();
+    await popup
+      .locator('.glance-item[data-phase="running"]')
+      .getByRole("button", { name: "外观状态详情", exact: true })
+      .hover();
     await popup.getByText("已收到更新的模块状态", { exact: true }).waitFor();
     await application.evaluate(async () => {
       const deadline = Date.now() + 8000;

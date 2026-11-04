@@ -11,8 +11,54 @@ import {
 } from "../apps/desktop/src/contracts/glance-layout";
 import { glanceDetailSchema } from "../apps/desktop/src/contracts/glance";
 import { glanceCards, moveGlanceCard } from "../apps/desktop/src/renderer/lib/glance-order";
+import { glanceGridPositions } from "../apps/desktop/src/renderer/lib/glance-grid";
 
 describe("information blocks", () => {
+  it("packs mixed-width drag previews in saved order without overlap or scaling", () => {
+    const rects = [
+      { left: 16, top: 50, width: 328, height: 140 },
+      { left: 16, top: 198, width: 328, height: 60 },
+      { left: 16, top: 266, width: 160, height: 80 },
+      { left: 184, top: 266, width: 160, height: 80 },
+      { left: 16, top: 354, width: 328, height: 40 },
+    ];
+    expect(glanceGridPositions(rects, 328, 8, 2, 3)).toEqual([
+      { left: 16, top: 50 },
+      { left: 16, top: 198 },
+      { left: 184, top: 266 },
+      { left: 16, top: 266 },
+      { left: 16, top: 354 },
+    ]);
+    for (let active = 0; active < rects.length; active++) {
+      for (let over = 0; over < rects.length; over++) {
+        const positions = glanceGridPositions(rects, 328, 8, active, over);
+        positions.forEach((position, index) => {
+          const rect = rects[index]!;
+          expect(position.left).toBeGreaterThanOrEqual(16);
+          expect(position.left + rect.width).toBeLessThanOrEqual(344);
+          for (let other = index + 1; other < positions.length; other++) {
+            const next = positions[other]!;
+            const shape = rects[other]!;
+            expect(
+              position.left + rect.width <= next.left ||
+                next.left + shape.width <= position.left ||
+                position.top + rect.height <= next.top ||
+                next.top + shape.height <= position.top,
+            ).toBe(true);
+          }
+        });
+      }
+    }
+    expect(
+      glanceGridPositions(
+        rects.map((rect) => ({ ...rect, width: 248 })),
+        248,
+        8,
+        2,
+        3,
+      ).map((position) => position.left),
+    ).toEqual([16, 16, 16, 16, 16]);
+  });
   it("moves whole Cards in either direction without losing or mutating a selection", () => {
     const blocks = defaultGlanceLayout.blocks;
     const original = [...blocks];

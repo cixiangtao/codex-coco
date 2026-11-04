@@ -5,9 +5,12 @@ export async function beginCardDrag(page, handle) {
   await handle.locator("xpath=ancestor::*[@data-sort-id]").scrollIntoViewIfNeeded();
   await handle.hover();
   const source = await handle.locator("xpath=ancestor::*[@data-sort-id]").boundingBox();
+  const viewport = await page.locator(".glance-content").boundingBox();
   const grip = await handle.boundingBox();
   assert(source && grip);
   const pointer = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 };
+  const expectedX =
+    source.width > viewport.width / 2 ? source.x : Math.max(viewport.x, source.x - 8);
   await page.mouse.move(pointer.x, pointer.y);
   await page.mouse.down();
   await page.mouse.move(pointer.x - 8, pointer.y + 3, { steps: 3 });
@@ -20,15 +23,15 @@ export async function beginCardDrag(page, handle) {
       const preview = document.querySelector("[data-drag-overlay]")?.getBoundingClientRect();
       return preview && Math.abs(preview.x - x) < 2 && Math.abs(preview.y - y) < 2;
     },
-    { x: source.x, y: source.y + 3 },
+    { x: expectedX, y: source.y + 3 },
     { timeout: 3000 },
   );
   const preview = await overlay.boundingBox();
   assert(Math.abs(preview.width - source.width) < 1, "The preview is the full Card width");
   assert(Math.abs(preview.height - source.height) < 1, "The preview is the full Card height");
   assert(
-    Math.abs(preview.x - source.x) < 2,
-    "The full-width Card stays in its column even when the pointer moves sideways",
+    Math.abs(preview.x - expectedX) < 2,
+    "Full rows stay in their column; small Cards preserve the bounded horizontal grab offset",
   );
   assert(Math.abs(preview.y - source.y - 3) < 2, "The Card keeps the actual vertical grab offset");
   return { source, pointer };

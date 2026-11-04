@@ -303,7 +303,7 @@ try {
   assert.equal(await popup.locator("[data-sort-handle]").count(), 6);
   assert.equal(await popup.getByRole("button", { name: "调整速览顺序", exact: true }).count(), 0);
   await capture(popup, "glance-light");
-  // Both quota windows share one Card and divide its available width, then wrap when constrained.
+  // Both quota windows share one Card; full-width tracks keep the values aligned at every width.
   const quotaGeometry = () =>
     popup
       .locator(".glance-quota-grid")
@@ -318,9 +318,16 @@ try {
       }));
   const wide = await quotaGeometry();
   assert.equal(wide.windows.length, 2);
-  assert(Math.abs(wide.windows[0].y - wide.windows[1].y) < 1);
+  assert(wide.windows[1].y > wide.windows[0].y);
   assert(Math.abs(wide.windows[0].width - wide.windows[1].width) < 1);
-  assert(Math.abs(wide.windows[0].width + wide.windows[1].width + wide.gap - wide.width) < 1);
+  assert(wide.windows.every((entry) => Math.abs(entry.width - wide.width) < 1));
+  const weekBounds = await popup.locator('[data-sort-id="usage.week"]').boundingBox();
+  const monthBounds = await popup.locator('[data-sort-id="usage.month"]').boundingBox();
+  assert(Math.abs(weekBounds.y - monthBounds.y) < 1);
+  assert(Math.abs(weekBounds.width - monthBounds.width) < 1);
+  await popup.getByRole("button", { name: "5 小时窗口恢复时间详情", exact: true }).focus();
+  await popup.getByRole("tooltip").locator("time").waitFor();
+  await popup.keyboard.press("Escape");
   const nativePopup = await application.browserWindow(popup);
   await nativePopup.evaluate((window) => window.setSize(280, 520));
   await popup.waitForFunction(() => innerWidth === 280);
@@ -427,6 +434,38 @@ try {
     (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value.blocks,
     originalOrder,
   );
+  const weekHandle = popup.locator('[data-sort-handle="usage.week"]');
+  await dragCardTo(popup, weekHandle, popup.locator('[data-sort-id="usage.month"]'));
+  await popup.waitForFunction(
+    () =>
+      document.querySelector(".glance-reorder")?.getAttribute("aria-busy") === "false" &&
+      [...document.querySelectorAll("[data-sort-id]")].find((node) =>
+        ["usage.week", "usage.month"].includes(node.dataset.sortId),
+      )?.dataset.sortId === "usage.month",
+  );
+  assert.deepEqual(
+    (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value.blocks.slice(3, 5),
+    ["usage.month", "usage.week"],
+  );
+  const movedWeek = await popup.locator('[data-sort-id="usage.week"]').boundingBox();
+  const movedMonth = await popup.locator('[data-sort-id="usage.month"]').boundingBox();
+  assert(movedMonth.x + movedMonth.width <= movedWeek.x);
+  assert(Math.abs(movedMonth.y - movedWeek.y) < 1);
+  await weekHandle.press("ArrowUp");
+  await popup.waitForFunction(
+    () =>
+      document.querySelector(".glance-reorder")?.getAttribute("aria-busy") === "false" &&
+      [...document.querySelectorAll("[data-sort-id]")].find((node) =>
+        ["usage.week", "usage.month"].includes(node.dataset.sortId),
+      )?.dataset.sortId === "usage.week",
+  );
+  assert.deepEqual(
+    (await page.evaluate(() => window.codexCoco.glanceLayout())).value.value.blocks,
+    originalOrder,
+  );
+  await popup.getByRole("button", { name: "近 7 天消耗统计详情", exact: true }).focus();
+  await popup.getByRole("tooltip").getByText("本机记录 · 含无归属计数", { exact: true }).waitFor();
+  await popup.keyboard.press("Escape");
   await popup.getByRole("button", { name: "刷新速览", exact: true }).click();
   assert.equal((await readFile(trace, "utf8")).split('"method":"spawn"').length, beforeTabs);
   const denied = await popup.evaluate(() =>
@@ -439,6 +478,23 @@ try {
   await toggle();
   await popup.locator(".glance-trend-block").waitFor();
   await popup.locator(".glance-trend-block").scrollIntoViewIfNeeded();
+  await popup.locator('[data-sort-id="appearance.status"]').hover();
+  assert.equal(
+    await popup
+      .locator('[data-sort-id="appearance.status"] .glance-phase')
+      .evaluate((node) => getComputedStyle(node).opacity),
+    "1",
+  );
+  const moduleGeometry = await popup
+    .locator('[data-sort-id="appearance.status"]')
+    .evaluate((node) => ({
+      phase: node.querySelector(".glance-phase").getBoundingClientRect().right,
+      actions: node.querySelector(".glance-card-actions").getBoundingClientRect().left,
+    }));
+  assert(
+    moduleGeometry.phase <= moduleGeometry.actions,
+    "Status remains visible beside hover actions",
+  );
   await capture(popup, "glance-custom-trend");
   await popup.keyboard.press("Escape");
   await page.bringToFront();
@@ -447,7 +503,7 @@ try {
   await popup.emulateMedia({ reducedMotion: "reduce" });
   assert.equal(
     await popup
-      .locator(".coco-ring-value")
+      .locator(".coco-progress-meter > span[aria-hidden]")
       .first()
       .evaluate((node) => getComputedStyle(node).transitionDuration.split(",")[0].trim()),
     "1e-05s",
@@ -493,6 +549,11 @@ try {
       document.documentElement.dataset.theme === "dark" &&
       getComputedStyle(document.querySelector(".glance-shell")).opacity === "1",
   );
+  await popup.evaluate(() => {
+    document.activeElement?.blur();
+    document.querySelector(".glance-content").scrollTop = 0;
+  });
+  await popup.mouse.move(4, 4);
   await capture(popup, "glance-dark");
   await popup.keyboard.press("Escape");
   await page.bringToFront();

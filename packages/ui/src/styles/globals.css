@@ -253,6 +253,27 @@
 .coco-tabs-content[hidden] {
   display: none;
 }
+.coco-progress-meter {
+  height: 5px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--muted);
+}
+.coco-progress-meter > span[aria-hidden] {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: var(--tone-color, var(--data-primary));
+  transform-origin: left;
+  transition: transform var(--motion-standard) var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .coco-progress-meter > span[aria-hidden] {
+    transition: none;
+  }
+}
 .coco-progress-ring {
   --tone-color: var(--data-primary);
   --ring-size: 112px;

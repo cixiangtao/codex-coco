@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { formatTokens } from "../lib/token-format";
-import { ArrowUpRight, Palette, Activity, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, Palette, Activity, TriangleAlert, Info } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@codex-coco/ui/components/card";
-import { Badge } from "@codex-coco/ui/components/badge";
 import { Button } from "@codex-coco/ui/components/button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@codex-coco/ui/components/tooltip";
 import {
   appearanceQuickActionLabels,
   type AppearanceQuickAction,
@@ -45,14 +45,19 @@ export function GlanceModule({
           )}
           <CardTitle>{item.title}</CardTitle>
         </div>
+        <span className="glance-phase" data-phase={item.phase}>
+          {item.busy ? "处理中" : phaseLabels[item.phase]}
+        </span>
         <div className="glance-card-actions">
-          <Badge
-            tone={
-              item.phase === "error" ? "danger" : item.phase === "running" ? "success" : "neutral"
-            }
-          >
-            {item.busy ? "处理中" : phaseLabels[item.phase]}
-          </Badge>
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button variant="ghost" size="icon-xs" />}
+              aria-label={`${item.title}状态详情`}
+            >
+              <Info />
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{item.description}</TooltipContent>
+          </Tooltip>
           {item.phase !== "error" && (
             <Button
               variant="ghost"
@@ -70,9 +75,9 @@ export function GlanceModule({
           {handle}
         </div>
       </CardHeader>
-      {(item.phase === "error" || statistics.length > 0 || item.phase === "running") && (
+      {(item.phase === "error" || statistics.length > 0 || item.busy || item.appearanceAction) && (
         <CardContent>
-          {(item.phase === "error" || item.phase === "running") && <p>{item.description}</p>}
+          <p>{item.description}</p>
           {statistics.length > 0 && (
             <dl className="glance-statistics">
               {statistics.map((metric) => (

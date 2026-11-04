@@ -17,7 +17,7 @@ import {
   type CollisionDetection,
   type Modifier,
 } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, useSortable, type SortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { cn } from "cn";
@@ -30,6 +30,7 @@ import {
   type GlanceLayout,
 } from "../../contracts/glance-layout";
 import { refreshGlance } from "../client/glance";
+import { glanceGridPositions } from "../lib/glance-grid";
 import {
   glanceCards,
   glanceCardTitle,
@@ -62,14 +63,20 @@ const subscribeMotion = (listener: () => void) => {
 };
 const reducedMotionSnapshot = () => window.matchMedia(motionQuery).matches;
 
-/** Full-width Cards move vertically and stay above the fixed footer while edge scrolling. */
+/** Full rows stay in their column; small Cards can travel horizontally without changing size. */
 const keepCardInViewport: Modifier = ({ transform, draggingNodeRect, scrollableAncestorRects }) => {
   const viewport = scrollableAncestorRects[0];
   if (!draggingNodeRect || !viewport || draggingNodeRect.height > viewport.height)
     return { ...transform, x: 0 };
   return {
     ...transform,
-    x: 0,
+    x:
+      draggingNodeRect.width > viewport.width / 2
+        ? 0
+        : Math.min(
+            Math.max(transform.x, viewport.left - draggingNodeRect.left),
+            viewport.right - draggingNodeRect.right,
+          ),
     y: Math.min(
       Math.max(transform.y, viewport.top - draggingNodeRect.top),
       viewport.bottom - draggingNodeRect.bottom,
@@ -230,6 +237,22 @@ export function GlanceReorder({
     });
   };
   const context: ReorderContext = { cards, disabled, dragging, reducedMotion, move };
+  const sortingStrategy: SortingStrategy = ({ rects, activeIndex, overIndex, index }) => {
+    const grid = container.current?.querySelector<HTMLElement>(".glance-card-list");
+    if (!grid) return null;
+    const positions = glanceGridPositions(
+      rects,
+      grid.clientWidth,
+      parseFloat(getComputedStyle(grid).gap),
+      activeIndex,
+      overIndex,
+    );
+    const position = positions[index];
+    const rect = rects[index];
+    return position && rect
+      ? { x: position.left - rect.left, y: position.top - rect.top, scaleX: 1, scaleY: 1 }
+      : null;
+  };
   return (
     <div ref={container} className="glance-reorder" aria-busy={pending}>
       {(error || (conflict && !pending)) && (
@@ -316,10 +339,7 @@ export function GlanceReorder({
             stop();
           }}
         >
-          <SortableContext
-            items={cards.map((card) => card.id)}
-            strategy={verticalListSortingStrategy}
-          >
+          <SortableContext items={cards.map((card) => card.id)} strategy={sortingStrategy}>
             {children({ blocks }, dragging?.snapshot ?? snapshot)}
           </SortableContext>
           {/* Synchronous optimistic placement avoids a second ghost flying back during IPC saves. */}
@@ -416,6 +436,7 @@ export function GlanceSortableCard({
       className={cn("glance-sortable", isDragging && order?.dragging && "glance-card-placeholder")}
       data-sort-id={id}
       data-block-ids={card.blocks.join(",")}
+      data-card-size={id === "usage.week" || id === "usage.month" ? "half" : "full"}
       data-dragging={isDragging && !!order?.dragging}
       style={{
         transform: order?.dragging ? CSS.Translate.toString(transform) : undefined,

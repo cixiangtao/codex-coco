@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { ArrowUpRight, ChartNoAxesColumn, Clock3, Ticket } from "lucide-react";
+import { ArrowUpRight, ChartNoAxesColumn, Info, Ticket, UserRound } from "lucide-react";
 import { Button } from "@codex-coco/ui/components/button";
 import { Card, CardHeader, CardContent, CardTitle } from "@codex-coco/ui/components/card";
-import { ProgressRing } from "@codex-coco/ui/components/progress-ring";
+import { ProgressMeter } from "@codex-coco/ui/components/progress-meter";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@codex-coco/ui/components/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@codex-coco/ui/components/alert";
 import {
   appearanceQuickActionLabels,
@@ -120,7 +121,7 @@ export function GlanceCardView({
     return (
       <Card className="glance-quota-block" density="compact" aria-label={title}>
         <CardHeader>
-          <CardTitle>{title}</CardTitle>
+          <CardTitle>剩余额度</CardTitle>
           {actions}
         </CardHeader>
         <CardContent className="glance-capacity-groups">
@@ -142,15 +143,40 @@ export function GlanceCardView({
                       data-quota-id={window}
                       aria-label={label}
                     >
-                      <h4>{label}</h4>
                       {entry ? (
                         <>
-                          <ProgressRing
-                            size="sm"
+                          <div className="glance-quota-heading">
+                            <div>
+                              <h4>{label}</h4>
+                              <Tooltip>
+                                <TooltipTrigger
+                                  className="glance-quota-reset"
+                                  aria-label={`${label}恢复时间详情`}
+                                >
+                                  {recoveryLabel(entry.resetsAt, now)}
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  {entry.resetsAt !== null && entry.resetsAt !== undefined ? (
+                                    <span>
+                                      恢复时间：
+                                      <time dateTime={new Date(entry.resetsAt).toISOString()}>
+                                        {shortDateTime(entry.resetsAt)}
+                                      </time>
+                                    </span>
+                                  ) : (
+                                    "来源尚未提供恢复时间"
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                            <strong className="glance-quota-value">
+                              {Number(entry.progress!.toFixed(1))}
+                              <span>%</span>
+                            </strong>
+                          </div>
+                          <ProgressMeter
                             value={entry.progress!}
                             label={entry.label}
-                            valuePrefix="剩余"
-                            caption="剩余额度"
                             tone={
                               entry.progress! <= 5
                                 ? "warning"
@@ -159,18 +185,12 @@ export function GlanceCardView({
                                   : "primary"
                             }
                           />
-                          <span className="glance-quota-reset">
-                            <Clock3 aria-hidden="true" />
-                            {recoveryLabel(entry.resetsAt, now)}
-                          </span>
-                          {entry.resetsAt !== null && entry.resetsAt !== undefined && (
-                            <time dateTime={new Date(entry.resetsAt).toISOString()}>
-                              {shortDateTime(entry.resetsAt)}
-                            </time>
-                          )}
                         </>
                       ) : (
-                        <p className="glance-quota-missing">暂无数据</p>
+                        <div className="glance-quota-heading">
+                          <h4>{label}</h4>
+                          <p className="glance-quota-missing">暂无数据</p>
+                        </div>
                       )}
                     </section>
                   );
@@ -183,11 +203,48 @@ export function GlanceCardView({
     );
   }
   if (tokens) {
+    const source = item.series?.estimated
+      ? "线程累计估算 · 含无归属记录"
+      : "本机记录 · 含无归属计数";
     return (
-      <Card className="glance-token-block" density="compact" aria-label={title}>
+      <Card
+        className="glance-token-block"
+        data-period={id.split(".")[1]}
+        density="compact"
+        aria-label={title}
+      >
         <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          {actions}
+          <CardTitle>
+            <Button
+              className="glance-title-link"
+              variant="ghost"
+              disabled={busy}
+              aria-label={`查看${title}`}
+              onClick={() => onOpen(definition.page)}
+            >
+              {title}
+            </Button>
+          </CardTitle>
+          <div className="glance-card-actions">
+            <Tooltip>
+              <TooltipTrigger
+                render={<Button variant="ghost" size="icon-xs" />}
+                aria-label={`${title}统计详情`}
+              >
+                <Info />
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <div className="glance-detail">
+                  <strong>{formatExactTokens(metric?.numericValue)} tokens</strong>
+                  <p>
+                    {source}
+                    {item.series?.limited ? " · 统计不完整" : ""}
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+            {handle}
+          </div>
         </CardHeader>
         <CardContent>
           <div
@@ -198,8 +255,8 @@ export function GlanceCardView({
             <span>tokens</span>
           </div>
           <p className="glance-token-note">
-            {item.series?.estimated ? "线程累计估算 · 含无归属记录" : "本机记录 · 含无归属计数"}
-            {item.series?.limited ? " · 统计不完整" : ""}
+            {item.series?.estimated ? "估算 · 含无归属" : "本机 · 含无归属"}
+            {item.series?.limited ? " · 不完整" : ""}
           </p>
         </CardContent>
       </Card>
@@ -295,22 +352,29 @@ export function GlanceBoard({ layout, ...props }: BoardProps & { layout?: Glance
       ))}
       {usage?.phase === "running" && (usage.identity || usage.capturedAt !== undefined) && (
         <div className="glance-account" aria-label="用量账号与更新时间">
-          <div>
-            <strong>{usage.identity?.label ?? "服务额度记录"}</strong>
-            {usage.identity && <span>{usage.identity.plan}</span>}
+          <div className="glance-account-icon">
+            <UserRound aria-hidden="true" />
           </div>
-          {usage.capturedAt !== undefined && (
-            <p title={`读取于 ${shortDateTime(usage.capturedAt)}`}>
-              {freshnessLabel(usage.capturedAt, now)}
-              {now - usage.capturedAt > 600_000 ||
-              usage.metrics?.some(
-                (entry) =>
-                  entry.resetsAt !== undefined && entry.resetsAt !== null && entry.resetsAt <= now,
-              )
-                ? " · 请刷新确认"
-                : ""}
-            </p>
-          )}
+          <div className="glance-account-copy">
+            <strong>{usage.identity?.label ?? "服务额度记录"}</strong>
+            <div className="glance-account-meta">
+              {usage.identity && <span>{usage.identity.plan}</span>}
+              {usage.capturedAt !== undefined && (
+                <span title={`读取于 ${shortDateTime(usage.capturedAt)}`}>
+                  {freshnessLabel(usage.capturedAt, now)}
+                  {now - usage.capturedAt > 600_000 ||
+                  usage.metrics?.some(
+                    (entry) =>
+                      entry.resetsAt !== undefined &&
+                      entry.resetsAt !== null &&
+                      entry.resetsAt <= now,
+                  )
+                    ? " · 请刷新确认"
+                    : ""}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       )}
       {usage?.phase === "running" && !usage.metrics?.length && !usage.series?.points.length && (

@@ -347,6 +347,8 @@ try {
     "Escape during a pointer drag does not persist",
   );
   // Holding at the scroll edge moves the viewport without distorting or persisting the Card.
+  await nativePopup.evaluate((window) => window.setSize(360, 400));
+  await popup.waitForFunction(() => innerHeight === 400);
   await beginCardDrag(popup, quotaHandle);
   const viewport = await popup.locator(".glance-content").boundingBox();
   const scrollBefore = await popup.locator(".glance-content").evaluate((node) => node.scrollTop);
@@ -393,6 +395,8 @@ try {
   await popup.mouse.up();
   assert.equal((await read(page)).value.revision, cancelRevision);
   assert.equal(await popup.locator("[data-drag-overlay]").count(), 0);
+  await nativePopup.evaluate((window) => window.setSize(360, 520));
+  await popup.waitForFunction(() => innerHeight === 520);
   // Reduced motion disables neighbor travel, and a click is not a reorder.
   await popup.emulateMedia({ reducedMotion: "reduce" });
   await beginCardDrag(popup, quotaHandle);
