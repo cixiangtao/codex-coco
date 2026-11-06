@@ -20,6 +20,7 @@ it.each(["success", "failed-build", "foreign-repository"])(
           PATH: `${directory}:/usr/bin:/bin`,
           GITHUB_ACTIONS: "true",
           GITHUB_REPOSITORY: "cixiangtao/codex-coco",
+          GITHUB_EVENT_NAME: "workflow_dispatch",
           GITHUB_REF: "refs/heads/main",
           GITHUB_SHA: "b".repeat(40),
           GITHUB_ENV: output,
