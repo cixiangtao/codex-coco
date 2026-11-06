@@ -6,13 +6,13 @@ A Codex desktop companion, shaped around personal workflows.
 
 [简体中文](README.zh-CN.md)
 
-**Status: macOS Apple Silicon preview, with phase-two core features implemented.** [Version 0.1.0-preview.2](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.2) is available with a project-owned self-signed identity. It is not Apple Developer ID signed or notarized. UI refinement follows core functionality. Controlled tests do not substitute for real-account, current-Codex, signed-update or Widget registration acceptance; see the [phase-two checklist](docs/phase-two.md).
+**Status: macOS Apple Silicon preview, with phase-two core features implemented.** [Version 0.1.0-preview.4](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.4) is available with a project-owned self-signed identity. It is not Apple Developer ID signed or notarized. UI refinement follows core functionality. Controlled tests do not substitute for real-account, current-Codex, signed-update or Widget registration acceptance; see the [phase-two checklist](docs/phase-two.md).
 
 ## Download
 
-Get the macOS arm64 DMG or ZIP from [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.2), verify SHA256SUMS.txt, and move Codex Coco.app to Applications. If macOS says Apple could not verify Codex Coco, dismiss the alert, open **System Settings → Privacy & Security → Open Anyway**, then confirm **Open**. The self-signed identity does not remove this first-launch warning. See the [installation guide](apps/desktop/resources/INSTALL.txt) and [Apple's instructions](https://support.apple.com/102445). No root certificate installation or global Gatekeeper change is required.
+Get the macOS arm64 DMG or ZIP from [Releases](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.4), verify SHA256SUMS.txt, and move Codex Coco.app to Applications. If macOS says Apple could not verify Codex Coco, dismiss the alert, open **System Settings → Privacy & Security → Open Anyway**, then confirm **Open**. The self-signed identity does not remove this first-launch warning. See the [installation guide](apps/desktop/resources/INSTALL.txt) and [Apple's instructions](https://support.apple.com/102445). No root certificate installation or global Gatekeeper change is required.
 
-Users of preview.1 need one manual upgrade to preview.2. Preview.2 includes automatic version checks and an explicit one-click download, verification and restart. Preview installations follow previews and stable releases; stable installations stay on stable releases. See [release and signing details](docs/releases.md) for the free self-signed identity, build verification and release workflow.
+Users of preview.1 need one manual upgrade to the current preview. Since preview.2, the app includes automatic version checks and an explicit one-click download, verification and restart. Preview installations follow previews and stable releases; stable installations stay on stable releases. See [release and signing details](docs/releases.md) for the free self-signed identity, build verification and release workflow.
 
 ## Features
 

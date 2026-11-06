@@ -1,5 +1,15 @@
 # 基建开发验证
 
+## preview.4 自动签名发行与公开下载验收（2026-11-06）
+
+- 用户授权提交、推送和发版。首次准备 preview.3 的源码提交为 `c7d780a`，main CI 通过；发布后 [Release 运行 42155860031](https://github.com/cixiangtao/codex-coco/actions/runs/42155860031) 在检查阶段失败：旧来源测试未覆盖 `GITHUB_EVENT_NAME`，继承真实 release 事件后误入事件校验。没有生成或上传发行附件，preview.3 已转回草稿；保留标签和失败记录，没有移动标签或覆盖旧发行。
+- `cae353a` 为来源测试显式设置 `workflow_dispatch`，在父环境为 release 时的 22 项发行定向测试、类型和 Lint 通过。随后 `GITHUB_EVENT_NAME=release VITEST_MAX_WORKERS=1 pnpm run check` 通过：33 个文件、277 项测试、静态检查和生产构建；`da9c4d98e7675fd0ea75be9f5e8708e32616ce89` 准备新版本 preview.4，[main CI 42156263620](https://github.com/cixiangtao/codex-coco/actions/runs/42156263620) 通过。
+- 发布 [v0.1.0-preview.4](https://github.com/cixiangtao/codex-coco/releases/tag/v0.1.0-preview.4) 后，实际 `release` 事件自动触发 [运行 42156433299](https://github.com/cixiangtao/codex-coco/actions/runs/42156433299)。build、独立 verify、publish 全部成功；固定项目证书签名、生产应用启动和 worker 验证通过，向同一公开 Pre-release 上传 DMG、ZIP、preview-mac.yml、来源清单、SHA256SUMS.txt 和生产依赖许可共六项附件，没有手动上传本机包。
+- 从公开 Release 重新下载六项附件，逐一核对 GitHub 资产 SHA-256、校验清单、来源提交与签名清单；更新元数据的 ZIP SHA-512/大小匹配。ZIP SHA-256 为 `686743c9f0a102246268762a2eace08e0a84842e7e7ddf6a63ae6754fe3568d5`，DMG 为 `7f40ad942afbe11b4a7c870e3b03911de43e04dc9f235b76564e6c7e24f90bc5`。解压应用的完整固定证书签名及实际版本核对通过，沿用既有签名身份。
+- 使用临时数据启动下载的 preview.4 和既有公开 preview.2，均确认默认每日检查、`installSupported=true`、业务模块停用且无 renderer 错误。实际匿名请求公开 GitHub：preview.4 为 up-to-date，preview.2 为 available 且目标为 preview.4。首次辅助等待脚本过早读取到 checking，改为保存已结算公开快照后重跑通过；没有改动应用或放宽结果断言。
+- 下载、解压和验收报告在忽略目录 `work/preview-downloads/0.1.0-preview.4/`。本轮未修改 Applications 中的安装版、系统信任/隔离属性或真实业务账号；未执行实际应用替换，因此仍不宣称两个公开产品版本之间的一键安装重启已验收。未重新做性能采样、Widget 注册或全量 UI 回归。
+- 推送时 GitHub 另报告 `minimatch@9.0.9` 中危告警 GHSA-g3hv-75wg-m249；本机依赖追踪位于 electron-builder 开发依赖链，`--prod` 查询未出现该包。本轮没有升级构建工具依赖，也未将告警标记为已修复。
+
 ## 发布 Release 后自动打包（2026-11-06）
 
 按 IKUN同学要求，同一 `Preview release` 工作流增加 `release.published` 入口：用户发布项目 Pre-release 后自动检查、长期自签名打包、独立收件验证，再向该 Release 补齐六项附件。普通推送和保存草稿不打包；原有手动构建、显式发布和复用已验证手动产物入口保留。目前仍只支持 macOS arm64 预览版。
