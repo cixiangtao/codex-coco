@@ -2,11 +2,15 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { appendFile } from "node:fs/promises";
+import { validateReleaseEvent } from "./validate-release-event.mjs";
 const exec = promisify(execFile);
 const repository = "cixiangtao/codex-coco";
 assert.equal(process.env.GITHUB_ACTIONS, "true");
 assert.equal(process.env.GITHUB_REPOSITORY, repository);
-assert.equal(process.env.GITHUB_REF, "refs/heads/main");
+if (process.env.GITHUB_EVENT_NAME === "release") {
+  await validateReleaseEvent();
+  assert(!process.env.VERIFIED_RUN, "Release events reuse only artifacts from their own run.");
+} else assert.equal(process.env.GITHUB_REF, "refs/heads/main");
 let runId = process.env.VERIFIED_RUN || process.env.GITHUB_RUN_ID;
 let source = process.env.GITHUB_SHA;
 assert.match(runId, /^[1-9]\d{0,14}$/);

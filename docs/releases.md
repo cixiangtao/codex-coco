@@ -1,14 +1,25 @@
 # Releases and signing
 
-Codex Coco uses one manually dispatched [Preview release workflow](../.github/workflows/preview-release.yml). A source push never publishes. `publish=false` builds and verifies only; `publish=true` additionally creates a GitHub Pre-release after every gate succeeds. Only the default branch of cixiangtao/codex-coco is accepted.
+Codex Coco uses one [Preview release workflow](../.github/workflows/preview-release.yml). Publishing a GitHub Pre-release triggers automatic self-signed packaging, independent verification and asset upload to that same Release. Source pushes and draft Release saves do not trigger packaging. Only preview versions from the main history of cixiangtao/codex-coco are accepted; stable releases are not supported by this workflow.
+
+## Publish a preview
+
+1. Update both application manifests to the same new `X.Y.Z-preview.N` version, add the matching English notes in `docs/releases/`, and push the commit to `main`.
+2. In GitHub Releases, create the matching `vX.Y.Z-preview.N` tag at that commit, mark the Release as a pre-release, and publish it. Use a tag containing the updated workflow; publishing a Release for an older tag does not retrofit its workflow.
+3. Actions checks the tag, manifest versions and main ancestry before loading the signing identity. It runs checks, builds the arm64 DMG/ZIP, verifies the signature and workers, and launches the same archive on a separate recipient runner before uploading the six release assets.
+4. Wait for the `publish` job to succeed and the attachments to appear. The Release is visible while packaging runs: clients may discover its version before its update metadata and archive are ready, so in-app download can fail until attachment upload finishes.
+
+Create/publish the Release through GitHub's UI or a maintainer-authorized API/CLI token. A Release created with a workflow's `GITHUB_TOKEN` does not trigger another release workflow. The existing manual path therefore builds and publishes within its own run, without relying on a second event.
+
+The manual Actions entry point remains available on `main`: `publish=false` builds and verifies only; `publish=true` creates a GitHub Pre-release after every gate succeeds. Use it when the Release should stay private until all attachments are ready, or when `full_validation` is required. Automatic Release-triggered runs use routine validation.
 
 Routine releases leave `full_validation=false`: check, sign/package once, verify the app and worker resources, launch the same artifact on a separate recipient runner, then publish. Dependency downloads use the pnpm store cache.
 
 Set `full_validation=true` for the first signing identity and after certificate, Electron, updater or installer changes. This additionally builds two synthetic signed apps and checks actual replacement, wrong-signer rejection and resource-tampering rejection. It is not repeated for unrelated UI or business changes. No certificate is regenerated for an ordinary release.
 
-If publication alone fails, set `publish=true` and `verified_run` to the prior run ID. The workflow reuses its original immutable artifacts without rebuilding. It requires successful build and recipient jobs from this repository and workflow, a main-branch source commit in the current ancestry, matching version/certificate/source manifest, and exact artifact checksums. Existing tags and assets must match; conflicts are rejected.
+If publication alone fails in a manual run, set `publish=true` and `verified_run` to the prior manual run ID. The workflow reuses its original immutable artifacts without rebuilding. It requires successful build and recipient jobs from this repository and workflow, a main-branch source commit in the current ancestry, matching version/certificate/source manifest, and exact artifact checksums. For a Release-triggered run, rerun failed jobs in the original run to reuse its verified artifacts (retained for seven days). Existing assets with matching hashes are skipped; conflicting assets fail before uploads and are never overwritten. If artifacts have expired, prepare a new preview version rather than replacing existing files with a different rebuild.
 
-The root and desktop package manifests own the application version together. Preview versions use `X.Y.Z-preview.N`; the private UI package is not a separately published product. Prepare and commit the version and matching English release notes before dispatching. Actions tags the exact tested commit, uploads already inspected artifacts to a draft, then publishes it with `prerelease=true` and `latest=false`. It refuses conflicting tags or assets rather than overwriting them. Retry with identical inspected artifacts, or prepare a new preview version if a rebuilt archive differs.
+The root and desktop package manifests own the application version together. Preview versions use `X.Y.Z-preview.N`; the private UI package is not a separately published product. Prepare and commit the version and matching English release notes before publication. Release-triggered runs build the exact tagged commit, accept lightweight or annotated tags from main history, and preserve the existing Release title, notes and channel. Manual runs create a tag at the exact tested commit, upload inspected artifacts to a draft, then publish with `prerelease=true` and `latest=false`. Both paths reject conflicting tags or assets rather than overwriting them.
 
 ## Free self-signed identity
 

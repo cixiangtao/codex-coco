@@ -7,7 +7,15 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 const exec = promisify(execFile);
 
-it("publishes using the create response and resource ID even when the release list stays stale", async () => {
+it.each([
+  "manual",
+  "release",
+  "release-resume",
+  "release-conflict",
+  "release-tag-mismatch",
+  "release-moved-tag",
+  "release-annotated-tag",
+])("publishes inspected assets with retry and identity checks: %s", async (scenario) => {
   const directory = await mkdtemp(join(tmpdir(), "codex-coco-publisher-"));
   const version = "0.1.0-preview.2";
   const source = "a".repeat(40);
@@ -58,12 +66,41 @@ it("publishes using the create response and resource ID even when the release li
         .map(([name, data]) => `${createHash("sha256").update(data).digest("hex")}  ${name}`)
         .join("\n") + "\n",
     );
+    const isRelease = scenario !== "manual";
+    const event = {
+      action: "published",
+      release: { id: 7, tag_name: `v${version}`, draft: false, prerelease: true },
+    };
+    await writeFile(join(directory, "event.json"), JSON.stringify(event));
+    if (isRelease)
+      await writeFile(
+        state,
+        JSON.stringify({
+          ...event.release,
+          tag_name: scenario === "release-tag-mismatch" ? "v0.1.0-preview.99" : `v${version}`,
+          assets:
+            scenario === "release-resume" || scenario === "release-conflict"
+              ? [
+                  {
+                    name: zip,
+                    digest: `sha256:${scenario === "release-conflict" ? "wrong" : createHash("sha256").update(bytes).digest("hex")}`,
+                  },
+                ]
+              : [],
+        }),
+      );
+    await writeFile(
+      join(directory, "git"),
+      `#!${process.execPath}\nif(process.argv[2]==='rev-parse')process.stdout.write(${JSON.stringify(source)});else if(process.argv[2]!=='merge-base')process.exit(1);\n`,
+      { mode: 0o700 },
+    );
     const gh = `#!${process.execPath}
 const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');
 const args=process.argv.slice(2), state=${JSON.stringify(state)}, calls=${JSON.stringify(calls)};
 fs.appendFileSync(calls,JSON.stringify(args)+'\\n');
 let result;const resource=args.find(value=>value.startsWith('repos/'));
-if(args[0]==='api'&&resource.includes('git/ref/')) result={object:{type:'commit',sha:${JSON.stringify(source)}}};
+if(args[0]==='api'&&resource.includes('git/ref/')) result={object:{type:${JSON.stringify(scenario === "release-annotated-tag" ? "tag" : "commit")},sha:${JSON.stringify(scenario === "release-moved-tag" ? "b".repeat(40) : source)}}};
+else if(args[0]==='api'&&resource.includes('git/tags/'))result={object:{type:'commit',sha:${JSON.stringify(source)}}};
 else if(args[0]==='api'&&resource.includes('releases?'))result=[];
 else if(args[0]==='api'&&args.includes('POST')) {result={id:7,draft:true,prerelease:true,assets:[]};fs.writeFileSync(state,JSON.stringify(result));}
 else if(args[0]==='api'&&resource.endsWith('/releases/7'))result=JSON.parse(fs.readFileSync(state,'utf8'));
@@ -73,7 +110,7 @@ else throw new Error('Unexpected gh operation');
 process.stdout.write(JSON.stringify(result));
 `;
     await writeFile(join(directory, "gh"), gh, { mode: 0o700 });
-    await exec(process.execPath, [resolve("scripts/publish-preview.mjs")], {
+    const request = exec(process.execPath, [resolve("scripts/publish-preview.mjs")], {
       cwd: directory,
       env: {
         ...process.env,
@@ -81,11 +118,23 @@ process.stdout.write(JSON.stringify(result));
         GH_TOKEN: "fixture",
         GITHUB_ACTIONS: "true",
         GITHUB_REPOSITORY: "cixiangtao/codex-coco",
-        GITHUB_REF: "refs/heads/main",
+        GITHUB_REF: isRelease ? `refs/tags/v${version}` : "refs/heads/main",
+        GITHUB_EVENT_NAME: isRelease ? "release" : "workflow_dispatch",
+        GITHUB_EVENT_PATH: join(directory, "event.json"),
         GITHUB_SHA: source,
         CODEX_COCO_RELEASE_SOURCE_SHA: source,
       },
     });
+    if (
+      scenario === "release-conflict" ||
+      scenario === "release-tag-mismatch" ||
+      scenario === "release-moved-tag"
+    ) {
+      await expect(request).rejects.toBeDefined();
+      expect(await readFile(calls, "utf8")).not.toContain('"upload"');
+      return;
+    }
+    await request;
     const published = JSON.parse(await readFile(state, "utf8"));
     expect(published.draft).toBe(false);
     expect(published.assets).toHaveLength(6);
@@ -94,8 +143,15 @@ process.stdout.write(JSON.stringify(result));
       .split("\n")
       .map((line) => JSON.parse(line) as string[]);
     expect(trace.filter((args) => args.some((value) => value.includes("releases?")))).toHaveLength(
-      1,
+      isRelease ? 0 : 1,
     );
+    expect(trace.filter((args) => args[0] === "release" && args[1] === "upload")).toHaveLength(
+      scenario === "release-resume" ? 5 : 6,
+    );
+    if (isRelease) {
+      expect(trace.some((args) => args.includes("POST"))).toBe(false);
+      expect(trace.some((args) => args[1] === "edit")).toBe(false);
+    }
     expect(trace.at(-1)).toEqual(["api", "repos/cixiangtao/codex-coco/releases/7"]);
   } finally {
     await rm(directory, { recursive: true, force: true });

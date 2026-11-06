@@ -5,14 +5,18 @@ import { readFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { verifyUpdateInfo } from "./release-update-info.mjs";
+import { validateReleaseEvent } from "./validate-release-event.mjs";
 const exec = promisify(execFile);
 const repository = "cixiangtao/codex-coco";
 assert.equal(process.env.GITHUB_ACTIONS, "true");
 assert.equal(process.env.GITHUB_REPOSITORY, repository);
-assert.equal(process.env.GITHUB_REF, "refs/heads/main");
+const releaseEvent =
+  process.env.GITHUB_EVENT_NAME === "release" ? await validateReleaseEvent() : null;
+if (!releaseEvent) assert.equal(process.env.GITHUB_REF, "refs/heads/main");
 assert.match(process.env.GITHUB_SHA ?? "", /^[a-f0-9]{40}$/);
 const sourceSha = process.env.CODEX_COCO_RELEASE_SOURCE_SHA ?? process.env.GITHUB_SHA;
 assert.match(sourceSha, /^[a-f0-9]{40}$/);
+if (releaseEvent) assert.equal(sourceSha, process.env.GITHUB_SHA);
 const pkg = JSON.parse(await readFile("apps/desktop/package.json", "utf8"));
 assert.match(pkg.version, /^0\.\d+\.\d+-preview\.[1-9]\d*$/);
 assert.equal(JSON.parse(await readFile("package.json", "utf8")).version, pkg.version);
@@ -66,9 +70,16 @@ const api = async (path) => {
 };
 const existingTag = await api(`git/ref/tags/${tag}`);
 if (existingTag) {
-  assert.equal(existingTag.object.type, "commit");
-  assert.equal(existingTag.object.sha, sourceSha);
-} else
+  let target = existingTag.object;
+  // Annotated tags must still resolve to the tested commit at upload time.
+  for (let depth = 0; target.type === "tag" && depth < 8; depth++) {
+    assert.match(target.sha, /^[a-f0-9]{40}$/);
+    target = (await api(`git/tags/${target.sha}`)).object;
+  }
+  assert.equal(target.type, "commit");
+  assert.equal(target.sha, sourceSha);
+} else {
+  assert(!releaseEvent, "Published release tag must still exist.");
   await gh([
     "api",
     "--method",
@@ -79,10 +90,17 @@ if (existingTag) {
     "-f",
     `sha=${sourceSha}`,
   ]);
+}
 // Draft releases are intentionally absent from the by-tag REST endpoint.
 const findRelease = async () =>
   (await api("releases?per_page=100")).find((value) => value.tag_name === tag) ?? null;
-let release = await findRelease();
+let release = releaseEvent ? await api(`releases/${releaseEvent.id}`) : await findRelease();
+if (releaseEvent) {
+  assert(release, "Published release must still exist.");
+  assert.equal(release.id, releaseEvent.id);
+  assert.equal(release.tag_name, tag);
+  assert.equal(release.draft, false);
+}
 if (!release) {
   // Creation returns the authoritative resource; the release list may still be stale.
   release = JSON.parse(
@@ -117,10 +135,11 @@ for (const [name, hash] of hashes) {
       `sha256:${hash}`,
       `Existing ${name} differs; refusing to overwrite.`,
     );
-  else {
-    assert.equal(
-      release.draft,
-      true,
+}
+for (const name of hashes.keys()) {
+  if (!release.assets.some((item) => item.name === name)) {
+    assert(
+      release.draft || releaseEvent,
       "A published release is missing assets; prepare a new preview version.",
     );
     await gh(["release", "upload", tag, join(directory, name), "--repo", repository]);
